@@ -1,7 +1,11 @@
+import ScalableImage from '@/components/scalable-image';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import React from 'react';
-import { Image, StyleSheet } from 'react-native';
+import { Dimensions, Image, StyleSheet } from 'react-native';
+import PostActions from './post-actions';
+import Spectrum from './spectrum';
+
+const screenWidth = Dimensions.get('window').width;
 
 export type PostType = {
   id: string;
@@ -11,14 +15,26 @@ export type PostType = {
   }
   text: string;
   timestamp: string;
-  likes: number;
+  media?: string;
+  upvotes: number;
+  downvotes: number;
+  commentCount: number;
+  topic: string;
+  position: number;
 }
 
 type Props = {
   post: PostType;
+  onUpvote: () => void;
+  onUnUpvote: () => void;
+  onDownvote: () => void;
+  onUnDownvote: () => void;
 }
 
-export default function Post({ post }: Props) {
+export default function Post({ post, onUpvote, onUnUpvote, onDownvote, onUnDownvote }: Props) {
+
+  
+
   return (
     <ThemedView style={styles.container}>
       <Image 
@@ -26,13 +42,34 @@ export default function Post({ post }: Props) {
         style={styles.avatar} 
       />
 
+
       <ThemedView style={styles.content}>
-        <ThemedText type="defaultSemiBold">{post.user.username}</ThemedText>
-        <ThemedText style={styles.posttext}>{post.text}</ThemedText>
 
-        <ThemedView style={styles.reactions}>
-
+        {/* Username & timestamp */}
+        <ThemedView style={styles.header}>
+          <ThemedText type="defaultSemiBold">{post.user.username}</ThemedText>
         </ThemedView>
+
+        {/* Post text */}
+        <ThemedText style={styles.text}>{post.text}</ThemedText>
+
+        {/* Post media (if any) */}
+        {post.media && (
+          // <ThemedView style={styles.mediaContainer}>
+            <ScalableImage
+              source={{uri: post.media}}
+              width={screenWidth - 82}
+              style={styles.media}
+            />
+          // </ThemedView>
+        )}
+
+        {/* Spectrum Bar */}
+        <Spectrum width={(screenWidth - 82)} height={20} topic={post.topic} position={post.position}/>
+        
+        {/* Interactions (likes, comments, etc.) */}
+        <PostActions post={post} onUpvote={onUpvote} onUnUpvote={onUnUpvote} onDownvote={onDownvote} onUnDownvote={onUnDownvote}/>
+
       </ThemedView>
     </ThemedView>
   )
@@ -40,8 +77,8 @@ export default function Post({ post }: Props) {
 
 const styles = StyleSheet.create({
   container: {
-    padding: 16,
-    gap: 12,
+    padding: 12,
+    gap: 8,
     flexDirection: 'row',
   },
   avatar: {
@@ -50,13 +87,18 @@ const styles = StyleSheet.create({
     borderRadius: 20,
   },
   content: {
-    flex: 1,
+    width: screenWidth - 82, // 50 (avatar) + 12*2 (padding) + 8 (gap)
   },
-  posttext: {
+  text: {
     flexShrink: 1,
     flexWrap: 'wrap',
+    marginBottom: 8,
   },
-  reactions: {
+  header: {
     flexDirection: 'row',
+  },
+  media: {
+    borderRadius: 16,
+    marginBottom: 8,
   },
 });

@@ -1,7 +1,87 @@
-import { Text } from 'react-native';
+import ScalableImage from '@/components/scalable-image';
+import Spectrum from '@/components/spectrum';
+import { ThemedText } from '@/components/themed-text';
+import { ThemedView } from '@/components/themed-view';
+import { IconSymbol } from '@/components/ui/icon-symbol';
+import { useState } from 'react';
+import { Dimensions, Image, Pressable, ScrollView, StyleSheet } from 'react-native';
+
+const screenWidth = Dimensions.get('window').width;
 
 export default function Profile() {
+
+  const spectrums = [
+    { id: 'government', label: '🏛️ Governance & Institutions ', position: .86, description: 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat.' },
+    { id: 'economy', label: '📈 Economy & Welfare', position: .12, description: 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat.' },
+    { id: 'social', label: '⚖️ Social & Cultural Values', position: .95, description: 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat.' },
+    { id: 'foreign', label: '🌎 Foreign Policy & Security', position: .35, description: 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat.' },
+    { id: 'stem', label: '🧬 Science, Technology & Environment', position: .60, description: 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat.' },
+  ]
+
+  const [openSpectrums, setOpenSpectrums] = useState<Record<string, boolean>>({});
+  
+  const toggleSpectrums = (spectrumId: string) => {
+    setOpenSpectrums(prev => ({
+      ...prev,
+      [spectrumId]: !prev[spectrumId]
+    }));
+  };
+
   return(
-    <Text> Profile Page </Text>
+    <ScrollView>
+      <ScalableImage source={require('@/assets/images/partial-react-logo.png')} type="width" dimension={screenWidth} height={200}/>
+      <ThemedView style={styles.container}>
+        <ThemedView style={styles.avatarContainer}>
+          <Image source={require('@/assets/images/Default_pfp.jpg')} style={styles.avatar}/>
+        </ThemedView>
+        <ThemedText type="defaultSemiBold" style={{marginTop: 48, fontWeight: '800', fontSize: 24}}>Username</ThemedText>
+
+        <ThemedText>
+          Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. 
+        </ThemedText>
+
+        {spectrums.map(spectrum=> (
+          <ThemedView key={spectrum.id}>
+            <Pressable
+              onPress={() => toggleSpectrums(spectrum.id)}
+            >
+              <ThemedView style={{ flexDirection: 'row', gap: 8, alignItems: 'center', marginBottom: 8}}>
+                <IconSymbol name={openSpectrums[spectrum.id] ? "chevron.down" : "chevron.right"} size={20} color="#592EDC" />
+                <ThemedText type="defaultSemiBold" style={{fontWeight: 600}}>{spectrum.label}</ThemedText>
+              </ThemedView>
+              <Spectrum width={(screenWidth - 32)} position={spectrum.position}/>
+              </Pressable>
+              {openSpectrums[spectrum.id] && (
+                <ThemedView style={{ backgroundColor: "#BAA8F0", padding: 16, borderRadius: 16, marginTop: 8}}>
+                  <ThemedText>{spectrum.description}</ThemedText>
+                </ThemedView>
+              )}
+          </ThemedView>
+        ))}
+
+      </ThemedView>
+    </ScrollView>
+    
   );
 }
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    padding: 16,
+    gap: 12,
+  },
+  avatarContainer: {
+    position: 'absolute',
+    top: -54,
+    left: 8,
+    borderRadius: 54,
+  },
+  avatar: {
+    width: 108,
+    height: 108,
+    borderRadius: 54,
+    borderColor: '#FFF',
+    borderWidth: 8,
+  },
+});

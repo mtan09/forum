@@ -2,8 +2,8 @@ import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { useState } from 'react';
-import { Pressable, Share, StyleSheet } from 'react-native';
-import { type PostType } from './post';
+import { Dimensions, Pressable, Share, StyleSheet } from 'react-native';
+import { type PostType } from './postComponent';
 
 export type PostActionsProps = {
   post: PostType;
@@ -12,6 +12,8 @@ export type PostActionsProps = {
   onDownvote: () => void;
   onUnDownvote: () => void;
 }
+
+const screenWidth = Dimensions.get('window').width;
 
 export default function PostActions({ post, onUpvote, onUnUpvote, onDownvote, onUnDownvote }: PostActionsProps) {
   const [isUpvoted, setUpvoted] = useState(false);
@@ -49,8 +51,7 @@ export default function PostActions({ post, onUpvote, onUnUpvote, onDownvote, on
     <ThemedView style={styles.container}>
 
       {/* Upvote */}
-      <ThemedView style={[styles.reactions, styles.upvote]}>
-        <Pressable onPress={() => {
+      <Pressable onPress={() => {
           if (isUpvoted) {
             setUpvoted(false);
             onUnUpvote();
@@ -64,16 +65,16 @@ export default function PostActions({ post, onUpvote, onUnUpvote, onDownvote, on
             onUpvote();
           }
         }}>
+        <ThemedView style={[styles.reactions, styles.upvote]}>
           <IconSymbol name={isUpvoted ? "arrowshape.up.fill" : "arrowshape.up"} size={20} color={isUpvoted ? "#14DD78" : "#8D8D8D"} />
-        </Pressable>
-        <ThemedText lightColor = "#8D8D8D">
-          {post.upvotes === 0 ? post.upvotes : `+${formatCount(post.upvotes)}`}
-        </ThemedText>
-      </ThemedView>
+          <ThemedText style={{color: isUpvoted ? "#14DD78" : "#8D8D8D"}}>
+            {post.upvotes === 0 ? post.upvotes : `+${formatCount(post.upvotes)}`}
+          </ThemedText>
+        </ThemedView>
+      </Pressable>
 
       {/* Downvote */}
-      <ThemedView style={[styles.reactions, styles.downvote]}>
-        <Pressable onPress={() => {
+      <Pressable onPress={() => {
           if (isDownvoted) {
             setDownvoted(false);
             onUnDownvote();
@@ -87,23 +88,24 @@ export default function PostActions({ post, onUpvote, onUnUpvote, onDownvote, on
             onDownvote();
           }
         }}>
+        <ThemedView style={[styles.reactions, styles.downvote]}>
           <IconSymbol name={isDownvoted ? "arrowshape.down.fill" : "arrowshape.down"} size={20} color={isDownvoted ? "#FF0080" : "#8D8D8D"} />
-        </Pressable>
-        <ThemedText lightColor = "#8D8D8D">
-          {post.downvotes === 0 ? post.downvotes: `-${formatCount(post.downvotes)}`}
-        </ThemedText>
-      </ThemedView>
+          <ThemedText style={{color: isDownvoted ? "#FF0080" : "#8D8D8D"}}>
+            {post.downvotes === 0 ? post.downvotes: `-${formatCount(post.downvotes)}`}
+          </ThemedText>
+        </ThemedView>
+      </Pressable>
       
       {/* Comment */}
-      <ThemedView style={[styles.reactions, styles.comments]}>
-        <Pressable onPress={() => {
+      <Pressable onPress={() => {
           console.log("Comment button pressed");
           // Add navigation to comments screen
         }}>
-          <IconSymbol name="bubble" size={20} color="#8D8D8D" />
-        </Pressable>
+      <ThemedView style={[styles.reactions, styles.comments]}>
+        <IconSymbol name="bubble" size={20} color="#8D8D8D" />
         <ThemedText lightColor={"#8D8D8D"}>{formatCount(post.commentCount)}</ThemedText>
       </ThemedView>
+      </Pressable>
       
       {/* Bookmark */}
       <ThemedView style={[styles.reactions, styles.bookmark]}>
@@ -142,20 +144,20 @@ const styles = StyleSheet.create({
     gap: 4,
   },
   upvote: {
-    width: 92,
-    marginRight: 8,
+    width: (screenWidth-32)/4,
   },
   downvote: {
-    width: 92,
+    width: (screenWidth-32)/4,
   },
   comments: {
-    width: 92,
-    marginLeft: 8,
+    width: (screenWidth-32)/4,
   },
   bookmark: {
-    marginLeft: 8,
+   width: (screenWidth-32)/8,
+   justifyContent: 'flex-end'
   },
   share: {
-    marginLeft: 8,
+    width: (screenWidth-32)/8,
+    justifyContent: 'flex-end',
   },
 });

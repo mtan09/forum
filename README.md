@@ -1,3 +1,17 @@
+forum App - Michael Tan
+
+Features:
+   - Social media feed with user posts as well as fed in news articles
+      - Each post has a spectrum describing its position
+   - Auto-generated subtopics for each of 7 general discussion topics
+      - Short summary blurb for each
+      - When pressed open into large summary screen with images, metadata, longer summary, relevant articles
+   - Specialized AI chat-bot (forumAI) offering more perspectives
+      - Explain like I'm: ...
+      - Left, Center, Right perspectives
+
+
+
 # Welcome to your Expo app 👋
 
 This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).

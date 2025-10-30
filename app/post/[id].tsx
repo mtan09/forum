@@ -1,11 +1,11 @@
+import CommentList from '@/components/commentComponent';
 import Post from '@/components/postComponent';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { IconSymbol } from '@/components/ui/icon-symbol';
 import { usePosts } from '@/context/postContext';
 import { useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
-import { Dimensions, Pressable, ScrollView, StyleSheet } from 'react-native';
+import { Dimensions, ScrollView, StyleSheet } from 'react-native';
 
 const screenWidth = Dimensions.get('window').width;
 
@@ -35,13 +35,9 @@ export default function PostScreen() {
     <ScrollView>
       <Post 
         post={post}
-        onUpvote={() => handleUpvote(post.id)}
-        onUnUpvote={() => handleUnUpvote(post.id)}
-        onDownvote={() => handleDownvote(post.id)}
-        onUnDownvote={() => handleUnDownvote(post.id)}
       />
       <ThemedView style={styles.container}>
-        <ThemedView style={styles.factCheck}>
+        {/* <ThemedView style={styles.factCheck}>
           <ThemedText type="defaultSemiBold" style={{ fontWeight: "800" }}>
             Fact Check
           </ThemedText>
@@ -68,18 +64,22 @@ export default function PostScreen() {
               </ThemedView>
             ))}
           </ThemedView>
-        </ThemedView>
+        </ThemedView> */}
 
-        <ThemedView style={styles.biggerPicture}>
+        {/* <ThemedView style={styles.biggerPicture}>
           <ThemedText type="defaultSemiBold" style={{ fontWeight: "800"}}>
             Here's the bigger picture:
           </ThemedText>
           <ThemedText>
             Israel and Hamas agreed to a ceasefire involving hostage and prisoner exchanges, partial Israeli troop withdrawals, and increased humanitarian aid to Gaza, though key issues like Hamas’s disarmament and Gaza’s future governance remain unresolved.
           </ThemedText>
-        </ThemedView>
+        </ThemedView> */}
 
         {/* Comments */}
+        <ThemedView style={{ marginTop: 8 }}>
+          <ThemedText type="defaultSemiBold" style={{ fontWeight: '800', marginBottom: 8 }}>Comments</ThemedText>
+          <CommentList postId={post.id} />
+        </ThemedView>
       </ThemedView>
     </ScrollView>
   );

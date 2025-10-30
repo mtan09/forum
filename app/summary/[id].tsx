@@ -1,19 +1,33 @@
+import { ArticleType } from '@/components/articleComponent';
+import Carousel from '@/components/carousel';
 import ImageCarousel from '@/components/imageCarousel';
 import Spectrum from '@/components/spectrum';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { fetchMockSummary, SummaryType } from '@/data/mockSummaries';
-import { useLocalSearchParams } from 'expo-router';
+import { supabase } from '@/lib/supabaseClient';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { Dimensions, Linking, Pressable, ScrollView, StyleSheet } from 'react-native';
+import { Dimensions, Image, Pressable, ScrollView, StyleSheet } from 'react-native';
 
 const screenWidth =  Dimensions.get('window').width;
 
+type Summary = {
+  title: string;
+  long_summary: string;
+  keywords: string[];
+  volume: number;
+  public_position: number;
+}
+
 export default function SummaryScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
+  const router = useRouter();
 
-  const [ summary, setSummary ] = useState<SummaryType | null>(null);
+  const [ summary, setSummary ] = useState<Summary | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [ articles, setArticles ] = useState<ArticleType[]>([]);
+
+  const [ images, setImages ] = useState<string[]>([]);
 
   const formatCount = (count: number): string => {
     if (count >= 1000000) {
@@ -33,21 +47,61 @@ export default function SummaryScreen() {
 
   useEffect(() => {
     const loadSummary = async () => {
-      try {
-        setIsLoading(true);
-        const data = await fetchMockSummary(id);
-        setSummary(data);
-      } catch (err) {
-        console.error('Failed to fetch summary:', err);
-      } finally {
+
+      const [
+        { data: summaryData, error: summaryError },
+        { data: articleData, error: articleError },
+      ] = await Promise.all([
+        supabase
+          .from('subtopics')
+          .select('title, long_summary, keywords, volume, public_position')
+          .eq('id', id)
+          .single(),
+        supabase
+          .from('articles')
+          .select('*')
+          .eq('subtopic_id', id)
+      ]);
+
+      if (summaryError) {
+        console.log('Error fetching data:', summaryError);
+        return;
+      } else {
+        setSummary(summaryData as Summary);
         setIsLoading(false);
       }
+
+      if (articleError) {
+        console.log('Error fetching articles:', articleError);
+        return;
+      } else {
+        setArticles(articleData as ArticleType[]);
+      }
+
+      const { data: imageData, error: imageError } = await supabase
+        .from('articles')
+        .select('media')
+        .eq('subtopic_id', id)
+
+      if (imageError) {
+        console.log('Error fetching images:', imageError);
+        return;
+      }
+
+      // Destructure to a string[]
+      const urls = (imageData ?? [])
+        .map(({ media }) => media)
+        .filter((u): u is string => Boolean(u));
+      setImages(urls);
+
+      console.log('Fetched images:', urls);
+      console.log("Fetched article data:", articleData);
     };
 
     loadSummary();
   }, [id]);
 
-  const text = '📊 ' + formatCount(summary?.info?.volume ?? 0) + ' posts' + '   •   ' + summary?.info.keywords.join('   •   ');
+  const text = '📊 ' + formatCount(summary?.volume ?? 0) + ' posts' + '   •   ' + summary?.keywords.join('   •   ');
 
 
   return (
@@ -55,53 +109,59 @@ export default function SummaryScreen() {
     <ScrollView showsVerticalScrollIndicator={false}>
       <ThemedView style={ styles.container }>
 
-        {/* Title */}
-        <ThemedText style={{ fontSize: 24, fontWeight: '800', lineHeight: 32, color: '#592EDC', marginTop: 8 }}>
-          {summary?.name}
+        <ThemedText style={{ fontSize: 24, fontWeight: '800', lineHeight: 32, color: '#9A00FF', marginTop: 8 }}>
+          {summary?.title}
         </ThemedText>
 
-        {/* Metadata */} 
         <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ maxHeight: 24, marginBottom: 8 }}>
-          <ThemedText numberOfLines={1} ellipsizeMode="clip" style={{ color: '#7049E0' }}>{text}   •   {text}</ThemedText>
+          <ThemedText numberOfLines={1} ellipsizeMode="clip" style={{ color: '#9A00FF' }}>{text}   •   {text}</ThemedText>
         </ScrollView>
         
-        {/* Image Carousel */}
-        {summary?.images && summary.images.length > 0 && (
-          <ImageCarousel images={summary.images} height={200} />
+        {images && images.length > 0 && (
+          <ImageCarousel images={images} height={240} />
         )}
 
-        {/* Summary Content */}
         <ThemedView style={styles.summary}>
           <ThemedText type="defaultSemiBold" style={{fontWeight: "800"}}>
-            {summary?.summaryContent}
+            {summary?.long_summary}
           </ThemedText>
         </ThemedView>
 
-        {/* Spectrum Visualization */}
-        <Spectrum width={(screenWidth - 32)} height={20} topic="Public Opinion" position={summary?.position ?? 0.5} textStyle={{fontWeight: '800'}}/>
+        <Spectrum width={(screenWidth - 32)} height={20} topic="Public Opinion" position={summary?.public_position ?? 0.5} textStyle={{fontWeight: '800'}}/>
         
-        {/* Across the Spectrum News Sources */}
-        <ThemedView style={ styles.news }>
-          <ThemedText type="defaultSemiBold" style={{fontWeight: "800"}}>Across the Spectrum</ThemedText>  
-          <ThemedView style={ styles.article }>
-            <ThemedText style={styles.newsSource}>🟦 {summary?.news.left.source}</ThemedText>
-            <Pressable
-              onPress={() => Linking.openURL(summary?.news.left.url ?? '')}
-            >
-              <ThemedText style={styles.articleTitle}>{summary?.news.left.title}</ThemedText>
-            </Pressable>
+        {/* Articles carousel */}
+        {articles && articles.length > 0 && (
+          <ThemedView style={{ marginTop: 12 }}>
+            <ThemedText type="defaultSemiBold" style={{ fontWeight: '800', marginBottom: 8 }}>
+              Latest coverage
+            </ThemedText>
+            <Carousel
+              data={articles}
+              keyExtractor={(a) => a.id}
+              horizontalPadding={16}
+              renderItem={({ item, size }) => (
+                <Pressable
+                  onPress={() => router.push(`/article/${item.id}`)}
+                  style={({ pressed }) => ({ opacity: pressed ? 0.7 : 1.0 })}
+                >
+                  <ThemedView style={styles.articleCard}> 
+                    {item.media ? (
+                      <Image
+                        source={{ uri: item.media }}
+                        style={styles.articleImage}
+                      />
+                    ) : null}
+                    <ThemedText style={styles.articleSource}>{item.source}</ThemedText>
+                    <ThemedText type="defaultSemiBold" style={styles.articleHeadline} numberOfLines={3}>
+                      {item.title}
+                    </ThemedText>
+                  </ThemedView>
+                </Pressable>
+              )}
+            />
           </ThemedView>
-          <ThemedView style={ styles.article }>
-            <ThemedText style={styles.newsSource}>🟪 {summary?.news.center.source}</ThemedText>
-            <ThemedText style={styles.articleTitle}>{summary?.news.center.title}</ThemedText>
-          </ThemedView>
-          <ThemedView style={ styles.article }>
-            <ThemedText style={styles.newsSource}>🟥 {summary?.news.right.source}</ThemedText>
-            <ThemedText style={styles.articleTitle}>{summary?.news.right.title}</ThemedText>
-          </ThemedView>
-        </ThemedView>
+        )}
 
-        {/* Other topics */}
 
       </ThemedView>
     </ScrollView>
@@ -116,7 +176,7 @@ const styles = StyleSheet.create({
     marginBottom: 32,
   },
   summary: {
-    backgroundColor: "#BAA8F0",
+    backgroundColor: "#E9C8FF",
     borderRadius: 16,
     padding: 16,
     marginBottom: 8,
@@ -124,6 +184,29 @@ const styles = StyleSheet.create({
   news: {
     gap: 16,
     marginTop: 12,
+  },
+  articleCard: {
+    borderRadius: 16,
+    padding: 12,
+    backgroundColor: '#F5F2FF',
+    borderWidth: 1,
+    borderColor: '#E4DCFF',
+  },
+  articleImage: {
+    width: '100%',
+    height: 160,
+    borderRadius: 12,
+    marginBottom: 8,
+  },
+  articleSource: {
+    color: '#B647FF',
+    marginBottom: 4,
+    fontWeight: '700',
+  },
+  articleHeadline: {
+    fontSize: 16,
+    lineHeight: 22,
+    fontWeight: '700',
   },
   article: {
     flexDirection: 'row',
@@ -135,7 +218,7 @@ const styles = StyleSheet.create({
     flexShrink: 1,
     flexWrap: 'wrap',
     width: (screenWidth-32)/2,
-    color: "#592EDC",
+    color: "#B647FF",
     textDecorationLine: 'underline'
   },
   newsSource: {

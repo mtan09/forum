@@ -2,34 +2,72 @@ import { CustomDropdown } from '@/components/customDropdown';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { IconSymbol } from '@/components/ui/icon-symbol';
-import { Message, mockMessages } from '@/data/mockMessages';
+import { supabase } from '@/lib/supabaseClient';
 import { useEffect, useRef, useState } from 'react';
-import { Dimensions, Image, Keyboard, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, TextInput } from 'react-native';
+import { Animated, Dimensions, Image, Keyboard, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, TextInput } from 'react-native';
+
+// import { createClient } from '@supabase/supabase-js'
+// const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY)
 
 const screenWidth = Dimensions.get('window').width;
 const screenHeight = Dimensions.get('window').height;
 
+type Message = {
+  id: string;
+  content: string;
+  sender: 'user' | 'ai';
+  left?: string;
+  center?: string;
+  right?: string;
+};
+
+const AnimatedLoadingDots = () => {
+  const dot1 = useRef(new Animated.Value(0)).current;
+  const dot2 = useRef(new Animated.Value(0)).current;
+  const dot3 = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    const createAnimation = (value: Animated.Value, delay: number) => {
+      return Animated.loop(
+        Animated.sequence([
+          Animated.delay(delay),
+          Animated.timing(value, {
+            toValue: 1,
+            duration: 300,
+            useNativeDriver: true,
+          }),
+          Animated.timing(value, {
+            toValue: 0,
+            duration: 300,
+            useNativeDriver: true,
+          }),
+        ])
+      );
+    };
+
+    Animated.parallel([
+      createAnimation(dot1, 0),
+      createAnimation(dot2, 150),
+      createAnimation(dot3, 300),
+    ]).start();
+  }, [dot1, dot2, dot3]);
+
+  return (
+    <ThemedView style={styles.loadingDotsContainer}>
+      <Animated.View style={{ opacity: dot1 }}>
+        <ThemedText style={styles.loadingDot}>●</ThemedText>
+      </Animated.View>
+      <Animated.View style={{ opacity: dot2 }}>
+        <ThemedText style={styles.loadingDot}>●</ThemedText>
+      </Animated.View>
+      <Animated.View style={{ opacity: dot3 }}>
+        <ThemedText style={styles.loadingDot}>●</ThemedText>
+      </Animated.View>
+    </ThemedView>
+  );
+};
+
 export default function AI() {
-
-  type Topic = {
-    id: string;
-    name: string;
-  }
-
-  const topics = [
-    { id: '1', name: 'Gaza Ceasefire' },
-    { id: '2', name: 'NYC Mayoral Race' },
-  ]
-
-  const [ activeTopic, setActiveTopic ] = useState<Topic | null>(null);
-
-  const toggleTopic = (topic: Topic) => {
-    if (activeTopic?.id === topic.id) {
-      setActiveTopic(null);
-    } else {
-      setActiveTopic(topic);
-    }
-  };
 
   const [inputText, setInputText] = useState('');
 
@@ -49,12 +87,13 @@ export default function AI() {
     setHasStarted(false);
     setInputText('');
     setActiveFraming(framings[0]);
-    setActiveTopic(null);
+    setActiveLean('Center');
     setMessages([]); // clear chat log
     Keyboard.dismiss();
   };
 
-  const [messages, setMessages] = useState<Message[]>(mockMessages); // start with an empty chat log
+  const [messages, setMessages] = useState<Message[]>([]); // start with an empty chat log
+  const [isLoading, setIsLoading] = useState(false);
   const scrollRef = useRef<ScrollView>(null);
 
   useEffect(() => {
@@ -63,6 +102,57 @@ export default function AI() {
   }, [messages, hasStarted]);
 
   const canSend = inputText.trim().length > 0;
+
+  const [ activeLean, setActiveLean ] = useState<'Left' | 'Center' | 'Right'>('Center');
+
+  const handleMessageSend = (userMessage: string) => {
+    setMessages(prev => [
+      ...prev,
+      {
+        id: Date.now().toString(),
+        sender: "user",
+        content: userMessage,
+      }
+    ])
+
+    setIsLoading(true);
+    const fetchMessage = async () => {
+      const { data, error } = await supabase.functions.invoke('super-handler', {
+        body: { message: userMessage, framing: activeFraming },
+      });
+
+      if (error) {
+        console.error('Error invoking forumAI function:', JSON.stringify(error, null, 2));
+        setIsLoading(false);
+        return;
+      }
+      setMessages(prev => [
+      ...prev,
+      {
+        id: Date.now().toString(),
+        sender: "ai",
+        content: activeLean === 'Left' ? data.left : (activeLean === 'Center' ? data.center : data.right),
+        left: data.left,
+        center: data.center,
+        right: data.right,
+      }
+      ]);
+      setIsLoading(false);
+
+      console.log('forumAI response data:', data.left, '\n', data.center, '\n', data.right);
+    }
+    
+    fetchMessage();
+  };
+
+  const prevMessageCountRef = useRef(0);
+
+  useEffect(() => {
+    if (messages.length > prevMessageCountRef.current) {
+      scrollRef.current?.scrollToEnd({ animated: true });
+      prevMessageCountRef.current = messages.length;
+    }
+  }, [messages]);
 
   return(
     <KeyboardAvoidingView
@@ -78,7 +168,7 @@ export default function AI() {
             <Pressable
               onPress={handleEndChat}
             >
-              <IconSymbol name="x.circle.fill" size={32} color="#7049e0" />
+              <IconSymbol name="x.circle.fill" size={32} color="#b647ff" />
             </Pressable>
           </ThemedView>
         )}
@@ -97,23 +187,80 @@ export default function AI() {
             style={styles.chatContainer}
             contentContainerStyle={styles.chatContent}
             showsVerticalScrollIndicator={true}
-            onContentSizeChange={() => scrollRef.current?.scrollToEnd({ animated: true })}
             keyboardDismissMode="on-drag"
             keyboardShouldPersistTaps="handled"
             onScrollBeginDrag={() => Keyboard.dismiss()}
           >
             {messages.map(message => (
+              
               <ThemedView
                 key={message.id}
                 style={[
                   message.sender === 'user' ? styles.userMessage : styles.aiMessage
                 ]}
               >
-                <ThemedText style={message.sender === 'user' ? styles.userText : styles.aiText}>
-                  {message.content}
-                </ThemedText>
+                {message.sender === 'ai' ? (
+                  <ThemedView style={styles.leanContainer}>
+                    <Pressable
+                      onPress={() => setActiveLean('Left')}
+                    >
+                      <ThemedView style={[styles.lean, {borderBottomLeftRadius: 16, borderTopLeftRadius: 16, backgroundColor: activeLean === 'Left' ? '#b647ff' : '#E9C8FF'}]}>
+                        <ThemedText style={styles.leanText}>Left</ThemedText>
+                      </ThemedView>
+                        
+                    </Pressable>
+                    <Pressable
+                      onPress={() => setActiveLean('Center')}
+                    >
+                      <ThemedView style={[styles.lean, {borderLeftColor: 'white', borderRightColor: 'white', borderLeftWidth: 1, borderRightWidth: 1, backgroundColor: activeLean === 'Center' ? '#b647ff' : '#E9C8FF'}]}>
+                        <ThemedText style={styles.leanText}>Center</ThemedText>
+                      </ThemedView>
+                        
+                    </Pressable>
+                    <Pressable
+                      onPress={() => setActiveLean('Right')}
+                    >
+                      <ThemedView style={[styles.lean, {borderBottomRightRadius: 16, borderTopRightRadius: 16, backgroundColor: activeLean === 'Right' ? '#b647ff' : '#E9C8FF'}]}>
+                        <ThemedText style={styles.leanText}>Right</ThemedText>
+                      </ThemedView>
+                        
+                    </Pressable>
+                  </ThemedView>
+                ) : null}
+
+                {message.sender === 'user' ? (
+                  <ThemedText style={styles.userText}>
+                    {message.content}
+                  </ThemedText>
+                ) : (
+                  <ThemedText style={styles.aiText}>
+                    {activeLean === 'Left' ? message.left : (activeLean === 'Center' ? message.center : message.right)}
+                  </ThemedText>
+                )}
               </ThemedView>
             ))}
+            {isLoading && (
+              <ThemedView style={styles.aiMessage}>
+                <ThemedView style={styles.leanContainer}>
+                  <Pressable onPress={() => setActiveLean('Left')}>
+                    <ThemedView style={[styles.lean, {borderBottomLeftRadius: 16, borderTopLeftRadius: 16, backgroundColor: activeLean === 'Left' ? '#b647ff' : '#E9C8FF'}]}>
+                      <ThemedText style={styles.leanText}>Left</ThemedText>
+                    </ThemedView>
+                  </Pressable>
+                  <Pressable onPress={() => setActiveLean('Center')}>
+                    <ThemedView style={[styles.lean, {borderLeftColor: 'white', borderRightColor: 'white', borderLeftWidth: 1, borderRightWidth: 1, backgroundColor: activeLean === 'Center' ? '#b647ff' : '#E9C8FF'}]}>
+                      <ThemedText style={styles.leanText}>Center</ThemedText>
+                    </ThemedView>
+                  </Pressable>
+                  <Pressable onPress={() => setActiveLean('Right')}>
+                    <ThemedView style={[styles.lean, {borderBottomRightRadius: 16, borderTopRightRadius: 16, backgroundColor: activeLean === 'Right' ? '#b647ff' : '#E9C8FF'}]}>
+                      <ThemedText style={styles.leanText}>Right</ThemedText>
+                    </ThemedView>
+                  </Pressable>
+                </ThemedView>
+                <AnimatedLoadingDots />
+              </ThemedView>
+            )}
           </ScrollView>
         )}
         
@@ -124,7 +271,7 @@ export default function AI() {
         >
 
           {/* Topic Quickselect */}
-          {!hasStarted && (
+          {/* {!hasStarted && (
 
             <ThemedView style={styles.topicSelector}>
               {topics.map(topic => (
@@ -135,13 +282,13 @@ export default function AI() {
                     <ThemedText style={{ 
                       fontSize: 14, 
                       fontWeight: activeTopic === topic ? '800' : '600', 
-                      color: activeTopic === topic ? '#592edc' : '#8f8f8f',
+                      color: activeTopic === topic ? '#b647ff' : '#8f8f8f',
                     }}>🟪 {topic.name}</ThemedText>
                   </Pressable>
                 </ThemedView>
               ))}
             </ThemedView>
-          )}
+          )} */}
 
           {/* Explain like I'm ... */}
           <ThemedView style={styles.pickerContainer}>
@@ -158,7 +305,7 @@ export default function AI() {
             <TextInput
               value={inputText}
               onChangeText={setInputText}
-              placeholder={activeTopic === null ? "Ask forumAI a question..." : `Ask forumAI about ${activeTopic.name}...`}
+              placeholder={"Ask forumAI a question..."}
               placeholderTextColor='#8f8f8f'
               multiline
               style={styles.textInput}
@@ -169,13 +316,13 @@ export default function AI() {
               disabled={!canSend}
               onPress={() => {
                 if (inputText.trim() === '') return;
-                console.log('Sending:' + inputText + ' ' + activeFraming + ' ' + (activeTopic ? activeTopic.name : 'No topic selected'));
+                handleMessageSend(inputText.trim());
                 setInputText('');
                 Keyboard.dismiss();
                 setHasStarted(true);
               }}
             >
-              <IconSymbol name="arrow.up.circle.fill" size={32} color={canSend ? "#7049e0" : "#cfc7f3"} />
+              <IconSymbol name="arrow.up.circle.fill" size={32} color={canSend ? "#B647FF" : "#dfaeffff"} />
             </Pressable>
           </ThemedView>  
 
@@ -201,7 +348,7 @@ const styles = StyleSheet.create({
     position: 'absolute',
     top: 175,
     alignSelf: 'center',
-    color: '#7049e0',
+    color: '#b647ff',
   },
   topicSelector: {
     flexDirection: 'row',
@@ -211,7 +358,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: 8,
     alignItems: 'flex-start',
-    borderColor: '#baa8f0',
+    borderColor: '#E9C8FF',
     borderRadius: 16,
     borderWidth: 2,
     paddingHorizontal: 8,
@@ -234,7 +381,7 @@ const styles = StyleSheet.create({
   picker: {
     width: 200,
     height: 20,
-    backgroundColor: '#baa8f0',
+    backgroundColor: '#E9C8FF',
     borderRadius: 16,
   },
   option: {
@@ -272,27 +419,26 @@ const styles = StyleSheet.create({
     height: 48,
   },
   headerTitle: {
-    color: '#7049e0',
+    color: '#B647FF',
     fontWeight: '800',
     fontSize: 20,
   },
   userMessage: {
     alignSelf: 'flex-end',
-    backgroundColor: '#7049e0',
+    backgroundColor: '#B647FF',
     paddingVertical: 8,
     paddingHorizontal: 12,
-    borderRadius: 12,
+    borderRadius: 16,
     borderTopRightRadius: 4,
     maxWidth: '80%',
   },
   aiMessage: {
     alignSelf: 'flex-start',
-    backgroundColor: '#f1effc',
+    backgroundColor: '#f8effcff',
     paddingVertical: 8,
     paddingHorizontal: 12,
-    borderRadius: 12,
-    borderTopLeftRadius: 4,
-    maxWidth: '80%',
+    borderRadius: 16,
+    maxWidth: '100%',
     borderWidth: 1,
     borderColor: '#e0d9fb',
   },
@@ -314,5 +460,44 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 8,
     paddingBottom: 112, // some extra space above the input
+  },
+  leanContainer: {
+    flexDirection: 'row',
+    marginVertical: 16,
+    width: screenWidth - 64,
+    alignSelf: 'center',
+    borderRadius: 16,
+    height: 32,
+    gap: 0
+  },
+  leanText: {
+    fontSize: 20,
+    textAlign: 'center',
+    color: 'white',
+    fontWeight: '800',
+  },
+  lean: {
+    width: (screenWidth - 64) /3,
+    height: 32,
+    justifyContent: 'center',
+    // paddingTop: 4,
+  },
+  loadingDot: {
+    color: '#B647FF',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  loadingDots: {
+    color: '#B647FF',
+    fontSize: 18,
+    fontWeight: '600',
+    letterSpacing: 2,
+  },
+  loadingDotsContainer: {
+    flexDirection: 'row',
+    gap: 4,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'transparent',
   }
 });

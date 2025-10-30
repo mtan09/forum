@@ -2,73 +2,68 @@ import ScalableImage from '@/components/scalable-image';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { useRelativeTime } from '@/hooks/useRelativeTime';
-import { supabase } from '@/lib/supabaseClient';
-import { useEffect, useState } from 'react';
-import { Dimensions, Image, StyleSheet } from 'react-native';
-import PostActions from './post-actions';
+import { Dimensions, StyleSheet } from 'react-native';
 import Spectrum from './spectrum';
 
 const screenWidth = Dimensions.get('window').width;
 
-export type PostType = {
+export type ArticleType = {
   id: string;
-  user: string;
-  text: string;
-  timestamp: string;
-  media?: string;
-  upvotes: number;
-  downvotes: number;
-  commentCount: number;
-  topic: string;
-  position: number;
+  url: string;
+  title: string;
+  source: string;
+  content: string;
+  media: string;
+  political_lean: number;
+  general_topic_id: string;
+  published_at: string;
 }
 
 export type UserType = {
   id: string;
   username: string;
-  avatar_url?: string;
+  avatar?: string;
 }
 
 type Props = {
-  post: PostType;
+  article: ArticleType;
 }
 
-export default function Post({ post }: Props) {
+export default function Article({ article }: Props) {
 
-  const timeAgo = useRelativeTime(post.timestamp);
+  const timeAgo = useRelativeTime(article.published_at);
 
-  const [ user, setUser ] = useState<UserType>({ id: '', username: '' });
+  // const [ user, setUser ] = useState<UserType>({ id: '', username: '' });
 
-  useEffect(() => {
-    const fetchUser = async () => {
-      const { data, error } = await supabase
-        .from('userdata')
-        .select('id, username, avatar_url')
-        .eq('id', post.user)
-        .single();
+  // useEffect(() => {
+  //   const fetchUser = async () => {
+  //     const { data, error } = await supabase
+  //       .from('userdata')
+  //       .select('id, username, avatar_url')
+  //       .eq('id', post.user)
+  //       .single();
 
-      if (error) {
-        console.log('Error fetching profile:', error);
-        return;
-      }
+  //     if (error) {
+  //       console.log('Error fetching profile:', error);
+  //       return;
+  //     }
 
-      setUser(data);
-    };
+  //     setUser(data);
+  //   };
 
-    fetchUser(); 
-  }, [post]);
+  //   fetchUser(); 
+  // }, [post]);
 
   return (
     <ThemedView style={styles.post}>
       <ThemedView style={styles.postContent}>
         <ThemedView style={styles.container}>
           <ThemedView style={styles.header}>
-            <Image 
-              source={user.avatar_url ? { uri: user.avatar_url } : require('@/assets/images/Default_pfp.jpg')} 
-              style={styles.avatar} 
-            />
+            <ThemedText style={styles.emoji}>
+              {article.political_lean < .35 ? '🟦' : article.political_lean > .65 ? '🟥' : '🟪'}
+            </ThemedText>
             <ThemedView>
-              <ThemedText type="defaultSemiBold" style={{fontWeight: 800, fontSize: 18}}>{user.username}</ThemedText>
+              <ThemedText type="defaultSemiBold" style={{fontWeight: 800, fontSize: 18}}>{article.source}</ThemedText>
               <ThemedText style={{color: '#8D8D8D', fontSize: 14}}>{timeAgo}</ThemedText>
             </ThemedView>
           </ThemedView>
@@ -76,13 +71,13 @@ export default function Post({ post }: Props) {
           <ThemedView style={styles.content}>
 
             {/* Post text */}
-            <ThemedText style={styles.text}>{post.text}</ThemedText>
+            <ThemedText style={styles.text}>{article.title}</ThemedText>
 
             {/* Post media (if any) */}
-            {post.media && (
+            {article.media && (
               // <ThemedView style={styles.mediaContainer}>
                 <ScalableImage
-                  source={{uri: post.media}}
+                  source={{uri: article.media}}
                   type='width'
                   dimension={screenWidth - 32}
                   style={styles.media}
@@ -93,11 +88,11 @@ export default function Post({ post }: Props) {
           </ThemedView>
         </ThemedView>
         {/* Spectrum Bar */}
-        <Spectrum width={(screenWidth - 32)} height={20}  position={post.position}/>
+        <Spectrum width={(screenWidth - 32)} height={20} topic={"Political Lean:"} position={article.political_lean}/>
         {/* topic={post.topic} */}
             
         {/* Interactions (likes, comments, etc.) */}
-        <PostActions post={post} user={user} />
+        {/* <PostActions post={post} user={user} /> */}
       </ThemedView>
     </ThemedView>
     
@@ -122,10 +117,11 @@ const styles = StyleSheet.create({
     borderColor: "#c6c6c6ff",
     borderBottomWidth: 1,
   },
-  avatar: {
+  emoji: {
     width: 50,
-    aspectRatio: 1,
-    borderRadius: 25,
+    fontSize: 32,
+    textAlign: 'center',
+    lineHeight: 50,
   },
   content: {
     width: screenWidth - 32, // 50 (avatar) + 12*2 (padding) + 8 (gap)

@@ -23,8 +23,8 @@ export default function Spectrum({width, height = 20, position, topic, textStyle
       )}
       <View style={styles.background}>
         <LinearGradient
-          // colors={['#E8C4FF', '#9A00FF']}
-          colors={['#BAA8F0', '#592EDC']}
+          colors={['#E8C4FF', '#9A00FF']}
+          // colors={['#C8B9F3', '#592EDC']}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 0 }}
           style={{ width, height, borderRadius: 16}}

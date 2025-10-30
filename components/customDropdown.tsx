@@ -72,7 +72,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    backgroundColor: '#baa8f0',
+    backgroundColor: '#E9C8FF',
     paddingHorizontal: 12,
     paddingVertical: 8,
     borderRadius: 16,
@@ -108,7 +108,7 @@ const styles = StyleSheet.create({
     fontSize: 14,
   },
   selectedOptionText: {
-    color: '#592EDC',
+    color: '#B647FF',
     fontWeight: '600',
   },
   optionsContainer: {

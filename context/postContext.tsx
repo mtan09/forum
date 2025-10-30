@@ -1,7 +1,6 @@
 import { PostType } from '@/components/postComponent';
-import { createContext, useContext, useState } from 'react';
-import { fetchMockPosts } from '@/data/mockPosts';
-import { useEffect } from 'react';
+import { supabase } from '@/lib/supabaseClient';
+import { createContext, useContext, useEffect, useState } from 'react';
 
 type PostContextType = {
   posts: PostType[];
@@ -17,7 +16,6 @@ type PostContextType = {
 const PostContext = createContext<PostContextType | null>(null);
 
 export function PostProvider({ children }: { children: React.ReactNode }) {
-  // Move your posts state and handlers from Feed component to here
   const [posts, setPosts] = useState<PostType[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -25,10 +23,29 @@ export function PostProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     const loadPosts = async () => {
       try {
-        const data = await fetchMockPosts();
-        setPosts(data);
-      } catch (err) {
-        setError('Failed to load posts');
+        const { data, error } = await supabase
+          .from('posts')
+          .select('*')
+          .order('created_at', { ascending: false });
+
+        if (error) throw error;
+
+        const mapped: PostType[] = (data ?? []).map((row: any): PostType => ({
+          id: String(row.id),
+          user: String(row.user_id),
+          text: row.content ?? '',
+          timestamp: row.created_at,         
+          media: row.media_url ?? undefined,    
+          upvotes: row?.upvotes ?? 0,
+          downvotes: row?.downvotes ?? 0,
+          commentCount: row?.commentcount ?? 0,  
+          topic: row?.general_topic_id ?? 'general',
+          position: row?.position ?? 0,
+        }));
+
+        setPosts(mapped);
+      } catch (err: any) {
+        setError(err?.message ?? 'Failed to load posts');
       } finally {
         setIsLoading(false);
       }

@@ -1,26 +1,28 @@
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { IconSymbol } from '@/components/ui/icon-symbol';
+import { usePosts } from '@/context/postContext';
 import { useState } from 'react';
 import { Dimensions, Pressable, Share, StyleSheet } from 'react-native';
-import { type PostType } from './postComponent';
+import { type PostType, type UserType } from './postComponent';
 
 export type PostActionsProps = {
   post: PostType;
-  onUpvote: () => void;
-  onUnUpvote: () => void;
-  onDownvote: () => void;
-  onUnDownvote: () => void;
+  user: UserType;
 }
 
 const screenWidth = Dimensions.get('window').width;
 
-export default function PostActions({ post, onUpvote, onUnUpvote, onDownvote, onUnDownvote }: PostActionsProps) {
+export default function PostActions({ post, user }: PostActionsProps) {
   const [isUpvoted, setUpvoted] = useState(false);
   const [isDownvoted, setDownvoted] = useState(false);
   const [isBookmarked, setBookmarked] = useState(false);
 
-  const formatCount = (count: number): string => {
+  const { posts, setPosts, error, handleUpvote, handleUnUpvote, handleDownvote, handleUnDownvote } = usePosts();
+
+  const formatCount = (count: number | null | undefined): string => {
+    if (!count) return '0';
+
     if (count >= 1000000) {
       if (count / 1000000 >= 10) {
         return (count / 1000000).toFixed(0) + 'M';
@@ -38,7 +40,7 @@ export default function PostActions({ post, onUpvote, onUnUpvote, onDownvote, on
   const handleShare = async () => {
     try {
       await Share.share({
-        message: `Check out this post by ${post.user.username}: "${post.text}"`,
+        message: `Check out this post by ${user.username}: "${post.text}"`,
         url: 'https://yourapp.com/posts/' + post.id,
         title: 'Share Post',
       });
@@ -54,15 +56,15 @@ export default function PostActions({ post, onUpvote, onUnUpvote, onDownvote, on
       <Pressable onPress={() => {
           if (isUpvoted) {
             setUpvoted(false);
-            onUnUpvote();
+            handleUnUpvote(post.id);
           } else if (isDownvoted) {
             setDownvoted(false);
-            onUnDownvote();
+            handleUnDownvote(post.id);
             setUpvoted(true);
-            onUpvote();
+            handleUpvote(post.id);
           } else {
             setUpvoted(true);
-            onUpvote();
+            handleUpvote(post.id);
           }
         }}>
         <ThemedView style={[styles.reactions, styles.upvote]}>
@@ -77,15 +79,15 @@ export default function PostActions({ post, onUpvote, onUnUpvote, onDownvote, on
       <Pressable onPress={() => {
           if (isDownvoted) {
             setDownvoted(false);
-            onUnDownvote();
+            handleUnDownvote(post.id);
           } else if (isUpvoted) {
             setUpvoted(false);
-            onUnUpvote();
+            handleUnUpvote(post.id);
             setDownvoted(true);
-            onDownvote();
+            handleDownvote(post.id);
           } else {
             setDownvoted(true);
-            onDownvote();
+            handleDownvote(post.id);
           }
         }}>
         <ThemedView style={[styles.reactions, styles.downvote]}>

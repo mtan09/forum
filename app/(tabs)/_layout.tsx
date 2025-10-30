@@ -28,9 +28,9 @@ export default function TabLayout() {
         }} 
       />
       <Tabs.Screen
-        name="explore"
+        name="createpost"
         options={{
-          tabBarIcon: ({ color, focused }) => <IconSymbol size={30} color={color} name="magnifyingglass" />,
+          tabBarIcon: ({ color, focused }) => <IconSymbol size={30} color={color} name={focused ? "plus.app.fill" : "plus.app"} />,
         }}
       />
       <Tabs.Screen
@@ -40,9 +40,15 @@ export default function TabLayout() {
         }}
       />
       <Tabs.Screen
-        name="inbox"
+        name="settings"
         options={{
-          tabBarIcon: ({ color, focused }) => <IconSymbol size={30} color={color} name={focused ? "paperplane.fill" : "paperplane"} />,
+          tabBarIcon: ({ color, focused }) => <IconSymbol size={30} color={color} name={focused ? "gearshape.fill" : "gearshape"} />,
+          headerShown: true,
+          title: 'Settings',
+          headerTitleStyle: {
+            fontWeight: '800',
+            fontSize: 20,
+          }
         }}
       />
       <Tabs.Screen

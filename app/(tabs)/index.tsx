@@ -56,7 +56,7 @@ export default function Feed() {
     { useNativeDriver: false }
   );
 
-  const [activeTab, setActiveTab] = useState<'For You' | 'Random' | 'Against You'>('For You');
+  const [activeTab, setActiveTab] = useState<'For You' | 'Random' | 'Against You'>('Random');
 
   const [ topics, setTopics ] = useState<Topic[]>([]);
 

@@ -54,7 +54,7 @@ function AppNavigator() {
       <TopicProvider>
         <Stack
           screenOptions={{
-            headerTintColor: "#7049E0",
+            headerTintColor: "#b647ff",
             headerTitleStyle: {
               color: 'black',
             }
@@ -104,13 +104,13 @@ function AppNavigator() {
               headerBackTitle: "Back",
             }}
           />
-          <Stack.Screen
+          {/* <Stack.Screen
             name="article/[id]"
             options={{
               title: 'Article',
               headerBackTitle: "Back",
             }}
-          />
+          /> */}
         </Stack>
       </TopicProvider>
     </PostProvider>

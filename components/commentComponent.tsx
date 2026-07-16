@@ -1,23 +1,21 @@
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { useRelativeTime } from '@/hooks/useRelativeTime';
-import { supabase } from '@/lib/supabaseClient';
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { api } from '@/lib/api';
+import React, { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, Image, Pressable, StyleSheet, View } from 'react-native';
 
-type Comment = {
+export type Comment = {
 	id: string;
 	user_id: string;
 	post_id: string;
 	parent_comment_id: string | null;
 	content: string;
 	created_at: string;
-};
-
-type UserProfile = {
-	id: string;
+	// joined in by the API
 	username: string;
 	avatar_url?: string | null;
+	reply_count: number;
 };
 
 type CommentListProps = {
@@ -25,20 +23,7 @@ type CommentListProps = {
 	parentCommentId?: string;
 	initialPageSize?: number;
 	indent?: number; // pixels to indent nested levels
-};
-
-// Small cache in memory for user profiles during the session of this component tree
-const useUserCache = () => {
-	const [cache, setCache] = useState<Record<string, UserProfile>>({});
-	const setMany = (users: UserProfile[]) => {
-		setCache((prev) => {
-			const next = { ...prev };
-			for (const u of users) next[u.id] = u;
-			return next;
-		});
-	};
-	const setOne = (user: UserProfile) => setMany([user]);
-	return { cache, setMany, setOne };
+	refreshKey?: number; // bump to force a reload (e.g. after posting a comment)
 };
 
 export default function CommentList({
@@ -46,6 +31,7 @@ export default function CommentList({
 	parentCommentId,
 	initialPageSize = 10,
 	indent = 0,
+	refreshKey = 0,
 }: CommentListProps) {
 	const [comments, setComments] = useState<Comment[]>([]);
 	const [loading, setLoading] = useState(false);
@@ -54,96 +40,54 @@ export default function CommentList({
 	const [hasMore, setHasMore] = useState(true);
 	const pageSize = initialPageSize;
 
-	const { cache: userCache, setMany: cacheUsers } = useUserCache();
-
-		// Track which pages have already been loaded to avoid duplicate fetch/append (e.g., React StrictMode double effects)
-		const loadedKeysRef = useRef<Set<string>>(new Set());
-
-	const filterDesc = useMemo(() => {
-		if (parentCommentId) return { type: 'reply', value: parentCommentId } as const;
-		return { type: 'post', value: postId! } as const;
-	}, [postId, parentCommentId]);
-
-	const fetchUsersForComments = useCallback(async (list: Comment[]) => {
-		const missingUserIds = Array.from(
-			new Set(list.map((c) => c.user_id).filter((id) => !userCache[id]))
-		);
-		if (missingUserIds.length === 0) return;
-		const { data, error } = await supabase
-			.from('userdata')
-			.select('id, username, avatar_url')
-			.in('id', missingUserIds);
-		if (!error && data) {
-			cacheUsers(data as unknown as UserProfile[]);
-		}
-	}, [userCache, cacheUsers]);
-
-		const loadPage = useCallback(async () => {
+	const loadPage = useCallback(async (pageToLoad: number, replace: boolean) => {
 		if (!postId && !parentCommentId) return;
-			const key = `${parentCommentId ? 'reply' : 'post'}:${parentCommentId ?? postId}:${page}`;
-			if (loadedKeysRef.current.has(key)) return; // already loaded this page for this target
 		setLoading(true);
 		setError(null);
 		try {
-			const from = page * pageSize;
-			const to = from + pageSize - 1;
-			let query = supabase
-				.from('comments')
-				.select('*', { count: 'exact' })
-				.order('created_at', { ascending: true });
-
-			if (parentCommentId) {
-				query = query.eq('parent_comment_id', parentCommentId);
-			} else if (postId) {
-				query = query.eq('post_id', postId).is('parent_comment_id', null);
-			}
-
-					const { data, error, count } = await query.range(from, to);
-			if (error) throw error;
-			const fetched = (data || []) as Comment[];
-					// Deduplicate by id in case effects run twice or backend returns duplicates
-					setComments((prev) => {
-						const map = new Map<string, Comment>();
-						for (const c of prev) map.set(c.id, c);
-						for (const c of fetched) map.set(c.id, c);
-						return Array.from(map.values());
-					});
-			setHasMore(typeof count === 'number' ? prevHasMore(from, to, count) : fetched.length === pageSize);
-
-			// Warm user cache
-			await fetchUsersForComments(fetched);
-
-					// mark this page as loaded
-					loadedKeysRef.current.add(key);
+			const filter = parentCommentId
+				? `parent_comment_id=${parentCommentId}`
+				: `post_id=${postId}`;
+			const data = await api<{ comments: Comment[]; hasMore: boolean }>(
+				`/comments?${filter}&page=${pageToLoad}&limit=${pageSize}`
+			);
+			setComments((prev) => {
+				const base = replace ? [] : prev;
+				const map = new Map<string, Comment>();
+				for (const c of base) map.set(c.id, c);
+				for (const c of data.comments) map.set(c.id, c);
+				return Array.from(map.values());
+			});
+			setHasMore(data.hasMore);
 		} catch (e: any) {
 			setError(e.message ?? 'Failed to load comments');
 		} finally {
 			setLoading(false);
 		}
-	}, [page, pageSize, postId, parentCommentId, fetchUsersForComments]);
+	}, [postId, parentCommentId, pageSize]);
 
+	// Reset and reload when the target (or refreshKey) changes
 	useEffect(() => {
-		// Reset when target changes
-		setComments([]);
 		setPage(0);
-		setHasMore(true);
-			loadedKeysRef.current.clear();
-	}, [filterDesc]);
+		loadPage(0, true);
+	}, [loadPage, refreshKey]);
 
-	useEffect(() => {
-		loadPage();
-	}, [page, loadPage]);
+	const loadMore = () => {
+		const next = page + 1;
+		setPage(next);
+		loadPage(next, false);
+	};
 
 	if (!postId && !parentCommentId) return null;
 
 	return (
-		<ThemedView style={[styles.container, indent ? { marginLeft: indent } : undefined]}>      
+		<ThemedView style={[styles.container, indent ? { marginLeft: indent } : undefined]}>
 			{comments.length === 0 && !loading && !error && (
 				<ThemedText style={styles.empty}>No comments yet.</ThemedText>
 			)}
 
 			{comments.map((c) => (
-				<CommentItem key={c.id} comment={c} user={userCache[c.user_id]} />
+				<CommentItem key={c.id} comment={c} />
 			))}
 
 			{error && (
@@ -155,7 +99,7 @@ export default function CommentList({
 				{!loading && hasMore && (
 					<Pressable
 						accessibilityRole="button"
-						onPress={() => setPage((p) => p + 1)}
+						onPress={loadMore}
 						style={styles.button}
 					>
 						<ThemedText type="defaultSemiBold" style={styles.buttonText}>Load more</ThemedText>
@@ -166,36 +110,19 @@ export default function CommentList({
 	);
 }
 
-function prevHasMore(from: number, to: number, count: number) {
-	return to < count - 1;
-}
-
-function CommentItem({ comment, user }: { comment: Comment; user?: UserProfile }) {
+function CommentItem({ comment }: { comment: Comment }) {
 	const [showReplies, setShowReplies] = useState(false);
-	const [replyCount, setReplyCount] = useState<number | null>(null);
 	const timeAgo = useRelativeTime(comment.created_at);
-
-	useEffect(() => {
-		// Fetch reply count to decide showing the toggle lazily
-		const fetchCount = async () => {
-			const { count } = await supabase
-				.from('comments')
-				.select('*', { count: 'exact', head: true })
-				.eq('parent_comment_id', comment.id);
-			if (typeof count === 'number') setReplyCount(count);
-		};
-		fetchCount();
-	}, [comment.id]);
 
 	return (
 		<ThemedView style={styles.comment}>
 			<ThemedView style={styles.header}>
 				<Image
-					source={user?.avatar_url ? { uri: user.avatar_url } : require('@/assets/images/Default_pfp.jpg')}
+					source={comment.avatar_url ? { uri: comment.avatar_url } : require('@/assets/images/Default_pfp.jpg')}
 					style={styles.avatar}
 				/>
 				<ThemedView style={{ flex: 1 }}>
-					<ThemedText type="defaultSemiBold" style={styles.username}>{user?.username ?? 'Anonymous'}</ThemedText>
+					<ThemedText type="defaultSemiBold" style={styles.username}>{comment.username ?? 'Anonymous'}</ThemedText>
 					<ThemedText style={styles.timestamp}>{timeAgo}</ThemedText>
 				</ThemedView>
 			</ThemedView>
@@ -203,9 +130,9 @@ function CommentItem({ comment, user }: { comment: Comment; user?: UserProfile }
 			<ThemedText style={styles.content}>{comment.content}</ThemedText>
 
 			<View style={styles.commentActions}>
-				{replyCount !== null && replyCount > 0 && !showReplies && (
+				{comment.reply_count > 0 && !showReplies && (
 					<Pressable style={styles.inlineButton} onPress={() => setShowReplies(true)}>
-						<ThemedText type="link">Load replies ({replyCount})</ThemedText>
+						<ThemedText type="link">Load replies ({comment.reply_count})</ThemedText>
 					</Pressable>
 				)}
 				{showReplies && (
@@ -286,4 +213,3 @@ const styles = StyleSheet.create({
 		paddingVertical: 2,
 	},
 });
-

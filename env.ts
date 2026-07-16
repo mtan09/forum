@@ -1,2 +1,0 @@
-export const SUPABASE_URL='https://knbnanozewinvoxhqgqb.supabase.co'
-export const SUPABASE_ANON_KEY= 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImtuYm5hbm96ZXdpbnZveGhxZ3FiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjE0NjQ4OTksImV4cCI6MjA3NzA0MDg5OX0.oA5cSWqorqa1iaIxT4WHEWoSLBl43DnRVbBgrWpSAso'

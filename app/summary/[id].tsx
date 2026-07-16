@@ -4,7 +4,7 @@ import ImageCarousel from '@/components/imageCarousel';
 import Spectrum from '@/components/spectrum';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { supabase } from '@/lib/supabaseClient';
+import { api } from '@/lib/api';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { Dimensions, Image, Pressable, ScrollView, StyleSheet } from 'react-native';
@@ -47,55 +47,18 @@ export default function SummaryScreen() {
 
   useEffect(() => {
     const loadSummary = async () => {
+      try {
+        // subtopic detail comes back with its articles nested
+        const data = await api<Summary & { articles: ArticleType[] }>(`/topics/subtopics/${id}`);
 
-      const [
-        { data: summaryData, error: summaryError },
-        { data: articleData, error: articleError },
-      ] = await Promise.all([
-        supabase
-          .from('subtopics')
-          .select('title, long_summary, keywords, volume, public_position')
-          .eq('id', id)
-          .single(),
-        supabase
-          .from('articles')
-          .select('*')
-          .eq('subtopic_id', id)
-      ]);
-
-      if (summaryError) {
-        console.log('Error fetching data:', summaryError);
-        return;
-      } else {
-        setSummary(summaryData as Summary);
+        setSummary(data);
+        setArticles(data.articles ?? []);
+        setImages((data.articles ?? []).map((a) => a.media).filter((u): u is string => Boolean(u)));
+      } catch (err: any) {
+        console.log('Error fetching summary:', err?.message);
+      } finally {
         setIsLoading(false);
       }
-
-      if (articleError) {
-        console.log('Error fetching articles:', articleError);
-        return;
-      } else {
-        setArticles(articleData as ArticleType[]);
-      }
-
-      const { data: imageData, error: imageError } = await supabase
-        .from('articles')
-        .select('media')
-        .eq('subtopic_id', id)
-
-      if (imageError) {
-        console.log('Error fetching images:', imageError);
-        return;
-      }
-
-      // Destructure to a string[]
-      const urls = (imageData ?? [])
-        .map(({ media }) => media)
-        .filter((u): u is string => Boolean(u));
-      setImages(urls);
-
-      console.log('Fetched images:', urls);
-      console.log("Fetched article data:", articleData);
     };
 
     loadSummary();

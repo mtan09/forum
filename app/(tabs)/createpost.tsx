@@ -1,20 +1,25 @@
+import { CustomDropdown } from '@/components/customDropdown';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { IconSymbol } from '@/components/ui/icon-symbol';
-import { supabase } from '@/lib/supabaseClient';
+import { useAuth } from '@/context/authContext';
+import { usePosts } from '@/context/postContext';
+import { api, uploadImage } from '@/lib/api';
 import * as ImagePicker from 'expo-image-picker';
 import { useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { Dimensions, Image, Keyboard, Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
 
+type TopicOption = { id: string; name: string };
+
 export default function CreatePost() {
   const router = useRouter();
   const screenWidth = Dimensions.get('window').width;
-  
-  const [info, setInfo] = useState<{
-    username: string;
-    avatar_url: string | null;
-  } | null>(null);
+
+  const { user } = useAuth();
+  const { refresh } = usePosts();
+
+  const info = user ? { username: user.username, avatar_url: user.avatar_url ?? null } : null;
 
   const [post, setPost] = useState<{
     content: string;
@@ -23,94 +28,48 @@ export default function CreatePost() {
     content: '',
     media: null,
   })
-  
+
+  const [topics, setTopics] = useState<TopicOption[]>([]);
+  const [activeTopicName, setActiveTopicName] = useState<string>('');
+
   useEffect(() => {
-    const fetchProfile = async () => {
-      // Get current user
-      const user = supabase.auth.getUser();
-      const uid = (await user).data.user?.id;
-  
-      if (!uid) return;
-  
-      // Fetch userdata for this uid
-      const { data, error } = await supabase
-        .from('userdata')
-        .select('username, avatar_url')
-        .eq('id', uid)
-        .single(); // .single() ensures only one row is returned
-  
-      if (error) {
-        console.log('Error fetching profile:', error);
-        return;
-      }
-  
-      setInfo(data);
-    };
-  
-    fetchProfile();
+    api<TopicOption[]>('/topics')
+      .then((data) => {
+        setTopics(data.map((t) => ({ id: t.id, name: t.name })));
+        if (data.length > 0) setActiveTopicName((prev) => prev || data[0].name);
+      })
+      .catch((err) => console.log('Error fetching topics:', err?.message));
   }, []);
 
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState<string | null>(null);
 
-  // Helper: upload image to storage and return public URL
-  const uploadImageAsync = async (uri: string, uid: string): Promise<string> => {
-    const res = await fetch(uri);
-    const arrayBuffer = await res.arrayBuffer(); // use arrayBuffer instead of blob()
-    // Try to infer extension from URI; fallback to jpeg
-    const uriExt = uri.split('.').pop()?.split('?')[0]?.toLowerCase();
-    const ext = uriExt && uriExt.length <= 5 ? uriExt : 'jpg';
-    const contentType =
-      ext === 'png' ? 'image/png'
-      : ext === 'webp' ? 'image/webp'
-      : ext === 'heic' ? 'image/heic'
-      : ext === 'heif' ? 'image/heif'
-      : 'image/jpeg';
-
-    const path = `${uid}/${Date.now()}.${ext}`;
-
-    const { error: uploadErr } = await supabase.storage
-      .from("post-media")
-      .upload(path, arrayBuffer, { contentType });
-
-    if (uploadErr) throw uploadErr;
-
-    const { data } = supabase.storage.from("post-media").getPublicUrl(path);
-    return data.publicUrl;
-  };
-
   const handlePost = async () => {
     setErr(null);
     try {
       setLoading(true);
-      const { data: userData, error: userErr } = await supabase.auth.getUser();
-      if (userErr) throw userErr;
-      const uid = userData.user?.id;
-      console.log('CreatePost uid:', uid); // debug: confirm auth
-
-      if (!uid) {
-        setErr('User not authenticated.');
-        return;
-      }
 
       let mediaUrl: string | null = null;
       if (pickedImage) {
-        mediaUrl = await uploadImageAsync(pickedImage.uri, uid);
+        mediaUrl = await uploadImage(pickedImage.uri);
       }
 
-      const { error } = await supabase
-        .from('posts')
-        .insert({
-          user_id: uid,
+      const topicId = topics.find((t) => t.name === activeTopicName)?.id ?? null;
+
+      await api('/posts', {
+        body: {
           content: post.content.trim(),
-          media_url: mediaUrl, // store public URL
-        });
+          media_url: mediaUrl,
+          general_topic_id: topicId,
+        },
+      });
 
-      if (error) throw error;
+      await refresh();
 
-      // reset UI and optionally navigate away
+      // reset UI and go back to the feed
       setPost({ content: '', media: null });
       setPickedImage(null);
+      router.push('/');
     } catch (e: any) {
       setErr(e?.message ?? 'Something went wrong.');
     } finally {
@@ -206,6 +165,17 @@ export default function CreatePost() {
               <IconSymbol name="photo" size={20} color="#b647ff" />
               <ThemedText style={styles.secondaryButtonText}>Add Image</ThemedText>
             </Pressable>
+
+            {topics.length > 0 && (
+              <ThemedView style={styles.topicRow}>
+                <ThemedText style={{ fontWeight: '600' }}>Topic: </ThemedText>
+                <CustomDropdown
+                  options={topics.map((t) => t.name)}
+                  value={activeTopicName}
+                  onValueChange={setActiveTopicName}
+                />
+              </ThemedView>
+            )}
           </ThemedView>
         </ScrollView>
 
@@ -316,6 +286,12 @@ const styles = StyleSheet.create({
   actionContainer: {
     gap: 12,
     marginBottom: 20,
+  },
+  topicRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    zIndex: 10,
   },
   secondaryButton: {
     flexDirection: 'row',

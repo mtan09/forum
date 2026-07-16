@@ -1,7 +1,7 @@
-import { supabase } from '@/lib/supabaseClient';
+import { useAuth } from '@/context/authContext';
 import { useRouter } from 'expo-router';
 import React, { useState } from 'react';
-import { ActivityIndicator, Alert, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 
 export default function Login() {
   const [email, setEmail] = useState('');
@@ -10,6 +10,7 @@ export default function Login() {
   const [err, setErr] = useState<string | null>(null);
 
   const router = useRouter();
+  const { signIn } = useAuth();
 
   const handleSignIn = async () => {
     setErr(null);
@@ -18,25 +19,13 @@ export default function Login() {
 
     try {
       setLoading(true);
-      const { error } = await supabase.auth.signInWithPassword({
-        email: email.trim(),
-        password,
-      });
-
-      if (error) {
-        setErr(error.message);
-        return;
-      }
-
-      Alert.alert('Signed in', 'You are now signed in.');
+      await signIn(email.trim(), password);
+      // root layout redirects to the feed once the session is set
     } catch (e: any) {
       setErr(e?.message ?? 'Something went wrong.');
     } finally {
       setLoading(false);
     }
-
-    // router.replace('/');
-
   };
 
   return (

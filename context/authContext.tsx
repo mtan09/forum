@@ -1,12 +1,24 @@
-import { Session, User } from '@supabase/supabase-js'
 import React, { createContext, ReactNode, useContext, useEffect, useMemo, useState } from 'react'
-import { supabase } from '../lib/supabaseClient'
+import { api, getToken, setToken } from '../lib/api'
+
+export type AuthUser = {
+  id: string
+  username: string
+  email?: string
+  avatar_url?: string | null
+  bio?: string | null
+  header_url?: string | null
+}
 
 type AuthContextType = {
-  session: Session | null
-  user: User | null
+  // session mirrors the old supabase shape ({ user } | null) so existing
+  // truthiness checks in screens keep working
+  session: { user: AuthUser } | null
+  user: AuthUser | null
   loading: boolean
   isAuthenticated: boolean
+  signIn: (email: string, password: string) => Promise<void>
+  signUp: (username: string, email: string, password: string) => Promise<void>
   signOut: () => Promise<void>
 }
 
@@ -15,64 +27,77 @@ const AuthContext = createContext<AuthContextType>({
   user: null,
   loading: true,
   isAuthenticated: false,
+  signIn: async () => {},
+  signUp: async () => {},
   signOut: async () => {},
 })
 
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
-  const [session, setSession] = useState<Session | null>(null)
-  const [user, setUser] = useState<User | null>(null)
+  const [user, setUser] = useState<AuthUser | null>(null)
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
     let isMounted = true
 
-    const getInitialSession = async () => {
+    const restoreSession = async () => {
       try {
-        const { data, error } = await supabase.auth.getSession()
-        if (error) console.log('Error getting session:', error.message)
-        if (!isMounted) return
-        setSession(data.session)
-        setUser(data.session?.user ?? null)
-      } catch (err) {
-        if (isMounted) console.log('Unexpected error getting session:', err)
+        const token = await getToken()
+        if (!token) return
+        const me = await api<AuthUser>('/users/me')
+        if (isMounted) setUser(me)
+      } catch {
+        // token expired or invalid — clear it
+        await setToken(null)
+        if (isMounted) setUser(null)
       } finally {
         if (isMounted) setLoading(false)
       }
     }
 
-    getInitialSession()
-
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, newSession) => {
-      if (!isMounted) return
-      setSession(newSession)
-      setUser(newSession?.user ?? null)
-      setLoading(false)
+    restoreSession().then(() => {
+      if (isMounted) setLoading(false)
     })
 
     return () => {
       isMounted = false
-      subscription.unsubscribe()
     }
   }, [])
 
-  const signOut = async () => {
-    const { error } = await supabase.auth.signOut()
-    if (error) console.log('Error signing out:', error.message)
+  const signIn = async (email: string, password: string) => {
+    const { token, user: me } = await api<{ token: string; user: AuthUser }>('/auth/login', {
+      body: { email, password },
+    })
+    await setToken(token)
+    setUser(me)
   }
 
-  const value = useMemo(() => ({
-    session,
-    user,
-    loading,
-    isAuthenticated: !!session?.user?.id,
-    signOut,
-  }), [session, user, loading])
+  const signUp = async (username: string, email: string, password: string) => {
+    const { token, user: me } = await api<{ token: string; user: AuthUser }>('/auth/signup', {
+      body: { username, email, password },
+    })
+    await setToken(token)
+    setUser(me)
+  }
 
-  return (
-    <AuthContext.Provider value={value}>
-      {children}
-    </AuthContext.Provider>
+  const signOut = async () => {
+    await setToken(null)
+    setUser(null)
+  }
+
+  const value = useMemo(
+    () => ({
+      session: user ? { user } : null,
+      user,
+      loading,
+      isAuthenticated: !!user,
+      signIn,
+      signUp,
+      signOut,
+    }),
+    [user, loading]
   )
+
+  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
 }
 
 export const useAuth = () => useContext(AuthContext)

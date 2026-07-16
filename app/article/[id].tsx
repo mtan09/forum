@@ -1,7 +1,7 @@
 import Article, { ArticleType } from '@/components/articleComponent';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { supabase } from '@/lib/supabaseClient';
+import { api } from '@/lib/api';
 import { useLocalSearchParams } from 'expo-router';
 import * as WebBrowser from 'expo-web-browser';
 import { useEffect, useMemo, useState } from 'react';
@@ -22,16 +22,12 @@ export default function ArticleScreen() {
     const load = async () => {
       setLoading(true);
       setError(null);
-      const { data, error } = await supabase
-        .from('articles')
-        .select('*')
-        .eq('id', articleId)
-        .single();
-      if (error) {
-        setError(error.message ?? 'Failed to load article');
+      try {
+        const data = await api<ArticleType>(`/articles/${articleId}`);
+        setArticle(data);
+      } catch (err: any) {
+        setError(err?.message ?? 'Failed to load article');
         setArticle(null);
-      } else {
-        setArticle(data as ArticleType);
       }
       setLoading(false);
     };

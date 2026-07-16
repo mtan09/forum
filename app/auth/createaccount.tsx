@@ -1,8 +1,8 @@
 import ScalableImage from '@/components/scalable-image';
-import { supabase } from '@/lib/supabaseClient'; // <-- update if your path differs
+import { useAuth } from '@/context/authContext';
 import { useRouter } from 'expo-router';
 import React, { useState } from 'react';
-import { ActivityIndicator, Alert, KeyboardAvoidingView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, KeyboardAvoidingView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 
 export default function CreateAccount() {
   const [name, setName] = useState('');
@@ -11,6 +11,8 @@ export default function CreateAccount() {
   const [confirm, setConfirm] = useState('');
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState<string | null>(null);
+
+  const { signUp } = useAuth();
 
   const handleSignUp = async () => {
     setErr(null);
@@ -21,49 +23,15 @@ export default function CreateAccount() {
 
     try {
       setLoading(true);
-      const { data: authUser, error: signUpError } = await supabase.auth.signUp({
-        email: email.trim(),
-        password,
-        options: {
-          data: { 
-            full_name: name.trim(),
-            created_at: new Date().toISOString(),
-          },
-        },
-      });
-
-
-      if (signUpError) {
-        setErr(signUpError.message);
-        return;
-      }
-
-      console.log('auth user ID:', authUser.user?.id);
-
-      const { data, error } = await supabase
-        .from('userdata')
-        .insert([
-          { id: authUser.user?.id, username: name.trim() },
-        ])
-        .select()
-
-      if (error) {
-        setErr(error.message);
-        return;
-      }
-
-      Alert.alert('Account created', 'Your account has been created.');
-
+      await signUp(name.trim(), email.trim(), password);
+      // root layout redirects to the feed once the session is set
     } catch (e: any) {
       setErr(e?.message ?? 'Something went wrong.');
     } finally {
       setLoading(false);
     }
-
-    // router.replace('/');
-
   };
-  
+
   const router = useRouter();
 
   return (

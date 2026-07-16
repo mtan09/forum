@@ -33,27 +33,6 @@ export default function Article({ article }: Props) {
 
   const timeAgo = useRelativeTime(article.published_at);
 
-  // const [ user, setUser ] = useState<UserType>({ id: '', username: '' });
-
-  // useEffect(() => {
-  //   const fetchUser = async () => {
-  //     const { data, error } = await supabase
-  //       .from('userdata')
-  //       .select('id, username, avatar_url')
-  //       .eq('id', post.user)
-  //       .single();
-
-  //     if (error) {
-  //       console.log('Error fetching profile:', error);
-  //       return;
-  //     }
-
-  //     setUser(data);
-  //   };
-
-  //   fetchUser(); 
-  // }, [post]);
-
   return (
     <ThemedView style={styles.post}>
       <ThemedView style={styles.postContent}>

@@ -2,9 +2,9 @@ import ScalableImage from '@/components/scalable-image';
 import Spectrum from '@/components/spectrum';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { supabase } from '@/lib/supabaseClient';
+import { useAuth } from '@/context/authContext';
 import { useRouter } from 'expo-router';
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { Dimensions, Image, ScrollView, StyleSheet } from 'react-native';
 
 const screenWidth = Dimensions.get('window').width;
@@ -40,38 +40,8 @@ export default function Profile() {
 
   const router = useRouter();
 
-  const [profile, setProfile] = useState<{
-    username: string;
-    avatar_url: string | null;
-    bio: string | null;
-    header_url: string | null;
-  } | null>(null);
-
-  useEffect(() => {
-    const fetchProfile = async () => {
-      // Get current user
-      const user = supabase.auth.getUser();
-      const uid = (await user).data.user?.id;
-
-      if (!uid) return;
-
-      // Fetch userdata for this uid
-      const { data, error } = await supabase
-        .from('userdata')
-        .select('username, avatar_url, bio, header_url')
-        .eq('id', uid)
-        .single(); // .single() ensures only one row is returned
-
-      if (error) {
-        console.log('Error fetching profile:', error);
-        return;
-      }
-
-      setProfile(data);
-    };
-
-    fetchProfile();
-  }, []);
+  // profile data comes from the auth session (/users/me)
+  const { user: profile } = useAuth();
 
   return(
     <ScrollView>

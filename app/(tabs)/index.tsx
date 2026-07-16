@@ -5,7 +5,7 @@ import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { useAuth } from '@/context/authContext';
 import { usePosts } from '@/context/postContext';
-import { supabase } from '@/lib/supabaseClient';
+import { api } from '@/lib/api';
 import { LinearGradient } from "expo-linear-gradient";
 import { useRouter } from 'expo-router';
 import * as WebBrowser from 'expo-web-browser';
@@ -45,7 +45,7 @@ export default function Feed() {
 
   const router = useRouter();
 
-  const { posts, setPosts, error, handleUpvote, handleUnUpvote, handleDownvote, handleUnDownvote } = usePosts();
+  const { posts, error } = usePosts();
 
   const scrollY = useRef(new Animated.Value(0)).current;
 
@@ -91,48 +91,21 @@ export default function Feed() {
   }, [activeSubtopicGroup]);
 
   useEffect(() => {
-    // fetch topics + subtopics in parallel and group subtopics by general_topic_id
+    // /topics returns topics (sorted by importance) with their subtopics nested
     const load = async () => {
-      const [
-        { data: topicData, error: topicError },
-        { data: subtopicData, error: subtopicError },
-      ] = await Promise.all([
-        supabase
-          .from('general_topics')
-          .select('id, name, slug, spectrum_left_label, spectrum_right_label, spectrum_left_description, spectrum_right_description, importance'),
-        supabase
-          .from('subtopics')
-          .select('id, general_topic_id, title, short_summary'),
-      ]);
+      try {
+        const data = await api<(Topic & { subtopics: Subtopic[] })[]>('/topics');
 
-      if (topicError) {
-        console.log('Error fetching topics:', topicError);
-      } else {
-        const sorted = ((topicData ?? []) as Topic[])
-          .slice()
-          .sort((a, b) => (b.importance ?? 0) - (a.importance ?? 0));
-        setTopics(sorted);
-        setActiveTopic(prev => prev ?? (sorted?.[0] ?? null));
-        console.log('Fetched topics (sorted by importance desc):', sorted);
-      }
+        setTopics(data);
+        setActiveTopic(prev => prev ?? (data?.[0] ?? null));
 
-      if (subtopicError) {
-        console.log('Error fetching subtopics:', subtopicError);
-      } else {
         const grouped: Record<string, Subtopic[]> = {};
-        (subtopicData as Subtopic[] | null)?.forEach((s) => {
-          const key = String(s.general_topic_id);
-          if (!grouped[key]) grouped[key] = [];
-          grouped[key].push(s);
+        data.forEach((t) => {
+          grouped[String(t.id)] = t.subtopics ?? [];
         });
         setSubtopicsByTopic(grouped);
-        console.log('Fetched subtopics:', subtopicData);
-
-        // setActiveSubtopicGroup(grouped[topicData?.[0]?.id ?? ''] ?? null);
-        // setActiveSubtopic(grouped[topicData?.[0]?.id ?? '']?.[0] ?? null);
-
-        // console.log('Active subtopic group:', activeSubtopicGroup);
-        // console.log('Active subtopic:', activeSubtopic);
+      } catch (err: any) {
+        console.log('Error fetching topics:', err?.message);
       }
     };
 
@@ -216,18 +189,12 @@ export default function Feed() {
 
   useEffect(() => {
     const fetchArticles = async () => {
-      const { data, error } = await supabase
-        .from('articles')
-        .select('*');
-
-      if (error) {
-        console.log('Error fetching articles:', error);
-        return;
+      try {
+        const rows = await api<ArticleType[]>('/articles');
+        setArticles(rows);
+      } catch (err: any) {
+        console.log('Error fetching articles:', err?.message);
       }
-
-      const rows = (data ?? []) as ArticleType[];
-      setArticles(rows);
-      // console.log('Fetched articles:', rows);
     };
 
     fetchArticles();

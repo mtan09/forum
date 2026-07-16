@@ -2,8 +2,8 @@ import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { usePosts } from '@/context/postContext';
-import { useState } from 'react';
 import { Dimensions, Pressable, Share, StyleSheet } from 'react-native';
+import { useState } from 'react';
 import { type PostType, type UserType } from './postComponent';
 
 export type PostActionsProps = {
@@ -14,11 +14,12 @@ export type PostActionsProps = {
 const screenWidth = Dimensions.get('window').width;
 
 export default function PostActions({ post, user }: PostActionsProps) {
-  const [isUpvoted, setUpvoted] = useState(false);
-  const [isDownvoted, setDownvoted] = useState(false);
   const [isBookmarked, setBookmarked] = useState(false);
 
-  const { posts, setPosts, error, handleUpvote, handleUnUpvote, handleDownvote, handleUnDownvote } = usePosts();
+  const { vote } = usePosts();
+
+  const isUpvoted = post.myVote === 'up';
+  const isDownvoted = post.myVote === 'down';
 
   const formatCount = (count: number | null | undefined): string => {
     if (!count) return '0';
@@ -53,20 +54,7 @@ export default function PostActions({ post, user }: PostActionsProps) {
     <ThemedView style={styles.container}>
 
       {/* Upvote */}
-      <Pressable onPress={() => {
-          if (isUpvoted) {
-            setUpvoted(false);
-            handleUnUpvote(post.id);
-          } else if (isDownvoted) {
-            setDownvoted(false);
-            handleUnDownvote(post.id);
-            setUpvoted(true);
-            handleUpvote(post.id);
-          } else {
-            setUpvoted(true);
-            handleUpvote(post.id);
-          }
-        }}>
+      <Pressable onPress={() => vote(post.id, isUpvoted ? null : 'up')}>
         <ThemedView style={[styles.reactions, styles.upvote]}>
           <IconSymbol name={isUpvoted ? "arrowshape.up.fill" : "arrowshape.up"} size={20} color={isUpvoted ? "#14DD78" : "#8D8D8D"} />
           <ThemedText style={{color: isUpvoted ? "#14DD78" : "#8D8D8D"}}>
@@ -76,20 +64,7 @@ export default function PostActions({ post, user }: PostActionsProps) {
       </Pressable>
 
       {/* Downvote */}
-      <Pressable onPress={() => {
-          if (isDownvoted) {
-            setDownvoted(false);
-            handleUnDownvote(post.id);
-          } else if (isUpvoted) {
-            setUpvoted(false);
-            handleUnUpvote(post.id);
-            setDownvoted(true);
-            handleDownvote(post.id);
-          } else {
-            setDownvoted(true);
-            handleDownvote(post.id);
-          }
-        }}>
+      <Pressable onPress={() => vote(post.id, isDownvoted ? null : 'down')}>
         <ThemedView style={[styles.reactions, styles.downvote]}>
           <IconSymbol name={isDownvoted ? "arrowshape.down.fill" : "arrowshape.down"} size={20} color={isDownvoted ? "#FF0080" : "#8D8D8D"} />
           <ThemedText style={{color: isDownvoted ? "#FF0080" : "#8D8D8D"}}>
@@ -97,22 +72,16 @@ export default function PostActions({ post, user }: PostActionsProps) {
           </ThemedText>
         </ThemedView>
       </Pressable>
-      
+
       {/* Comment */}
-      <Pressable onPress={() => {
-          console.log("Comment button pressed");
-          // Add navigation to comments screen
-        }}>
       <ThemedView style={[styles.reactions, styles.comments]}>
         <IconSymbol name="bubble" size={20} color="#8D8D8D" />
         <ThemedText lightColor={"#8D8D8D"}>{formatCount(post.commentCount)}</ThemedText>
       </ThemedView>
-      </Pressable>
-      
+
       {/* Bookmark */}
       <ThemedView style={[styles.reactions, styles.bookmark]}>
         <Pressable onPress={() => {
-          console.log("Bookmark button pressed");
           setBookmarked(!isBookmarked);
 
           //Functionality later
@@ -123,10 +92,7 @@ export default function PostActions({ post, user }: PostActionsProps) {
 
       {/* Share */}
       <ThemedView style={[styles.reactions, styles.share]}>
-        <Pressable onPress={() => {
-          console.log("Share button pressed");
-          handleShare();
-        }}>
+        <Pressable onPress={handleShare}>
           <IconSymbol name="square.and.arrow.up" size={20} color="#8D8D8D" />
         </Pressable>
       </ThemedView>
@@ -137,7 +103,6 @@ export default function PostActions({ post, user }: PostActionsProps) {
 const styles = StyleSheet.create({
   container: {
     flexDirection: 'row',
-    // justifyContent: 'space-between',
   },
   reactions: {
     flexDirection: 'row',

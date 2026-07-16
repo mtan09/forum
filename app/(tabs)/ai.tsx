@@ -2,12 +2,9 @@ import { CustomDropdown } from '@/components/customDropdown';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { IconSymbol } from '@/components/ui/icon-symbol';
-import { supabase } from '@/lib/supabaseClient';
+import { api } from '@/lib/api';
 import { useEffect, useRef, useState } from 'react';
 import { Animated, Dimensions, Image, Keyboard, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, TextInput } from 'react-native';
-
-// import { createClient } from '@supabase/supabase-js'
-// const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY)
 
 const screenWidth = Dimensions.get('window').width;
 const screenHeight = Dimensions.get('window').height;
@@ -117,31 +114,40 @@ export default function AI() {
 
     setIsLoading(true);
     const fetchMessage = async () => {
-      const { data, error } = await supabase.functions.invoke('super-handler', {
-        body: { message: userMessage, framing: activeFraming },
-      });
+      try {
+        const data = await api<{ left: string; center: string; right: string }>('/ai/chat', {
+          body: { message: userMessage, framing: activeFraming },
+        });
 
-      if (error) {
-        console.error('Error invoking forumAI function:', JSON.stringify(error, null, 2));
+        setMessages(prev => [
+          ...prev,
+          {
+            id: Date.now().toString(),
+            sender: "ai",
+            content: activeLean === 'Left' ? data.left : (activeLean === 'Center' ? data.center : data.right),
+            left: data.left,
+            center: data.center,
+            right: data.right,
+          }
+        ]);
+      } catch (error: any) {
+        console.error('Error invoking forumAI:', error?.message);
+        setMessages(prev => [
+          ...prev,
+          {
+            id: Date.now().toString(),
+            sender: "ai",
+            content: error?.message ?? 'forumAI is unavailable right now.',
+            left: error?.message,
+            center: error?.message,
+            right: error?.message,
+          }
+        ]);
+      } finally {
         setIsLoading(false);
-        return;
       }
-      setMessages(prev => [
-      ...prev,
-      {
-        id: Date.now().toString(),
-        sender: "ai",
-        content: activeLean === 'Left' ? data.left : (activeLean === 'Center' ? data.center : data.right),
-        left: data.left,
-        center: data.center,
-        right: data.right,
-      }
-      ]);
-      setIsLoading(false);
-
-      console.log('forumAI response data:', data.left, '\n', data.center, '\n', data.right);
     }
-    
+
     fetchMessage();
   };
 
@@ -292,7 +298,7 @@ export default function AI() {
 
           {/* Explain like I'm ... */}
           <ThemedView style={styles.pickerContainer}>
-            <ThemedText style={{fontWeight: '600'}}>🎓 Explain like I'm: </ThemedText>
+            <ThemedText style={{fontWeight: '600'}}>🎓 Explain like I&apos;m: </ThemedText>
             <CustomDropdown
               options={framings}
               value={activeFraming}

@@ -5,8 +5,6 @@ import { useColorScheme } from '@/hooks/use-color-scheme';
 
 import { PostProvider } from '../context/postContext';
 
-import { TopicProvider } from '@/context/topicContext';
-
 import { AuthProvider, useAuth } from '@/context/authContext';
 
 import { ActivityIndicator, View } from 'react-native';
@@ -51,7 +49,6 @@ function AppNavigator() {
 
   return (
     <PostProvider>
-      <TopicProvider>
         <Stack
           screenOptions={{
             headerTintColor: "#b647ff",
@@ -112,7 +109,6 @@ function AppNavigator() {
             }}
           /> */}
         </Stack>
-      </TopicProvider>
     </PostProvider>
   );
 }

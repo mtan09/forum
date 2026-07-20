@@ -7,7 +7,7 @@ type SpectrumProps = {
   width: number;
   height?: number;
   topic?: string;
-  position: number;
+  position: number;  // 0 = left (blue) … 1 = right (red)
   textStyle?: StyleProp<TextStyle>;
 }
 
@@ -23,8 +23,9 @@ export default function Spectrum({width, height = 20, position, topic, textStyle
       )}
       <View style={styles.background}>
         <LinearGradient
-          colors={['#E8C4FF', '#9A00FF']}
-          // colors={['#C8B9F3', '#592EDC']}
+          // blue (left) → purple (center) → red (right)
+          colors={['#2563EB', '#8B5CF6', '#EF4444']}
+          locations={[0, 0.5, 1]}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 0 }}
           style={{ width, height, borderRadius: 16}}
@@ -35,9 +36,9 @@ export default function Spectrum({width, height = 20, position, topic, textStyle
         }]}/>
 
       </View>
-      
+
     </ThemedView>
-      
+
   );
 }
 

@@ -5,13 +5,14 @@ import { ThemedView } from '@/components/themed-view';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { usePosts } from '@/context/postContext';
 import { api } from '@/lib/api';
-import { useLocalSearchParams } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useState } from 'react';
 import { Dimensions, Keyboard, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, TextInput } from 'react-native';
 
 const screenWidth = Dimensions.get('window').width;
 
 export default function PostScreen() {
+  const router = useRouter();
   const { id } = useLocalSearchParams();
   const { posts, refresh } = usePosts();
 
@@ -53,6 +54,25 @@ export default function PostScreen() {
           post={post}
         />
         <ThemedView style={styles.container}>
+          {/* Hand this post to forumAI as the chat subject */}
+          <Pressable
+            onPress={() =>
+              router.push({
+                pathname: '/(tabs)/ai',
+                params: {
+                  subjectKind: 'post',
+                  subjectId: post.id,
+                  subjectTitle: (post.text ?? '').slice(0, 80) || 'Post',
+                  subjectTs: String(Date.now()),
+                },
+              })
+            }
+            style={({ pressed }) => [styles.aiButton, { opacity: pressed ? 0.7 : 1 }]}
+          >
+            <IconSymbol name="sparkles" size={18} color="#FFFFFF" />
+            <ThemedText style={styles.aiButtonText}>Ask forumAI about this post</ThemedText>
+          </Pressable>
+
           {/* Comments */}
           <ThemedView style={{ marginTop: 8 }}>
             <ThemedText type="defaultSemiBold" style={{ fontWeight: '800', marginBottom: 8 }}>Comments</ThemedText>
@@ -96,21 +116,36 @@ const styles = StyleSheet.create({
     padding: 16,
     gap: 12,
   },
+  aiButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    paddingVertical: 12,
+    borderRadius: 16,
+    backgroundColor: '#B647FF',
+  },
+  aiButtonText: {
+    fontWeight: '700',
+    color: '#FFFFFF',
+  },
   composer: {
     flexDirection: 'row',
-    alignItems: 'flex-end',
+    alignItems: 'center',
     gap: 8,
     borderColor: '#E9C8FF',
     borderWidth: 2,
     borderRadius: 16,
     paddingHorizontal: 12,
-    paddingVertical: 8,
+    paddingVertical: 10,
     marginBottom: 12,
   },
   composerInput: {
     flex: 1,
     fontSize: 15,
     maxHeight: 96,
+    paddingTop: 0,
+    paddingBottom: 0,
   },
   composerError: {
     color: '#b91c1c',

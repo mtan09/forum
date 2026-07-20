@@ -28,9 +28,9 @@ export default function TabLayout() {
         }} 
       />
       <Tabs.Screen
-        name="createpost"
+        name="debate"
         options={{
-          tabBarIcon: ({ color, focused }) => <IconSymbol size={30} color={color} name={focused ? "plus.app.fill" : "plus.app"} />,
+          tabBarIcon: ({ color, focused }) => <IconSymbol size={30} color={color} name={focused ? "bubble.left.and.bubble.right.fill" : "bubble.left.and.bubble.right"} />,
         }}
       />
       <Tabs.Screen
@@ -40,15 +40,9 @@ export default function TabLayout() {
         }}
       />
       <Tabs.Screen
-        name="settings"
+        name="search"
         options={{
-          tabBarIcon: ({ color, focused }) => <IconSymbol size={30} color={color} name={focused ? "gearshape.fill" : "gearshape"} />,
-          headerShown: true,
-          title: 'Settings',
-          headerTitleStyle: {
-            fontWeight: '800',
-            fontSize: 20,
-          }
+          tabBarIcon: ({ color, focused }) => <IconSymbol size={30} color={color} name="magnifyingglass" />,
         }}
       />
       <Tabs.Screen

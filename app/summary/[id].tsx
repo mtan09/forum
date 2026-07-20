@@ -1,5 +1,4 @@
 import { ArticleType } from '@/components/articleComponent';
-import Carousel from '@/components/carousel';
 import ImageCarousel from '@/components/imageCarousel';
 import Spectrum from '@/components/spectrum';
 import { ThemedText } from '@/components/themed-text';
@@ -10,14 +9,40 @@ import { useEffect, useState } from 'react';
 import { Dimensions, Image, Pressable, ScrollView, StyleSheet } from 'react-native';
 
 const screenWidth =  Dimensions.get('window').width;
+const MAX_IMAGES = 6;
+const MAX_ARTICLES = 12;
 
 type Summary = {
   title: string;
   long_summary: string;
   keywords: string[];
   volume: number;
-  public_position: number;
+  public_position: number | null;
 }
+
+// The generated long_summary has a fixed shape — "From the left (Source):
+// quote" paragraphs — so it parses cleanly into perspective cards.
+type Perspective = { lean: 'left' | 'center' | 'right'; source: string; quote: string };
+
+function parsePerspectives(text: string): Perspective[] | null {
+  const matches = [...text.matchAll(/From the (left|center|right) \(([^)]+)\):\s*/gi)];
+  if (matches.length === 0) return null;
+  return matches.map((m, i) => {
+    const start = (m.index ?? 0) + m[0].length;
+    const end = i + 1 < matches.length ? matches[i + 1].index ?? text.length : text.length;
+    return {
+      lean: m[1].toLowerCase() as Perspective['lean'],
+      source: m[2],
+      quote: text.slice(start, end).trim(),
+    };
+  });
+}
+
+const LEAN_STYLE: Record<Perspective['lean'], { label: string; color: string; bg: string }> = {
+  left:   { label: 'Left',   color: '#2563EB', bg: '#E8F0FE' },
+  center: { label: 'Center', color: '#6B7280', bg: '#F1F1F3' },
+  right:  { label: 'Right',  color: '#DC2626', bg: '#FDE8E8' },
+};
 
 export default function SummaryScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -28,6 +53,9 @@ export default function SummaryScreen() {
   const [ articles, setArticles ] = useState<ArticleType[]>([]);
 
   const [ images, setImages ] = useState<string[]>([]);
+
+  // Card images that fail to load fall back to the lettered placeholder
+  const [failedMedia, setFailedMedia] = useState<Set<string>>(new Set());
 
   const formatCount = (count: number): string => {
     if (count >= 1000000) {
@@ -53,7 +81,12 @@ export default function SummaryScreen() {
 
         setSummary(data);
         setArticles(data.articles ?? []);
-        setImages((data.articles ?? []).map((a) => a.media).filter((u): u is string => Boolean(u)));
+        setImages(
+          (data.articles ?? [])
+            .map((a) => a.media)
+            .filter((u): u is string => Boolean(u))
+            .slice(0, MAX_IMAGES)
+        );
       } catch (err: any) {
         console.log('Error fetching summary:', err?.message);
       } finally {
@@ -66,6 +99,9 @@ export default function SummaryScreen() {
 
   const text = '📊 ' + formatCount(summary?.volume ?? 0) + ' posts' + '   •   ' + summary?.keywords.join('   •   ');
 
+  const perspectives = summary?.long_summary ? parsePerspectives(summary.long_summary) : null;
+  const outletCount = new Set(articles.map((a) => a.source)).size;
+  const shownArticles = articles.slice(0, MAX_ARTICLES);
 
   return (
 
@@ -79,49 +115,102 @@ export default function SummaryScreen() {
         <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ maxHeight: 24, marginBottom: 8 }}>
           <ThemedText numberOfLines={1} ellipsizeMode="clip" style={{ color: '#9A00FF' }}>{text}   •   {text}</ThemedText>
         </ScrollView>
-        
+
         {images && images.length > 0 && (
           <ImageCarousel images={images} height={240} />
         )}
 
-        <ThemedView style={styles.summary}>
-          <ThemedText type="defaultSemiBold" style={{fontWeight: "800"}}>
-            {summary?.long_summary}
-          </ThemedText>
-        </ThemedView>
-
-        <Spectrum width={(screenWidth - 32)} height={20} topic="Public Opinion" position={summary?.public_position ?? 0.5} textStyle={{fontWeight: '800'}}/>
-        
-        {/* Articles carousel */}
-        {articles && articles.length > 0 && (
-          <ThemedView style={{ marginTop: 12 }}>
-            <ThemedText type="defaultSemiBold" style={{ fontWeight: '800', marginBottom: 8 }}>
-              Latest coverage
+        {/* Coverage by perspective — one voice per side of the spectrum */}
+        {perspectives ? (
+          <ThemedView style={styles.perspectives}>
+            {perspectives.map((p) => {
+              const s = LEAN_STYLE[p.lean];
+              return (
+                <ThemedView key={p.lean} style={[styles.perspectiveCard, { backgroundColor: s.bg, borderLeftColor: s.color }]}>
+                  <ThemedView style={styles.perspectiveHeader}>
+                    <ThemedView style={[styles.leanTag, { backgroundColor: s.color }]}>
+                      <ThemedText style={styles.leanTagText}>{s.label}</ThemedText>
+                    </ThemedView>
+                    <ThemedText type="defaultSemiBold" style={styles.perspectiveSource}>{p.source}</ThemedText>
+                  </ThemedView>
+                  <ThemedText style={styles.perspectiveQuote}>{p.quote}</ThemedText>
+                </ThemedView>
+              );
+            })}
+          </ThemedView>
+        ) : summary?.long_summary ? (
+          <ThemedView style={styles.summary}>
+            <ThemedText type="defaultSemiBold" style={{fontWeight: "800"}}>
+              {summary.long_summary}
             </ThemedText>
-            <Carousel
-              data={articles}
-              keyExtractor={(a) => a.id}
-              horizontalPadding={16}
-              renderItem={({ item, size }) => (
+          </ThemedView>
+        ) : null}
+
+        {/* Public opinion = average scored position of matched posts;
+            hidden until enough community posts exist for this story */}
+        {summary?.public_position != null && (
+          <Spectrum width={(screenWidth - 32)} height={20} topic="Public Opinion" position={summary.public_position} textStyle={{fontWeight: '800'}}/>
+        )}
+
+        {/* Coverage rail: peeking cards signal scrollability — no dots
+            needed no matter how many articles the story gathers */}
+        {shownArticles.length > 0 && (
+          <ThemedView style={{ marginTop: 12 }}>
+            <ThemedView style={styles.coverageHeader}>
+              <ThemedText type="defaultSemiBold" style={{ fontWeight: '800' }}>
+                Latest coverage
+              </ThemedText>
+              <ThemedText style={styles.coverageCount}>
+                {articles.length} article{articles.length === 1 ? '' : 's'} · {outletCount} outlet{outletCount === 1 ? '' : 's'}
+              </ThemedText>
+            </ThemedView>
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              decelerationRate="fast"
+              snapToInterval={screenWidth * 0.68 + 12}
+              snapToAlignment="start"
+              // Edge padding centers every snapped card on screen —
+              // including the first and last
+              contentContainerStyle={{
+                gap: 12,
+                paddingHorizontal: (screenWidth - screenWidth * 0.68) / 2 - 16,
+              }}
+            >
+              {shownArticles.map((item) => (
                 <Pressable
+                  key={item.id}
                   onPress={() => router.push(`/article/${item.id}`)}
                   style={({ pressed }) => ({ opacity: pressed ? 0.7 : 1.0 })}
                 >
-                  <ThemedView style={styles.articleCard}> 
-                    {item.media ? (
+                  <ThemedView style={[styles.articleCard, { width: screenWidth * 0.68 }]}>
+                    {/* Image frame always renders at the same size; a
+                        lettered placeholder fills in when there's no media
+                        (or the media URL turns out to be dead) */}
+                    {item.media && !failedMedia.has(item.media) ? (
                       <Image
                         source={{ uri: item.media }}
                         style={styles.articleImage}
+                        resizeMode="cover"
+                        onError={() =>
+                          setFailedMedia((prev) => new Set(prev).add(item.media!))
+                        }
                       />
-                    ) : null}
-                    <ThemedText style={styles.articleSource}>{item.source}</ThemedText>
+                    ) : (
+                      <ThemedView style={[styles.articleImage, styles.articleImagePlaceholder]}>
+                        <ThemedText style={styles.articleImageInitial}>
+                          {(item.source ?? '?').charAt(0).toUpperCase()}
+                        </ThemedText>
+                      </ThemedView>
+                    )}
+                    <ThemedText style={styles.articleSource} numberOfLines={1}>{item.source}</ThemedText>
                     <ThemedText type="defaultSemiBold" style={styles.articleHeadline} numberOfLines={3}>
                       {item.title}
                     </ThemedText>
                   </ThemedView>
                 </Pressable>
-              )}
-            />
+              ))}
+            </ScrollView>
           </ThemedView>
         )}
 
@@ -144,9 +233,50 @@ const styles = StyleSheet.create({
     padding: 16,
     marginBottom: 8,
   },
-  news: {
-    gap: 16,
-    marginTop: 12,
+  perspectives: {
+    gap: 10,
+    marginBottom: 8,
+  },
+  perspectiveCard: {
+    borderRadius: 12,
+    borderLeftWidth: 4,
+    padding: 12,
+    gap: 6,
+  },
+  perspectiveHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: 'transparent',
+  },
+  leanTag: {
+    borderRadius: 9,
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+  },
+  leanTagText: {
+    color: '#FFFFFF',
+    fontSize: 12,
+    fontWeight: '800',
+    lineHeight: 16,
+  },
+  perspectiveSource: {
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  perspectiveQuote: {
+    fontSize: 15,
+    lineHeight: 21,
+  },
+  coverageHeader: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    justifyContent: 'space-between',
+    marginBottom: 8,
+  },
+  coverageCount: {
+    color: '#8D8D8D',
+    fontSize: 13,
   },
   articleCard: {
     borderRadius: 16,
@@ -157,9 +287,20 @@ const styles = StyleSheet.create({
   },
   articleImage: {
     width: '100%',
-    height: 160,
+    height: 140,
     borderRadius: 12,
     marginBottom: 8,
+  },
+  articleImagePlaceholder: {
+    backgroundColor: '#E9C8FF',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  articleImageInitial: {
+    fontSize: 44,
+    lineHeight: 52,
+    fontWeight: '800',
+    color: '#9A00FF',
   },
   articleSource: {
     color: '#B647FF',
@@ -170,22 +311,6 @@ const styles = StyleSheet.create({
     fontSize: 16,
     lineHeight: 22,
     fontWeight: '700',
+    height: 66, // always reserve 3 lines so every card is the same height
   },
-  article: {
-    flexDirection: 'row',
-    
-    // width: screenWidth - 32,
-    
-  },
-  articleTitle: {
-    flexShrink: 1,
-    flexWrap: 'wrap',
-    width: (screenWidth-32)/2,
-    color: "#B647FF",
-    textDecorationLine: 'underline'
-  },
-  newsSource: {
-    width: (screenWidth-32)/2-8,
-    marginLeft: 8,
-  }
 });

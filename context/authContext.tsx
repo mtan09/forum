@@ -8,6 +8,7 @@ export type AuthUser = {
   avatar_url?: string | null
   bio?: string | null
   header_url?: string | null
+  created_at?: string
 }
 
 type AuthContextType = {
@@ -20,6 +21,7 @@ type AuthContextType = {
   signIn: (email: string, password: string) => Promise<void>
   signUp: (username: string, email: string, password: string) => Promise<void>
   signOut: () => Promise<void>
+  refreshUser: () => Promise<void>
 }
 
 const AuthContext = createContext<AuthContextType>({
@@ -30,6 +32,7 @@ const AuthContext = createContext<AuthContextType>({
   signIn: async () => {},
   signUp: async () => {},
   signOut: async () => {},
+  refreshUser: async () => {},
 })
 
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
@@ -84,6 +87,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     setUser(null)
   }
 
+  // Re-fetch the profile after edits so every screen sees the update
+  const refreshUser = async () => {
+    const me = await api<AuthUser>('/users/me')
+    setUser(me)
+  }
+
   const value = useMemo(
     () => ({
       session: user ? { user } : null,
@@ -93,6 +102,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       signIn,
       signUp,
       signOut,
+      refreshUser,
     }),
     [user, loading]
   )

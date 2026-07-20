@@ -1,6 +1,6 @@
-import { useRef, useState } from 'react';
-import { Dimensions, FlatList, NativeScrollEvent, NativeSyntheticEvent, StyleSheet } from 'react-native';
-import ScalableImage from './scalable-image';
+import { useMemo, useRef, useState } from 'react';
+import { Dimensions, FlatList, Image, NativeScrollEvent, NativeSyntheticEvent, StyleSheet } from 'react-native';
+import { ThemedText } from './themed-text';
 import { ThemedView } from './themed-view';
 
 type ImageCarouselProps = {
@@ -8,16 +8,26 @@ type ImageCarouselProps = {
   height?: number;
 };
 
-export default function ImageCarousel({ images, height = 300 }: ImageCarouselProps) {
+export default function ImageCarousel({ images: allImages, height = 300 }: ImageCarouselProps) {
   const [activeIndex, setActiveIndex] = useState(0);
   const flatListRef = useRef<FlatList>(null);
   const screenWidth = Dimensions.get('window').width;
   const itemWidth = screenWidth - 32;
   const isAdjustingRef = useRef(false);
-  const showDots = images.length > 1;
+
+  // Article media URLs aren't guaranteed to load (dead links, hotlink
+  // blocking) — anything that errors is dropped instead of showing a
+  // blank frame.
+  const [failedUris, setFailedUris] = useState<Set<string>>(new Set());
+  const images = useMemo(
+    () => allImages.filter((u) => !failedUris.has(u)),
+    [allImages, failedUris]
+  );
 
   // Create extended array for infinite scroll effect
   const extendedImages = [...images, ...images, ...images];
+
+  if (images.length === 0) return null;
 
   const handleMomentumEnd = (e: NativeSyntheticEvent<NativeScrollEvent>) => {
     const x = e.nativeEvent.contentOffset.x;
@@ -53,18 +63,15 @@ export default function ImageCarousel({ images, height = 300 }: ImageCarouselPro
         onMomentumScrollEnd={handleMomentumEnd}
         viewabilityConfig={{ viewAreaCoveragePercentThreshold: 50 }}
         renderItem={({ item }) => (
-          <ThemedView style={{ width: itemWidth, height }}>
-            <ThemedView style={[
-              styles.imageContainer,
-              { width: itemWidth, height}
-            ]}>
-              <ScalableImage
-                source={{ uri: item }}
-                type="width"
-                dimension={itemWidth}
-                style={styles.image}
-              />
-            </ThemedView>
+          <ThemedView style={[styles.imageContainer, { width: itemWidth, height }]}>
+            {/* Fixed frame + cover crop: every slide occupies the same
+                space regardless of the source image's dimensions */}
+            <Image
+              source={{ uri: item }}
+              style={[styles.image, { width: itemWidth, height }]}
+              resizeMode="cover"
+              onError={() => setFailedUris((prev) => new Set(prev).add(item))}
+            />
           </ThemedView>
         )}
         getItemLayout={(_, index) => ({
@@ -73,21 +80,15 @@ export default function ImageCarousel({ images, height = 300 }: ImageCarouselPro
           index,
         })}
       />
-      
-      {/* Dots indicator */}
-      {showDots ? (
-        <ThemedView style={styles.pagination}>
-          {images.map((_, index) => (
-            <ThemedView
-              key={index}
-              style={[
-                styles.dot,
-                { backgroundColor: index === activeIndex ? '#B647FF' : '#E9C8FF' }
-              ]}
-            />
-          ))}
+
+      {/* Counter pill instead of dots — scales to any number of images */}
+      {images.length > 1 && (
+        <ThemedView style={styles.counter}>
+          <ThemedText style={styles.counterText}>
+            {Math.min(activeIndex + 1, images.length)} / {images.length}
+          </ThemedText>
         </ThemedView>
-      ) : null}
+      )}
     </ThemedView>
   );
 }
@@ -95,25 +96,28 @@ export default function ImageCarousel({ images, height = 300 }: ImageCarouselPro
 const styles = StyleSheet.create({
   container: {
     width: '100%',
+    marginBottom: 8,
   },
   image: {
     borderRadius: 16,
   },
   imageContainer: {
-    paddingBottom: 16,
     overflow: 'hidden',
     borderRadius: 16,
   },
-  pagination: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingTop: 8,
-    gap: 8,
+  counter: {
+    position: 'absolute',
+    top: 12,
+    right: 12,
+    backgroundColor: 'rgba(0,0,0,0.55)',
+    borderRadius: 12,
+    paddingHorizontal: 10,
+    paddingVertical: 3,
   },
-  dot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
+  counterText: {
+    color: '#FFFFFF',
+    fontSize: 12,
+    fontWeight: '700',
+    lineHeight: 16,
   },
 });

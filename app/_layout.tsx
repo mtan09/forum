@@ -88,8 +88,29 @@ function AppNavigator() {
           />
 
           <Stack.Screen
+            name="createpost"
+            options={{
+              presentation: 'modal',
+              headerShown: false,
+            }}
+          />
+          <Stack.Screen
+            name="editprofile"
+            options={{
+              presentation: 'modal',
+              headerShown: false,
+            }}
+          />
+          <Stack.Screen
+            name="changepassword"
+            options={{
+              presentation: 'modal',
+              headerShown: false,
+            }}
+          />
+          <Stack.Screen
             name="post/[id]"
-            options={{ 
+            options={{
               title: 'Post',
               headerBackTitle: "Back",
             }}
@@ -101,13 +122,48 @@ function AppNavigator() {
               headerBackTitle: "Back",
             }}
           />
-          {/* <Stack.Screen
+          <Stack.Screen
             name="article/[id]"
             options={{
               title: 'Article',
               headerBackTitle: "Back",
             }}
-          /> */}
+          />
+          <Stack.Screen
+            name="user/[id]"
+            options={{
+              title: 'Profile',
+              headerBackTitle: "Back",
+            }}
+          />
+          <Stack.Screen
+            name="debate/[id]"
+            options={{
+              title: 'The Floor',
+              headerBackTitle: "Back",
+            }}
+          />
+          <Stack.Screen
+            name="settings"
+            options={{
+              title: 'Settings',
+              headerBackTitle: "Back",
+            }}
+          />
+          <Stack.Screen
+            name="blocked"
+            options={{
+              title: 'Blocked Accounts',
+              headerBackTitle: "Back",
+            }}
+          />
+          <Stack.Screen
+            name="source/[name]"
+            options={{
+              title: 'Source',
+              headerBackTitle: "Back",
+            }}
+          />
         </Stack>
     </PostProvider>
   );

@@ -1,4 +1,3 @@
-import { CustomDropdown } from '@/components/customDropdown';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { IconSymbol } from '@/components/ui/icon-symbol';
@@ -7,10 +6,8 @@ import { usePosts } from '@/context/postContext';
 import { api, uploadImage } from '@/lib/api';
 import * as ImagePicker from 'expo-image-picker';
 import { useRouter } from 'expo-router';
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { Dimensions, Image, Keyboard, Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
-
-type TopicOption = { id: string; name: string };
 
 export default function CreatePost() {
   const router = useRouter();
@@ -29,17 +26,28 @@ export default function CreatePost() {
     media: null,
   })
 
-  const [topics, setTopics] = useState<TopicOption[]>([]);
-  const [activeTopicName, setActiveTopicName] = useState<string>('');
+  // Author-selected hashtags; a space/comma/return commits the typed tag
+  // as a chip. The server also picks up any inline #tags in the text.
+  const [hashtags, setHashtags] = useState<string[]>([]);
+  const [tagInput, setTagInput] = useState('');
 
-  useEffect(() => {
-    api<TopicOption[]>('/topics')
-      .then((data) => {
-        setTopics(data.map((t) => ({ id: t.id, name: t.name })));
-        if (data.length > 0) setActiveTopicName((prev) => prev || data[0].name);
-      })
-      .catch((err) => console.log('Error fetching topics:', err?.message));
-  }, []);
+  const commitTag = (raw: string) => {
+    const tag = raw.replace(/^#/, '').toLowerCase().replace(/[^a-z0-9_]/g, '');
+    if (tag.length >= 2 && tag.length <= 30 && !hashtags.includes(tag) && hashtags.length < 8) {
+      setHashtags((prev) => [...prev, tag]);
+    }
+  };
+
+  const onTagInputChange = (text: string) => {
+    if (/[ ,]$/.test(text)) {
+      commitTag(text.slice(0, -1));
+      setTagInput('');
+    } else {
+      setTagInput(text);
+    }
+  };
+
+  const removeTag = (tag: string) => setHashtags((prev) => prev.filter((t) => t !== tag));
 
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState<string | null>(null);
@@ -54,22 +62,22 @@ export default function CreatePost() {
         mediaUrl = await uploadImage(pickedImage.uri);
       }
 
-      const topicId = topics.find((t) => t.name === activeTopicName)?.id ?? null;
-
       await api('/posts', {
         body: {
           content: post.content.trim(),
           media_url: mediaUrl,
-          general_topic_id: topicId,
+          hashtags: tagInput ? [...hashtags, tagInput] : hashtags,
         },
       });
 
       await refresh();
 
-      // reset UI and go back to the feed
+      // reset UI and dismiss the modal back to the feed
       setPost({ content: '', media: null });
+      setHashtags([]);
+      setTagInput('');
       setPickedImage(null);
-      router.push('/');
+      router.back();
     } catch (e: any) {
       setErr(e?.message ?? 'Something went wrong.');
     } finally {
@@ -166,16 +174,28 @@ export default function CreatePost() {
               <ThemedText style={styles.secondaryButtonText}>Add Image</ThemedText>
             </Pressable>
 
-            {topics.length > 0 && (
-              <ThemedView style={styles.topicRow}>
-                <ThemedText style={{ fontWeight: '600' }}>Topic: </ThemedText>
-                <CustomDropdown
-                  options={topics.map((t) => t.name)}
-                  value={activeTopicName}
-                  onValueChange={setActiveTopicName}
-                />
-              </ThemedView>
-            )}
+            <ThemedView>
+              {hashtags.length > 0 && (
+                <View style={styles.tagChips}>
+                  {hashtags.map((tag) => (
+                    <Pressable key={tag} onPress={() => removeTag(tag)} style={styles.tagChip}>
+                      <ThemedText style={styles.tagChipText}>#{tag}</ThemedText>
+                      <IconSymbol name="x.circle.fill" size={16} color="#b647ff" />
+                    </Pressable>
+                  ))}
+                </View>
+              )}
+              <TextInput
+                placeholder="Add hashtags (space to add)"
+                value={tagInput}
+                onChangeText={onTagInputChange}
+                onSubmitEditing={() => { commitTag(tagInput); setTagInput(''); }}
+                autoCapitalize="none"
+                autoCorrect={false}
+                style={styles.tagInput}
+                placeholderTextColor="#8f8f8f"
+              />
+            </ThemedView>
           </ThemedView>
         </ScrollView>
 
@@ -287,11 +307,37 @@ const styles = StyleSheet.create({
     gap: 12,
     marginBottom: 20,
   },
-  topicRow: {
+  tagChips: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginBottom: 8,
+  },
+  tagChip: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
-    zIndex: 10,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 12,
+    backgroundColor: '#f8effcff',
+    borderWidth: 1,
+    borderColor: '#E9C8FF',
+  },
+  tagChipText: {
+    color: '#b647ff',
+    fontWeight: '700',
+    fontSize: 14,
+  },
+  tagInput: {
+    width: '100%',
+    borderWidth: 2,
+    borderColor: '#E9C8FF',
+    borderRadius: 16,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    fontSize: 15,
+    fontWeight: '600',
   },
   secondaryButton: {
     flexDirection: 'row',

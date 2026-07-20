@@ -1,25 +1,34 @@
+import ContentActions from '@/components/contentActions';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
+import { IconSymbol } from '@/components/ui/icon-symbol';
 import { useRelativeTime } from '@/hooks/useRelativeTime';
 import { api } from '@/lib/api';
+import { useRouter } from 'expo-router';
 import React, { useCallback, useEffect, useState } from 'react';
-import { ActivityIndicator, Image, Pressable, StyleSheet, View } from 'react-native';
+import { ActivityIndicator, Image, Keyboard, Pressable, StyleSheet, TextInput, View } from 'react-native';
 
 export type Comment = {
 	id: string;
 	user_id: string;
-	post_id: string;
+	post_id: string | null;
+	article_id: string | null;
 	parent_comment_id: string | null;
 	content: string;
 	created_at: string;
+	upvotes: number;
+	downvotes: number;
 	// joined in by the API
 	username: string;
 	avatar_url?: string | null;
+	my_vote?: 'up' | 'down' | null;
 	reply_count: number;
 };
 
 type CommentListProps = {
 	postId?: string;
+	articleId?: string;
+	debateId?: string;
 	parentCommentId?: string;
 	initialPageSize?: number;
 	indent?: number; // pixels to indent nested levels
@@ -28,6 +37,8 @@ type CommentListProps = {
 
 export default function CommentList({
 	postId,
+	articleId,
+	debateId,
 	parentCommentId,
 	initialPageSize = 10,
 	indent = 0,
@@ -41,13 +52,17 @@ export default function CommentList({
 	const pageSize = initialPageSize;
 
 	const loadPage = useCallback(async (pageToLoad: number, replace: boolean) => {
-		if (!postId && !parentCommentId) return;
+		if (!postId && !articleId && !debateId && !parentCommentId) return;
 		setLoading(true);
 		setError(null);
 		try {
 			const filter = parentCommentId
 				? `parent_comment_id=${parentCommentId}`
-				: `post_id=${postId}`;
+				: debateId
+					? `debate_id=${debateId}`
+					: articleId
+						? `article_id=${articleId}`
+						: `post_id=${postId}`;
 			const data = await api<{ comments: Comment[]; hasMore: boolean }>(
 				`/comments?${filter}&page=${pageToLoad}&limit=${pageSize}`
 			);
@@ -64,7 +79,7 @@ export default function CommentList({
 		} finally {
 			setLoading(false);
 		}
-	}, [postId, parentCommentId, pageSize]);
+	}, [postId, articleId, debateId, parentCommentId, pageSize]);
 
 	// Reset and reload when the target (or refreshKey) changes
 	useEffect(() => {
@@ -78,7 +93,7 @@ export default function CommentList({
 		loadPage(next, false);
 	};
 
-	if (!postId && !parentCommentId) return null;
+	if (!postId && !articleId && !debateId && !parentCommentId) return null;
 
 	return (
 		<ThemedView style={[styles.container, indent ? { marginLeft: indent } : undefined]}>
@@ -110,40 +125,152 @@ export default function CommentList({
 	);
 }
 
+type VoteDirection = 'up' | 'down' | null;
+
 function CommentItem({ comment }: { comment: Comment }) {
 	const [showReplies, setShowReplies] = useState(false);
+	const [replyOpen, setReplyOpen] = useState(false);
+	const [replyText, setReplyText] = useState('');
+	const [replySubmitting, setReplySubmitting] = useState(false);
+	const [replyRefresh, setReplyRefresh] = useState(0);
+	const [replyCount, setReplyCount] = useState(comment.reply_count);
+	const router = useRouter();
 	const timeAgo = useRelativeTime(comment.created_at);
+
+	// Optimistic vote state, reconciled with the server response
+	const [votes, setVotes] = useState<{ up: number; down: number; myVote: VoteDirection }>({
+		up: comment.upvotes ?? 0,
+		down: comment.downvotes ?? 0,
+		myVote: comment.my_vote ?? null,
+	});
+
+	const applyVote = (prev: typeof votes, direction: VoteDirection) => {
+		let { up, down } = prev;
+		if (prev.myVote === 'up') up = Math.max(up - 1, 0);
+		if (prev.myVote === 'down') down = Math.max(down - 1, 0);
+		if (direction === 'up') up += 1;
+		if (direction === 'down') down += 1;
+		return { up, down, myVote: direction };
+	};
+
+	const vote = async (direction: VoteDirection) => {
+		const prev = votes;
+		setVotes(applyVote(prev, direction));
+		try {
+			const res = await api<{ upvotes: number; downvotes: number; my_vote: VoteDirection }>(
+				`/comments/${comment.id}/vote`,
+				{ body: { direction } }
+			);
+			setVotes({ up: res.upvotes, down: res.downvotes, myVote: res.my_vote });
+		} catch (e: any) {
+			console.log('Error voting on comment:', e?.message);
+			setVotes(prev);
+		}
+	};
+
+	const submitReply = async () => {
+		const content = replyText.trim();
+		if (!content || replySubmitting) return;
+		try {
+			setReplySubmitting(true);
+			await api('/comments', { body: { parent_comment_id: comment.id, content } });
+			setReplyText('');
+			setReplyOpen(false);
+			setReplyCount((n) => n + 1);
+			setShowReplies(true);
+			setReplyRefresh((k) => k + 1);
+			Keyboard.dismiss();
+		} catch (e: any) {
+			console.log('Error posting reply:', e?.message);
+		} finally {
+			setReplySubmitting(false);
+		}
+	};
+
+	const isUpvoted = votes.myVote === 'up';
+	const isDownvoted = votes.myVote === 'down';
+	const [hidden, setHidden] = useState(false);
+
+	if (hidden) return null;
 
 	return (
 		<ThemedView style={styles.comment}>
+			{/* Header: avatar + username · time on one line; tapping the
+			    identity opens the author's public profile */}
 			<ThemedView style={styles.header}>
-				<Image
-					source={comment.avatar_url ? { uri: comment.avatar_url } : require('@/assets/images/Default_pfp.jpg')}
-					style={styles.avatar}
+				<Pressable
+					onPress={() => router.push(`/user/${comment.user_id}`)}
+					style={({ pressed }) => ({ opacity: pressed ? 0.6 : 1.0 })}
+				>
+					<Image
+						source={comment.avatar_url ? { uri: comment.avatar_url } : require('@/assets/images/Default_pfp.jpg')}
+						style={styles.avatar}
+					/>
+				</Pressable>
+				<ThemedText type="defaultSemiBold" style={styles.username} numberOfLines={1}>
+					{comment.username ?? 'Anonymous'}
+					<ThemedText style={styles.timestamp}>{'   ·   '}{timeAgo}</ThemedText>
+				</ThemedText>
+				<ContentActions
+					targetKind="comment"
+					targetId={comment.id}
+					authorId={comment.user_id}
+					authorName={comment.username}
+					onBlocked={() => setHidden(true)}
 				/>
-				<ThemedView style={{ flex: 1 }}>
-					<ThemedText type="defaultSemiBold" style={styles.username}>{comment.username ?? 'Anonymous'}</ThemedText>
-					<ThemedText style={styles.timestamp}>{timeAgo}</ThemedText>
-				</ThemedView>
 			</ThemedView>
 
 			<ThemedText style={styles.content}>{comment.content}</ThemedText>
 
+			{/* Actions: votes, reply, replies toggle */}
 			<View style={styles.commentActions}>
-				{comment.reply_count > 0 && !showReplies && (
-					<Pressable style={styles.inlineButton} onPress={() => setShowReplies(true)}>
-						<ThemedText type="link">Load replies ({comment.reply_count})</ThemedText>
-					</Pressable>
-				)}
-				{showReplies && (
-					<Pressable style={styles.inlineButton} onPress={() => setShowReplies(false)}>
-						<ThemedText type="link">Hide replies</ThemedText>
+				<Pressable onPress={() => vote(isUpvoted ? null : 'up')} style={styles.voteButton}>
+					<IconSymbol name={isUpvoted ? 'arrowshape.up.fill' : 'arrowshape.up'} size={16} color={isUpvoted ? '#14DD78' : '#8D8D8D'} />
+					<ThemedText style={[styles.voteCount, isUpvoted && { color: '#14DD78' }]}>{votes.up}</ThemedText>
+				</Pressable>
+				<Pressable onPress={() => vote(isDownvoted ? null : 'down')} style={styles.voteButton}>
+					<IconSymbol name={isDownvoted ? 'arrowshape.down.fill' : 'arrowshape.down'} size={16} color={isDownvoted ? '#FF0080' : '#8D8D8D'} />
+					<ThemedText style={[styles.voteCount, isDownvoted && { color: '#FF0080' }]}>{votes.down}</ThemedText>
+				</Pressable>
+				<Pressable onPress={() => setReplyOpen((o) => !o)} style={styles.voteButton}>
+					<IconSymbol name="bubble" size={15} color="#8D8D8D" />
+					<ThemedText style={styles.replyLabel}>Reply</ThemedText>
+				</Pressable>
+				{replyCount > 0 && (
+					<Pressable style={styles.voteButton} onPress={() => setShowReplies((s) => !s)}>
+						<ThemedText style={styles.repliesToggle}>
+							{showReplies ? 'Hide replies' : `Replies (${replyCount})`}
+						</ThemedText>
 					</Pressable>
 				)}
 			</View>
 
+			{/* Inline reply composer */}
+			{replyOpen && (
+				<View style={styles.replyComposer}>
+					<TextInput
+						placeholder={`Reply to ${comment.username ?? 'comment'}...`}
+						placeholderTextColor="#8f8f8f"
+						value={replyText}
+						onChangeText={setReplyText}
+						multiline
+						style={styles.replyInput}
+						editable={!replySubmitting}
+						autoFocus
+					/>
+					<Pressable onPress={submitReply} disabled={replySubmitting || !replyText.trim()}>
+						<IconSymbol
+							name="arrow.up.circle.fill"
+							size={24}
+							color={replyText.trim() && !replySubmitting ? '#B647FF' : '#dfaeffff'}
+						/>
+					</Pressable>
+				</View>
+			)}
+
+			{/* Nested replies */}
 			{showReplies && (
-				<CommentList parentCommentId={comment.id} initialPageSize={5} indent={16} />
+				<CommentList parentCommentId={comment.id} initialPageSize={5} indent={16} refreshKey={replyRefresh} />
 			)}
 		</ThemedView>
 	);
@@ -180,8 +307,9 @@ const styles = StyleSheet.create({
 	comment: {
 		borderLeftWidth: 2,
 		borderLeftColor: '#e5e5e5',
-		paddingLeft: 8,
+		paddingLeft: 10,
 		gap: 6,
+		paddingVertical: 2,
 	},
 	header: {
 		flexDirection: 'row',
@@ -191,25 +319,60 @@ const styles = StyleSheet.create({
 	avatar: {
 		width: 28,
 		height: 28,
-		borderRadius: 12,
+		borderRadius: 14,
 	},
 	username: {
+		flex: 1,
 		fontSize: 14,
 		fontWeight: '700',
 	},
 	timestamp: {
 		color: '#8D8D8D',
 		fontSize: 12,
+		fontWeight: '400',
 	},
 	content: {
 		fontSize: 15,
 	},
 	commentActions: {
 		flexDirection: 'row',
-		gap: 12,
+		gap: 16,
 		alignItems: 'center',
 	},
-	inlineButton: {
-		paddingVertical: 2,
+	voteButton: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		gap: 4,
+	},
+	voteCount: {
+		fontSize: 13,
+		color: '#8D8D8D',
+	},
+	replyLabel: {
+		fontSize: 13,
+		color: '#8D8D8D',
+		fontWeight: '600',
+	},
+	repliesToggle: {
+		fontSize: 13,
+		color: '#B647FF',
+		fontWeight: '600',
+	},
+	replyComposer: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		gap: 8,
+		borderColor: '#E9C8FF',
+		borderWidth: 1.5,
+		borderRadius: 12,
+		paddingHorizontal: 10,
+		paddingVertical: 6,
+	},
+	replyInput: {
+		flex: 1,
+		fontSize: 14,
+		maxHeight: 80,
+		paddingTop: 0,
+		paddingBottom: 0,
 	},
 });

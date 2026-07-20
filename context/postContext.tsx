@@ -16,7 +16,7 @@ type PostContextType = {
 
 const PostContext = createContext<PostContextType | null>(null);
 
-const mapPost = (row: any): PostType => ({
+export const mapPost = (row: any): PostType => ({
   id: String(row.id),
   user: String(row.user_id),
   text: row.content ?? '',
@@ -26,10 +26,17 @@ const mapPost = (row: any): PostType => ({
   downvotes: row.downvotes ?? 0,
   commentCount: row.commentcount ?? 0,
   topic: row.general_topic_id ?? 'general',
-  position: row.position ?? 0.5,
+  hashtags: row.hashtags ?? [],
+  // null = scorer's confidence gate not met; the post shows no placement
+  position: typeof row.position === 'number' ? row.position : null,
+  // scorer receipts: the exact signals that produced the placement
+  positionSignals: row.position_signals ?? [],
+  positionConfidence: typeof row.position_confidence === 'number' ? row.position_confidence : null,
+  scorerVersion: row.scorer_version ?? undefined,
   username: row.username,
   avatarUrl: row.avatar_url ?? undefined,
   myVote: row.my_vote ?? null,
+  myBookmark: row.my_bookmark ?? false,
 });
 
 // Applies a vote change to local counts before the server confirms

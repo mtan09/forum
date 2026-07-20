@@ -1,22 +1,21 @@
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { IconSymbol } from '@/components/ui/icon-symbol';
-import { usePosts } from '@/context/postContext';
 import { api } from '@/lib/api';
-import { Dimensions, Pressable, Share, StyleSheet } from 'react-native';
 import { useEffect, useState } from 'react';
-import { type PostType, type UserType } from './postComponent';
-
-export type PostActionsProps = {
-  post: PostType;
-  user: UserType;
-}
+import { Dimensions, Pressable, Share, StyleSheet } from 'react-native';
+import { type ArticleType } from './articleComponent';
 
 const screenWidth = Dimensions.get('window').width;
 
-export default function PostActions({ post, user }: PostActionsProps) {
-  const [isBookmarked, setBookmarked] = useState(post.myBookmark ?? false);
-  useEffect(() => setBookmarked(post.myBookmark ?? false), [post.myBookmark]);
+type VoteDirection = 'up' | 'down' | null;
+type VoteState = { upvotes: number; downvotes: number; myVote: VoteDirection };
+
+// Articles aren't held in a context like posts are, so each actions row
+// owns its vote state: optimistic update, then reconcile with the server.
+export default function ArticleActions({ article }: { article: ArticleType }) {
+  const [isBookmarked, setBookmarked] = useState(article.my_bookmark ?? false);
+  useEffect(() => setBookmarked(article.my_bookmark ?? false), [article.my_bookmark]);
 
   // Optimistic toggle, reconciled with the server's answer
   const toggleBookmark = async () => {
@@ -24,7 +23,7 @@ export default function PostActions({ post, user }: PostActionsProps) {
     setBookmarked(!prev);
     try {
       const res = await api<{ bookmarked: boolean }>('/bookmarks/toggle', {
-        body: { post_id: post.id },
+        body: { article_id: article.id },
       });
       setBookmarked(res.bookmarked);
     } catch (error: any) {
@@ -33,24 +32,45 @@ export default function PostActions({ post, user }: PostActionsProps) {
     }
   };
 
-  const { vote } = usePosts();
+  const [state, setState] = useState<VoteState>({
+    upvotes: article.upvotes ?? 0,
+    downvotes: article.downvotes ?? 0,
+    myVote: article.my_vote ?? null,
+  });
 
-  const isUpvoted = post.myVote === 'up';
-  const isDownvoted = post.myVote === 'down';
+  const applyVote = (prev: VoteState, direction: VoteDirection): VoteState => {
+    let { upvotes, downvotes } = prev;
+    if (prev.myVote === 'up') upvotes = Math.max(upvotes - 1, 0);
+    if (prev.myVote === 'down') downvotes = Math.max(downvotes - 1, 0);
+    if (direction === 'up') upvotes += 1;
+    if (direction === 'down') downvotes += 1;
+    return { upvotes, downvotes, myVote: direction };
+  };
+
+  const vote = async (direction: VoteDirection) => {
+    const prev = state;
+    setState(applyVote(prev, direction));
+    try {
+      const res = await api<{ upvotes: number; downvotes: number; my_vote: VoteDirection }>(
+        `/articles/${article.id}/vote`,
+        { body: { direction } }
+      );
+      setState({ upvotes: res.upvotes, downvotes: res.downvotes, myVote: res.my_vote });
+    } catch (error: any) {
+      console.log('Error voting on article:', error?.message);
+      setState(prev);
+    }
+  };
+
+  const isUpvoted = state.myVote === 'up';
+  const isDownvoted = state.myVote === 'down';
 
   const formatCount = (count: number | null | undefined): string => {
     if (!count) return '0';
-
     if (count >= 1000000) {
-      if (count / 1000000 >= 10) {
-        return (count / 1000000).toFixed(0) + 'M';
-      }
-      return (count / 1000000).toFixed(1) + 'M';
+      return (count / 1000000).toFixed(count / 1000000 >= 10 ? 0 : 1) + 'M';
     } else if (count >= 1000) {
-      if (count / 1000 >= 10) {
-        return (count / 1000).toFixed(0) + 'k';
-      }
-      return (count / 1000).toFixed(1) + 'k';
+      return (count / 1000).toFixed(count / 1000 >= 10 ? 0 : 1) + 'k';
     }
     return count.toString();
   };
@@ -58,9 +78,9 @@ export default function PostActions({ post, user }: PostActionsProps) {
   const handleShare = async () => {
     try {
       await Share.share({
-        message: `Check out this post by ${user.username}: "${post.text}"`,
-        url: 'https://yourapp.com/posts/' + post.id,
-        title: 'Share Post',
+        message: `${article.title} (${article.source})`,
+        url: article.url,
+        title: 'Share Article',
       });
     } catch (error) {
       console.error(error);
@@ -71,29 +91,29 @@ export default function PostActions({ post, user }: PostActionsProps) {
     <ThemedView style={styles.container}>
 
       {/* Upvote */}
-      <Pressable onPress={() => vote(post.id, isUpvoted ? null : 'up')}>
+      <Pressable onPress={() => vote(isUpvoted ? null : 'up')}>
         <ThemedView style={[styles.reactions, styles.upvote]}>
           <IconSymbol name={isUpvoted ? "arrowshape.up.fill" : "arrowshape.up"} size={20} color={isUpvoted ? "#14DD78" : "#8D8D8D"} />
           <ThemedText style={{color: isUpvoted ? "#14DD78" : "#8D8D8D"}}>
-            {post.upvotes === 0 ? post.upvotes : `+${formatCount(post.upvotes)}`}
+            {state.upvotes === 0 ? 0 : `+${formatCount(state.upvotes)}`}
           </ThemedText>
         </ThemedView>
       </Pressable>
 
       {/* Downvote */}
-      <Pressable onPress={() => vote(post.id, isDownvoted ? null : 'down')}>
+      <Pressable onPress={() => vote(isDownvoted ? null : 'down')}>
         <ThemedView style={[styles.reactions, styles.downvote]}>
           <IconSymbol name={isDownvoted ? "arrowshape.down.fill" : "arrowshape.down"} size={20} color={isDownvoted ? "#FF0080" : "#8D8D8D"} />
           <ThemedText style={{color: isDownvoted ? "#FF0080" : "#8D8D8D"}}>
-            {post.downvotes === 0 ? post.downvotes: `-${formatCount(post.downvotes)}`}
+            {state.downvotes === 0 ? 0 : `-${formatCount(state.downvotes)}`}
           </ThemedText>
         </ThemedView>
       </Pressable>
 
-      {/* Comment */}
+      {/* Comment count */}
       <ThemedView style={[styles.reactions, styles.comments]}>
         <IconSymbol name="bubble" size={20} color="#8D8D8D" />
-        <ThemedText lightColor={"#8D8D8D"}>{formatCount(post.commentCount)}</ThemedText>
+        <ThemedText lightColor={"#8D8D8D"}>{formatCount(article.commentcount)}</ThemedText>
       </ThemedView>
 
       {/* Bookmark */}

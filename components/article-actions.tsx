@@ -1,6 +1,8 @@
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { IconSymbol } from '@/components/ui/icon-symbol';
+import { usePalette } from '@/hooks/use-palette';
+import { notifySuccess, tapLight } from '@/lib/haptics';
 import { api } from '@/lib/api';
 import { useEffect, useState } from 'react';
 import { Dimensions, Pressable, Share, StyleSheet } from 'react-native';
@@ -14,11 +16,13 @@ type VoteState = { upvotes: number; downvotes: number; myVote: VoteDirection };
 // Articles aren't held in a context like posts are, so each actions row
 // owns its vote state: optimistic update, then reconcile with the server.
 export default function ArticleActions({ article }: { article: ArticleType }) {
+  const { c } = usePalette();
   const [isBookmarked, setBookmarked] = useState(article.my_bookmark ?? false);
   useEffect(() => setBookmarked(article.my_bookmark ?? false), [article.my_bookmark]);
 
   // Optimistic toggle, reconciled with the server's answer
   const toggleBookmark = async () => {
+    tapLight();
     const prev = isBookmarked;
     setBookmarked(!prev);
     try {
@@ -77,6 +81,7 @@ export default function ArticleActions({ article }: { article: ArticleType }) {
 
   const handleShare = async () => {
     try {
+      notifySuccess();
       await Share.share({
         message: `${article.title} (${article.source})`,
         url: article.url,
@@ -91,20 +96,20 @@ export default function ArticleActions({ article }: { article: ArticleType }) {
     <ThemedView style={styles.container}>
 
       {/* Upvote */}
-      <Pressable onPress={() => vote(isUpvoted ? null : 'up')}>
+      <Pressable accessibilityRole="button" accessibilityLabel={isUpvoted ? 'Remove upvote' : 'Upvote'} onPress={() => { tapLight(); vote(isUpvoted ? null : 'up'); }}>
         <ThemedView style={[styles.reactions, styles.upvote]}>
-          <IconSymbol name={isUpvoted ? "arrowshape.up.fill" : "arrowshape.up"} size={20} color={isUpvoted ? "#14DD78" : "#8D8D8D"} />
-          <ThemedText style={{color: isUpvoted ? "#14DD78" : "#8D8D8D"}}>
+          <IconSymbol name={isUpvoted ? "arrowshape.up.fill" : "arrowshape.up"} size={20} color={isUpvoted ? c.green : c.muted} />
+          <ThemedText style={{color: isUpvoted ? c.green : c.muted}}>
             {state.upvotes === 0 ? 0 : `+${formatCount(state.upvotes)}`}
           </ThemedText>
         </ThemedView>
       </Pressable>
 
       {/* Downvote */}
-      <Pressable onPress={() => vote(isDownvoted ? null : 'down')}>
+      <Pressable accessibilityRole="button" accessibilityLabel={isDownvoted ? 'Remove downvote' : 'Downvote'} onPress={() => { tapLight(); vote(isDownvoted ? null : 'down'); }}>
         <ThemedView style={[styles.reactions, styles.downvote]}>
-          <IconSymbol name={isDownvoted ? "arrowshape.down.fill" : "arrowshape.down"} size={20} color={isDownvoted ? "#FF0080" : "#8D8D8D"} />
-          <ThemedText style={{color: isDownvoted ? "#FF0080" : "#8D8D8D"}}>
+          <IconSymbol name={isDownvoted ? "arrowshape.down.fill" : "arrowshape.down"} size={20} color={isDownvoted ? "#FF0080" : c.muted} />
+          <ThemedText style={{color: isDownvoted ? "#FF0080" : c.muted}}>
             {state.downvotes === 0 ? 0 : `-${formatCount(state.downvotes)}`}
           </ThemedText>
         </ThemedView>
@@ -112,21 +117,21 @@ export default function ArticleActions({ article }: { article: ArticleType }) {
 
       {/* Comment count */}
       <ThemedView style={[styles.reactions, styles.comments]}>
-        <IconSymbol name="bubble" size={20} color="#8D8D8D" />
-        <ThemedText lightColor={"#8D8D8D"}>{formatCount(article.commentcount)}</ThemedText>
+        <IconSymbol name="bubble" size={20} color={c.muted} />
+        <ThemedText style={{color: c.muted}}>{formatCount(article.commentcount)}</ThemedText>
       </ThemedView>
 
       {/* Bookmark */}
       <ThemedView style={[styles.reactions, styles.bookmark]}>
-        <Pressable onPress={toggleBookmark}>
-          <IconSymbol name={isBookmarked ? "bookmark.fill" : "bookmark"} size={20} color={isBookmarked ? "#FFD000" : "#8D8D8D"} />
+        <Pressable accessibilityRole="button" accessibilityLabel={isBookmarked ? 'Remove bookmark' : 'Bookmark'} onPress={toggleBookmark}>
+          <IconSymbol name={isBookmarked ? "bookmark.fill" : "bookmark"} size={20} color={isBookmarked ? "#FFD000" : c.muted} />
         </Pressable>
       </ThemedView>
 
       {/* Share */}
       <ThemedView style={[styles.reactions, styles.share]}>
-        <Pressable onPress={handleShare}>
-          <IconSymbol name="square.and.arrow.up" size={20} color="#8D8D8D" />
+        <Pressable accessibilityRole="button" accessibilityLabel="Share article" onPress={handleShare}>
+          <IconSymbol name="square.and.arrow.up" size={20} color={c.muted} />
         </Pressable>
       </ThemedView>
     </ThemedView>

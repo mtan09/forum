@@ -9,15 +9,55 @@ type IconMapping = Record<SymbolViewProps['name'], ComponentProps<typeof Materia
 type IconSymbolName = keyof typeof MAPPING;
 
 /**
- * Add your SF Symbols to Material Icons mappings here.
- * - see Material Icons in the [Icons Directory](https://icons.expo.fyi).
- * - see SF Symbols in the [SF Symbols](https://developer.apple.com/sf-symbols/) app.
+ * Every SF Symbol the app uses, mapped to a Material Icon so Android and
+ * web render real glyphs instead of blanks.
+ * - Material Icons in the [Icons Directory](https://icons.expo.fyi)
+ * - SF Symbols in the [SF Symbols](https://developer.apple.com/sf-symbols/) app
  */
 const MAPPING = {
+  // navigation / tab bar
   'house.fill': 'home',
-  'paperplane.fill': 'send',
-  'chevron.left.forwardslash.chevron.right': 'code',
+  house: 'home',
+  'bubble.left.and.bubble.right.fill': 'forum',
+  'bubble.left.and.bubble.right': 'forum',
+  'brain.fill': 'psychology',
+  brain: 'psychology',
+  magnifyingglass: 'search',
+  'person.fill': 'person',
+  person: 'person-outline',
+  'chevron.left': 'chevron-left',
   'chevron.right': 'chevron-right',
+  'chevron.up': 'keyboard-arrow-up',
+  'chevron.left.forwardslash.chevron.right': 'code',
+
+  // actions
+  'arrowshape.up.fill': 'thumb-up',
+  'arrowshape.up': 'thumb-up-off-alt',
+  'arrowshape.down.fill': 'thumb-down',
+  'arrowshape.down': 'thumb-down-off-alt',
+  bubble: 'chat-bubble-outline',
+  'bookmark.fill': 'bookmark',
+  bookmark: 'bookmark-border',
+  'square.and.arrow.up': 'ios-share',
+  'arrow.up.circle.fill': 'arrow-circle-up',
+  'x.circle.fill': 'cancel',
+  plus: 'add',
+  ellipsis: 'more-horiz',
+
+  // content / profile
+  'checkmark.circle.fill': 'check-circle',
+  'checkmark.seal.fill': 'verified',
+  calendar: 'calendar-today',
+  'camera.fill': 'photo-camera',
+  photo: 'photo',
+  sparkles: 'auto-awesome',
+  'gearshape.fill': 'settings',
+  'envelope.fill': 'email',
+  envelope: 'mail-outline',
+  flag: 'outlined-flag',
+  'hand.raised': 'front-hand',
+  'hand.raised.fill': 'front-hand',
+  'paperplane.fill': 'send',
 } as IconMapping;
 
 /**

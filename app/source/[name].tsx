@@ -2,6 +2,8 @@ import Article, { ArticleType } from '@/components/articleComponent';
 import Spectrum from '@/components/spectrum';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
+import { type Palette } from '@/constants/theme';
+import { usePalette } from '@/hooks/use-palette';
 import { api } from '@/lib/api';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useMemo, useState } from 'react';
@@ -51,6 +53,8 @@ const TYPE_LABELS: [string, string][] = [
 ];
 
 export default function SourceScreen() {
+  const { c } = usePalette();
+  const styles = useMemo(() => makeStyles(c), [c]);
   const { name } = useLocalSearchParams();
   const sourceName = useMemo(
     () => decodeURIComponent((Array.isArray(name) ? name[0] : name) ?? ''),
@@ -194,7 +198,7 @@ export default function SourceScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (c: Palette) => StyleSheet.create({
   container: {
     padding: 16,
     gap: 12,
@@ -210,14 +214,14 @@ const styles = StyleSheet.create({
     borderRadius: 32,
   },
   logoFallback: {
-    backgroundColor: '#E9C8FF',
+    backgroundColor: c.accentFaint,
     alignItems: 'center',
     justifyContent: 'center',
   },
   logoInitial: {
     fontSize: 28,
     fontWeight: '800',
-    color: '#9A00FF',
+    color: c.onAccentFaint,
     lineHeight: 34,
   },
   sourceName: {
@@ -226,15 +230,15 @@ const styles = StyleSheet.create({
     lineHeight: 30,
   },
   leanText: {
-    color: '#5A5A5A',
+    color: c.subtle,
     fontSize: 13,
     marginTop: 2,
   },
   card: {
     borderRadius: 16,
     borderWidth: 1,
-    borderColor: '#E4DCFF',
-    backgroundColor: '#F5F2FF',
+    borderColor: c.cardBorder,
+    backgroundColor: c.card,
     padding: 16,
     gap: 8,
   },
@@ -242,7 +246,7 @@ const styles = StyleSheet.create({
     fontWeight: '800',
   },
   cardNote: {
-    color: '#8D8D8D',
+    color: c.muted,
     fontSize: 12,
     lineHeight: 17,
   },
@@ -261,27 +265,27 @@ const styles = StyleSheet.create({
     flex: 1,
     height: 10,
     borderRadius: 5,
-    backgroundColor: '#E4DCFF',
+    backgroundColor: c.barTrack,
     overflow: 'hidden',
   },
   mixBarFill: {
     height: 10,
     borderRadius: 5,
-    backgroundColor: '#B647FF',
+    backgroundColor: c.accent,
   },
   mixPct: {
     width: 40,
     textAlign: 'right',
     fontSize: 13,
-    color: '#5A5A5A',
+    color: c.subtle,
   },
   statsRow: {
     flexDirection: 'row',
     justifyContent: 'space-around',
     borderRadius: 16,
     borderWidth: 1,
-    borderColor: '#E4DCFF',
-    backgroundColor: '#F5F2FF',
+    borderColor: c.cardBorder,
+    backgroundColor: c.card,
     paddingVertical: 12,
   },
   stat: {
@@ -293,13 +297,13 @@ const styles = StyleSheet.create({
     fontSize: 16,
   },
   statLabel: {
-    color: '#8D8D8D',
+    color: c.muted,
     fontSize: 12,
   },
   recentHeader: {
     paddingHorizontal: 16,
     paddingBottom: 8,
     borderBottomWidth: 1,
-    borderBottomColor: '#c6c6c6ff',
+    borderBottomColor: c.border,
   },
 });

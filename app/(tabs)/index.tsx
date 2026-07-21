@@ -4,9 +4,13 @@ import Post from '@/components/postComponent';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { IconSymbol } from '@/components/ui/icon-symbol';
+import { type Palette } from '@/constants/theme';
 import { useAuth } from '@/context/authContext';
-import { usePosts } from '@/context/postContext';
+import { mapPost, usePosts } from '@/context/postContext';
+import { usePalette } from '@/hooks/use-palette';
 import { api } from '@/lib/api';
+import { selectTick, tapLight } from '@/lib/haptics';
+import { onTabRefresh } from '@/lib/tabRefresh';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -44,11 +48,35 @@ export default function Feed() {
 
   const router = useRouter();
 
-  const { posts, refresh } = usePosts();
+  const { c, scheme } = usePalette();
+  const styles = useMemo(() => makeStyles(c), [c]);
+
+  const { posts, setPosts, refresh, loadMorePosts, hasMorePosts, postsEpoch } = usePosts();
 
   const scrollY = useRef(new Animated.Value(0)).current;
 
-  const [activeTab, setActiveTab] = useState<'For You' | 'Random' | 'Against You'>('Random');
+  const [activeTab, setActiveTab] = useState<'Following' | 'For You' | 'Random' | 'Against You'>('Random');
+
+  // Following tab: posts from people you follow, merged into the shared
+  // post context (so votes stay in sync) and tracked here by id.
+  const [followingIds, setFollowingIds] = useState<string[] | null>(null);
+  const fetchFollowing = useCallback(async () => {
+    try {
+      const rows = await api<any[]>('/posts?feed=following&limit=50');
+      const mapped = rows.map(mapPost);
+      setPosts((prev) => {
+        const seen = new Set(prev.map((p) => p.id));
+        return [...prev, ...mapped.filter((p) => !seen.has(p.id))];
+      });
+      setFollowingIds(mapped.map((p) => p.id));
+    } catch (err: any) {
+      console.log('Error fetching following feed:', err?.message);
+      setFollowingIds((prev) => prev ?? []);
+    }
+  }, [setPosts]);
+  useEffect(() => {
+    if (activeTab === 'Following' && followingIds === null) fetchFollowing();
+  }, [activeTab, followingIds, fetchFollowing]);
 
   // Each feed tab remembers its own scroll position; the listener keeps
   // the active tab's offset current on every scroll event.
@@ -165,44 +193,52 @@ export default function Feed() {
     refreshInflight.current = true;
     setRefreshing(true);
     try {
-      await Promise.all([refresh(), fetchArticles(true), fetchHotTopics()]);
+      await Promise.all([
+        refresh(),
+        fetchArticles(true),
+        fetchHotTopics(),
+        followingIds !== null ? fetchFollowing() : Promise.resolve(),
+      ]);
     } finally {
       setRefreshing(false);
       refreshInflight.current = false;
     }
-  }, [refresh, fetchArticles, fetchHotTopics]);
+  }, [refresh, fetchArticles, fetchHotTopics, followingIds, fetchFollowing]);
 
-  // Infinite scroll: page in more articles when the bottom nears
+  // Infinite scroll: page in more articles AND posts when the bottom nears
   const onEndReached = useCallback(async () => {
-    if (loadingMore || refreshing || !hasMoreArticles) return;
+    if (loadingMore || refreshing || (!hasMoreArticles && !hasMorePosts)) return;
     setLoadingMore(true);
     try {
-      const added = await fetchArticles(false);
+      const [addedArticles, addedPosts] = await Promise.all([
+        hasMoreArticles ? fetchArticles(false) : Promise.resolve([] as ArticleType[]),
+        hasMorePosts ? loadMorePosts() : Promise.resolve([]),
+      ]);
       // Appended pages join the END of the master order (shuffled among
       // themselves); every tab sees them below what it already showed.
       setMasterOrder((prev) => {
         const seen = new Set(prev.map((o) => o.id));
-        const fresh = added
-          .filter((a) => !seen.has(a.id))
-          .map((a) => ({ kind: 'article' as const, id: a.id }));
+        const fresh = [
+          ...addedArticles.filter((a) => !seen.has(a.id)).map((a) => ({ kind: 'article' as const, id: a.id })),
+          ...addedPosts.filter((p) => !seen.has(p.id)).map((p) => ({ kind: 'post' as const, id: p.id })),
+        ];
         return [...prev, ...shuffle(fresh)];
       });
     } finally {
       setLoadingMore(false);
     }
-  }, [loadingMore, refreshing, hasMoreArticles, fetchArticles]);
+  }, [loadingMore, refreshing, hasMoreArticles, hasMorePosts, fetchArticles, loadMorePosts]);
 
-  // Rebuild the master shuffle only when membership actually changes
-  // (new data epoch or posts arriving) — NOT on tab switches, so every
-  // tab keeps its sequence.
-  const postIdsKey = posts.map((p) => p.id).join(',');
+  // Rebuild the master shuffle only on data RESETS (pull-to-refresh, new
+  // post created) — never on appended pages or tab switches, so the
+  // sequence users already scrolled through stays put.
+  const postsForOrderRef = useRef(posts);
+  useEffect(() => { postsForOrderRef.current = posts; }, [posts]);
   useEffect(() => {
-    const postEntries = postIdsKey === ''
-      ? []
-      : postIdsKey.split(',').map((id) => ({ kind: 'post' as const, id }));
+    const postEntries = postsForOrderRef.current.map((p) => ({ kind: 'post' as const, id: p.id }));
     const articleEntries = articlesRef.current.map((a) => ({ kind: 'article' as const, id: a.id }));
     setMasterOrder(shuffle([...postEntries, ...articleEntries]));
-  }, [postIdsKey, orderEpoch]);
+  }, [postsEpoch, orderEpoch]);
 
   type FeedItem =
     | { kind: 'post'; id: string; data: import('@/components/postComponent').PostType }
@@ -218,6 +254,12 @@ export default function Feed() {
     [filteredPosts]
   );
   const feedItems = useMemo<FeedItem[]>(() => {
+    if (activeTab === 'Following') {
+      return (followingIds ?? [])
+        .map((id) => postsById.get(id))
+        .filter((p): p is NonNullable<typeof p> => !!p)
+        .map((data) => ({ kind: 'post' as const, id: `p-${data.id}`, data }));
+    }
     const items: FeedItem[] = [];
     for (const o of masterOrder) {
       if (o.kind === 'post') {
@@ -229,9 +271,18 @@ export default function Feed() {
       }
     }
     return items;
-  }, [masterOrder, postsById, articlesById, visiblePostIds, tabAllows]);
+  }, [masterOrder, postsById, articlesById, visiblePostIds, tabAllows, activeTab, followingIds]);
 
   const listRef = useRef<FlatList<FeedItem>>(null);
+
+  // Re-tapping the home tab button jumps to the top and reloads the feed
+  useEffect(() => {
+    return onTabRefresh('index', () => {
+      listRef.current?.scrollToOffset({ offset: 0, animated: true });
+      scrollOffsets.current[activeTab] = 0;
+      onRefresh();
+    });
+  }, [onRefresh, activeTab]);
 
   // Coming back to a tab drops you where you left it
   useEffect(() => {
@@ -290,10 +341,17 @@ export default function Feed() {
           }
           onEndReached={onEndReached}
           onEndReachedThreshold={0.6}
+          ListEmptyComponent={
+            activeTab === 'Following' && followingIds !== null ? (
+              <ThemedText style={styles.feedEnd}>
+                You&apos;re not following anyone yet — tap Follow on any profile and their posts land here.
+              </ThemedText>
+            ) : null
+          }
           ListFooterComponent={
             loadingMore ? (
               <ActivityIndicator style={{ paddingVertical: 24 }} />
-            ) : !hasMoreArticles && feedItems.length > 0 ? (
+            ) : !hasMoreArticles && !hasMorePosts && feedItems.length > 0 ? (
               <ThemedText style={styles.feedEnd}>You&apos;re all caught up</ThemedText>
             ) : null
           }
@@ -314,14 +372,14 @@ export default function Feed() {
                   onPress={() => router.push(`/summary/${item.id}`)}
                   style={({ pressed }) => [
                     styles.hotCard,
-                    { backgroundColor: pressed ? '#e9c8ffbf' : '#E9C8FF' },
+                    { backgroundColor: pressed ? c.accentFaint + 'BF' : c.accentFaint },
                   ]}
                 >
                   <ThemedText style={styles.hotCardText} numberOfLines={2}>
                     {item.title}
                   </ThemedText>
                   {/* Dots live inside the card so they sit on purple, not
-                      on the fading white background */}
+                      on the fading background */}
                   {hotTopics.length > 1 && (
                     <ThemedView style={styles.hotDots}>
                       {hotTopics.map((_, i) => (
@@ -329,7 +387,7 @@ export default function Feed() {
                           key={i}
                           style={[
                             styles.hotDot,
-                            { backgroundColor: i === hotIndex ? '#9A00FF' : '#FFFFFF' },
+                            { backgroundColor: i === hotIndex ? c.accentDeep : scheme === 'dark' ? '#6E5C85' : '#FFFFFF' },
                           ]}
                         />
                       ))}
@@ -345,71 +403,49 @@ export default function Feed() {
             smoothly instead of being cut off mid-fade */}
         {hotTopics.length > 0 && (
           <LinearGradient
-            colors={[
-              'rgba(255,255,255,1)',
-              'rgba(255,255,255,0.6)',
-              'rgba(255,255,255,0.25)',
-              'rgba(255,255,255,0)',
-            ]}
+            // fades from the screen background color, so it must track the theme
+            colors={
+              scheme === 'dark'
+                ? ['rgba(21,23,24,1)', 'rgba(21,23,24,0.6)', 'rgba(21,23,24,0.25)', 'rgba(21,23,24,0)']
+                : ['rgba(255,255,255,1)', 'rgba(255,255,255,0.6)', 'rgba(255,255,255,0.25)', 'rgba(255,255,255,0)']
+            }
             locations={[0, 0.45, 0.75, 1]}
             style={styles.fadeOverlay}
             pointerEvents="none"
           />
         )}
         <ThemedView style={styles.header}>
-          <Pressable
-            onPress={() => setActiveTab('For You')}
-            style={{
-              padding: 10,
-              borderBottomLeftRadius: activeTab === 'For You' ? 4 : 0,
-              borderBottomRightRadius: activeTab === 'For You' ? 4 : 0,
-              borderBottomWidth: 4,
-              borderBottomColor: activeTab === 'For You' ? '#B647FF' : 'white',
-              alignItems: 'center',
-              justifyContent: 'center',
-              marginTop: 54,
-              width: screenWidth / 3,
-            }}
-          >
-            <ThemedText type="subtitle" lightColor={activeTab === 'For You' ? 'black' : '#8D8D8D'}>For You</ThemedText>
-          </Pressable>
-          <Pressable
-            onPress={() => setActiveTab('Random')}
-            style={{
-              padding: 10,
-              borderBottomLeftRadius: activeTab === 'Random' ? 4 : 0,
-              borderBottomRightRadius: activeTab === 'Random' ? 4 : 0,
-              borderBottomWidth: 4,
-              borderBottomColor: activeTab === 'Random' ? '#B647FF' : 'white',
-              alignItems: 'center',
-              justifyContent: 'center',
-              marginTop: 54,
-              width: screenWidth / 3,
-            }}
-          >
-            <ThemedText type="subtitle" lightColor={activeTab === 'Random' ? 'black' : '#8D8D8D'}>Random</ThemedText>
-          </Pressable>
-          <Pressable
-            onPress={() => setActiveTab('Against You')}
-            style={{
-              padding: 10,
-              borderBottomLeftRadius: activeTab === 'Against You' ? 4 : 0,
-              borderBottomRightRadius: activeTab === 'Against You' ? 4 : 0,
-              borderBottomWidth: 4,
-              borderBottomColor: activeTab === 'Against You' ? '#B647FF' : 'white',
-              alignItems: 'center',
-              justifyContent: 'center',
-              marginTop: 54,
-              width: screenWidth / 3,
-            }}
-          >
-            <ThemedText type="subtitle" lightColor={activeTab === 'Against You' ? 'black' : '#8D8D8D'}>Against You</ThemedText>
-          </Pressable>
+          {(['Following', 'For You', 'Random', 'Against You'] as const).map((tab) => (
+            <Pressable
+              key={tab}
+              onPress={() => { selectTick(); setActiveTab(tab); }}
+              style={{
+                paddingVertical: 10,
+                borderBottomLeftRadius: activeTab === tab ? 4 : 0,
+                borderBottomRightRadius: activeTab === tab ? 4 : 0,
+                borderBottomWidth: 4,
+                borderBottomColor: activeTab === tab ? c.accent : c.background,
+                alignItems: 'center',
+                justifyContent: 'center',
+                marginTop: 54,
+                width: screenWidth / 4,
+              }}
+            >
+              <ThemedText
+                style={{ fontSize: 15, fontWeight: '800', color: activeTab === tab ? c.text : c.muted }}
+                numberOfLines={1}
+              >
+                {tab}
+              </ThemedText>
+            </Pressable>
+          ))}
         </ThemedView>
         {/* Floating create-post button */}
         <Pressable
-          onPress={() => router.push('/createpost')}
+          onPress={() => { tapLight(); router.push('/createpost'); }}
           style={({ pressed }) => [styles.fab, { opacity: pressed ? 0.85 : 1 }]}
+          accessibilityRole="button"
+          accessibilityLabel="Create post"
         >
           <IconSymbol name="plus" size={28} color="#FFFFFF" />
         </Pressable>
@@ -418,7 +454,7 @@ export default function Feed() {
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (c: Palette) => StyleSheet.create({
   container: {
     flex: 1,
     marginTop: 0,
@@ -426,11 +462,11 @@ const styles = StyleSheet.create({
   header: {
     flexDirection: 'row',
     justifyContent: 'space-around',
-    backgroundColor: 'white',
+    backgroundColor: c.background,
     position: 'absolute',
     width: screenWidth,
     height: 104,
-    borderColor: "#c6c6c6ff",
+    borderColor: c.border,
     borderBottomWidth: 1,
   },
   hotBar: {
@@ -439,7 +475,7 @@ const styles = StyleSheet.create({
     width: screenWidth,
     paddingTop: 14,
     paddingBottom: 8,
-    backgroundColor: 'white',
+    backgroundColor: c.background,
   },
   // sits directly below the solid bar (104 + 14 + 84 card + 8 = 210)
   fadeOverlay: {
@@ -461,7 +497,7 @@ const styles = StyleSheet.create({
     fontSize: 15,
     lineHeight: 21,
     fontWeight: '700',
-    color: '#7A1FA8',
+    color: c.onAccentFaint,
     textAlign: 'center',
   },
   hotDots: {
@@ -479,7 +515,7 @@ const styles = StyleSheet.create({
   },
   feedEnd: {
     textAlign: 'center',
-    color: '#8D8D8D',
+    color: c.muted,
     paddingVertical: 24,
   },
   fab: {

@@ -1,18 +1,21 @@
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { IconSymbol } from '@/components/ui/icon-symbol';
+import { type Palette } from '@/constants/theme';
 import { useAuth } from '@/context/authContext';
 import { usePosts } from '@/context/postContext';
+import { usePalette } from '@/hooks/use-palette';
 import { api, uploadImage } from '@/lib/api';
+import { notifySuccess, tapLight, tapMedium } from '@/lib/haptics';
 import * as ImagePicker from 'expo-image-picker';
 import { useRouter } from 'expo-router';
-import { useState } from 'react';
-import { Dimensions, Image, Keyboard, Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
+import { useMemo, useState } from 'react';
+import { Image, Keyboard, Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
 
 export default function CreatePost() {
   const router = useRouter();
-  const screenWidth = Dimensions.get('window').width;
-
+  const { c } = usePalette();
+  const styles = useMemo(() => makeStyles(c), [c]);
   const { user } = useAuth();
   const { refresh } = usePosts();
 
@@ -55,6 +58,7 @@ export default function CreatePost() {
   const handlePost = async () => {
     setErr(null);
     try {
+      tapMedium();
       setLoading(true);
 
       let mediaUrl: string | null = null;
@@ -77,6 +81,7 @@ export default function CreatePost() {
       setHashtags([]);
       setTagInput('');
       setPickedImage(null);
+      notifySuccess();
       router.back();
     } catch (e: any) {
       setErr(e?.message ?? 'Something went wrong.');
@@ -88,6 +93,7 @@ export default function CreatePost() {
   const [pickedImage, setPickedImage] = useState<{ uri: string; width: number; height: number } | null>(null);
 
   const pickImage = async () => {
+    tapLight();
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: 'images' as const,
       allowsEditing: false,
@@ -142,7 +148,7 @@ export default function CreatePost() {
             onSubmitEditing={Keyboard.dismiss}
             textAlignVertical="top"
             style={styles.input}
-            placeholderTextColor="#8f8f8f"
+            placeholderTextColor={c.muted}
           />
 
           {pickedImage && (
@@ -157,7 +163,7 @@ export default function CreatePost() {
                 resizeMode="cover"
               />
               <Pressable onPress={removePickedImage} style={styles.removeButton}>
-                <IconSymbol name="x.circle.fill" size={28} color="#b647ff" />
+                <IconSymbol name="x.circle.fill" size={28} color={c.accent} />
               </Pressable>
             </View>
           )}
@@ -170,7 +176,7 @@ export default function CreatePost() {
 
           <ThemedView style={styles.actionContainer}>
             <Pressable onPress={pickImage} style={styles.secondaryButton}>
-              <IconSymbol name="photo" size={20} color="#b647ff" />
+              <IconSymbol name="photo" size={20} color={c.accent} />
               <ThemedText style={styles.secondaryButtonText}>Add Image</ThemedText>
             </Pressable>
 
@@ -180,7 +186,7 @@ export default function CreatePost() {
                   {hashtags.map((tag) => (
                     <Pressable key={tag} onPress={() => removeTag(tag)} style={styles.tagChip}>
                       <ThemedText style={styles.tagChipText}>#{tag}</ThemedText>
-                      <IconSymbol name="x.circle.fill" size={16} color="#b647ff" />
+                      <IconSymbol name="x.circle.fill" size={16} color={c.accent} />
                     </Pressable>
                   ))}
                 </View>
@@ -193,7 +199,7 @@ export default function CreatePost() {
                 autoCapitalize="none"
                 autoCorrect={false}
                 style={styles.tagInput}
-                placeholderTextColor="#8f8f8f"
+                placeholderTextColor={c.muted}
               />
             </ThemedView>
           </ThemedView>
@@ -219,10 +225,10 @@ export default function CreatePost() {
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (c: Palette) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#fff',
+    backgroundColor: c.background,
   },
   scrollView: {
     flex: 1,
@@ -237,7 +243,7 @@ const styles = StyleSheet.create({
     marginTop: 60,
   },
   headerTitle: {
-    color: '#b647ff',
+    color: c.accent,
     fontWeight: '800',
   },
   authorContainer: {
@@ -247,10 +253,10 @@ const styles = StyleSheet.create({
     marginBottom: 20,
     paddingHorizontal: 12,
     paddingVertical: 8,
-    backgroundColor: '#f8effcff',
+    backgroundColor: c.card,
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: '#e0d9fb',
+    borderColor: c.cardBorder,
   },
   avatar: {
     width: 40,
@@ -265,7 +271,7 @@ const styles = StyleSheet.create({
     width: '100%',
     minHeight: 140,
     borderWidth: 2,
-    borderColor: '#E9C8FF',
+    borderColor: c.accentFaint,
     borderRadius: 16,
     paddingHorizontal: 16,
     paddingVertical: 12,
@@ -273,6 +279,7 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
     textAlignVertical: 'top',
+    color: c.text,
   },
   imageContainer: {
     width: '100%',
@@ -285,13 +292,13 @@ const styles = StyleSheet.create({
     position: 'absolute',
     top: 8,
     right: 8,
-    backgroundColor: 'white',
+    backgroundColor: c.background,
     borderRadius: 16,
     padding: 4,
   },
   errorContainer: {
-    backgroundColor: '#ffe0e0',
-    borderColor: '#ff6b6b',
+    backgroundColor: c.redBg,
+    borderColor: c.red,
     borderWidth: 1,
     borderRadius: 12,
     paddingHorizontal: 12,
@@ -299,7 +306,7 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   errorText: {
-    color: '#d32f2f',
+    color: c.danger,
     fontWeight: '600',
     fontSize: 14,
   },
@@ -320,24 +327,25 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     paddingVertical: 4,
     borderRadius: 12,
-    backgroundColor: '#f8effcff',
+    backgroundColor: c.card,
     borderWidth: 1,
-    borderColor: '#E9C8FF',
+    borderColor: c.accentFaint,
   },
   tagChipText: {
-    color: '#b647ff',
+    color: c.accent,
     fontWeight: '700',
     fontSize: 14,
   },
   tagInput: {
     width: '100%',
     borderWidth: 2,
-    borderColor: '#E9C8FF',
+    borderColor: c.accentFaint,
     borderRadius: 16,
     paddingHorizontal: 16,
     paddingVertical: 10,
     fontSize: 15,
     fontWeight: '600',
+    color: c.text,
   },
   secondaryButton: {
     flexDirection: 'row',
@@ -348,13 +356,13 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     borderRadius: 16,
     borderWidth: 2,
-    borderColor: '#E9C8FF',
-    backgroundColor: '#f8effcff',
+    borderColor: c.accentFaint,
+    backgroundColor: c.card,
   },
   secondaryButtonText: {
     fontWeight: '700',
     fontSize: 16,
-    color: '#b647ff',
+    color: c.accent,
   },
   bottomContainer: {
     position: 'absolute',
@@ -363,9 +371,9 @@ const styles = StyleSheet.create({
     right: 0,
     paddingHorizontal: 16,
     paddingVertical: 16,
-    backgroundColor: 'white',
+    backgroundColor: c.background,
     borderTopWidth: 1,
-    borderTopColor: '#e0d9fb',
+    borderTopColor: c.cardBorder,
   },
   primaryButton: {
     flexDirection: 'row',
@@ -375,10 +383,10 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
     paddingHorizontal: 24,
     borderRadius: 16,
-    backgroundColor: '#b647ff',
+    backgroundColor: c.accent,
   },
   primaryButtonDisabled: {
-    backgroundColor: '#d9a5ff',
+    backgroundColor: c.accentFaint,
     opacity: 0.6,
   },
   primaryButtonText: {

@@ -1,9 +1,11 @@
 import ScalableImage from '@/components/scalable-image';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
+import { type Palette } from '@/constants/theme';
+import { usePalette } from '@/hooks/use-palette';
 import { useRelativeTime } from '@/hooks/useRelativeTime';
 import { useRouter } from 'expo-router';
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Dimensions, Image, Pressable, StyleSheet } from 'react-native';
 import ArticleActions from './article-actions';
 import ScorerReceipts from './scorerReceipts';
@@ -56,6 +58,8 @@ type Props = {
 
 export default function Article({ article }: Props) {
 
+  const { c } = usePalette();
+  const styles = useMemo(() => makeStyles(c), [c]);
   const timeAgo = useRelativeTime(article.published_at);
 
   // Articles are identified by their OUTLET's published lean (a small
@@ -63,9 +67,9 @@ export default function Article({ article }: Props) {
   const sourceLean = article.source_lean ?? article.political_lean;
   const leanTag =
     sourceLean == null ? null :
-    sourceLean < 0.4 ? { label: 'Left',   color: '#2563EB', bg: '#E8F0FE' } :
-    sourceLean > 0.6 ? { label: 'Right',  color: '#DC2626', bg: '#FDE8E8' } :
-                       { label: 'Center', color: '#6B7280', bg: '#F1F1F3' };
+    sourceLean < 0.4 ? { label: 'Left',   color: c.blue, bg: c.blueBg } :
+    sourceLean > 0.6 ? { label: 'Right',  color: c.red, bg: c.redBg } :
+                       { label: 'Center', color: c.subtle, bg: c.inputBg };
 
   const router = useRouter();
   const [logoFailed, setLogoFailed] = useState(false);
@@ -111,7 +115,7 @@ export default function Article({ article }: Props) {
                   </Pressable>
                 )}
               </ThemedView>
-              <ThemedText style={{color: '#8D8D8D', fontSize: 14}}>{timeAgo}</ThemedText>
+              <ThemedText style={{color: c.muted, fontSize: 14}}>{timeAgo}</ThemedText>
             </ThemedView>
           </ThemedView>
           
@@ -155,7 +159,7 @@ export default function Article({ article }: Props) {
   )
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (c: Palette) => StyleSheet.create({
   container: {
     gap: 8,
     flexDirection: 'column',
@@ -170,7 +174,7 @@ const styles = StyleSheet.create({
   },
   postContent: {
     paddingVertical: 16,
-    borderColor: "#c6c6c6ff",
+    borderColor: c.border,
     borderBottomWidth: 1,
   },
   logo: {
@@ -179,13 +183,13 @@ const styles = StyleSheet.create({
     borderRadius: 25,
     backgroundColor: '#FFFFFF',
     borderWidth: 1,
-    borderColor: '#E2E2E2',
+    borderColor: c.border,
   },
   logoFallback: {
     width: 50,
     aspectRatio: 1,
     borderRadius: 25,
-    backgroundColor: '#E9C8FF',
+    backgroundColor: c.accentFaint,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -193,7 +197,7 @@ const styles = StyleSheet.create({
     fontSize: 22,
     fontWeight: '800',
     lineHeight: 26,
-    color: '#9A00FF',
+    color: c.onAccentFaint,
   },
   content: {
     width: screenWidth - 32, // 50 (avatar) + 12*2 (padding) + 8 (gap)

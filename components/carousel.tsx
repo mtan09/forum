@@ -1,3 +1,4 @@
+import { usePalette } from '@/hooks/use-palette';
 import React, { useMemo, useRef, useState } from 'react';
 import {
   Dimensions,
@@ -44,12 +45,15 @@ export default function Carousel<T>({
   onIndexChange,
   renderPagination,
   showPagination = true,
-  dotActiveColor = '#9A00FF',
-  dotInactiveColor = '#E9C8FF',
+  dotActiveColor,
+  dotInactiveColor,
   dotSize = 8,
   dotSpacing = 8,
   paginationContainerStyle,
 }: CarouselProps<T>) {
+  const { c } = usePalette();
+  const activeDot = dotActiveColor ?? c.accentDeep;
+  const inactiveDot = dotInactiveColor ?? c.accentFaint;
   const flatListRef = useRef<FlatList<T>>(null);
   const [activeIndex, setActiveIndex] = useState(Math.max(0, Math.min(initialIndex, Math.max(0, data.length - 1))));
   const isAdjustingRef = useRef(false);
@@ -136,7 +140,7 @@ export default function Carousel<T>({
                       height: dotSize,
                       borderRadius: dotSize / 2,
                       marginHorizontal: dotSpacing / 2,
-                      backgroundColor: i === activeIndex ? dotActiveColor : dotInactiveColor,
+                      backgroundColor: i === activeIndex ? activeDot : inactiveDot,
                     },
                   ]}
                 />

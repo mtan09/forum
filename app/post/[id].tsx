@@ -3,20 +3,29 @@ import Post from '@/components/postComponent';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { IconSymbol } from '@/components/ui/icon-symbol';
+import { type Palette } from '@/constants/theme';
 import { usePosts } from '@/context/postContext';
+import { usePalette } from '@/hooks/use-palette';
 import { api } from '@/lib/api';
+import { tapMedium } from '@/lib/haptics';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useState } from 'react';
-import { Dimensions, Keyboard, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, TextInput } from 'react-native';
-
-const screenWidth = Dimensions.get('window').width;
+import { useEffect, useMemo, useState } from 'react';
+import { Keyboard, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, TextInput } from 'react-native';
 
 export default function PostScreen() {
   const router = useRouter();
+  const { c, scheme } = usePalette();
+  const styles = useMemo(() => makeStyles(c), [c]);
   const { id } = useLocalSearchParams();
-  const { posts, refresh } = usePosts();
+  const { posts, refresh, ensurePost } = usePosts();
 
   const post = posts.find(p => p.id === id);
+
+  // With a paged feed, posts opened from search/profile/deep links may not
+  // be loaded yet — pull this one in on demand.
+  useEffect(() => {
+    if (!post && typeof id === 'string') ensurePost(id);
+  }, [post, id, ensurePost]);
 
   const [commentText, setCommentText] = useState('');
   const [submitting, setSubmitting] = useState(false);
@@ -30,6 +39,7 @@ export default function PostScreen() {
     if (!content || submitting) return;
     setCommentError(null);
     try {
+      tapMedium();
       setSubmitting(true);
       await api('/comments', { body: { post_id: post.id, content } });
       setCommentText('');
@@ -81,7 +91,7 @@ export default function PostScreen() {
             <ThemedView style={styles.composer}>
               <TextInput
                 placeholder="Add a comment..."
-                placeholderTextColor="#8f8f8f"
+                placeholderTextColor={c.muted}
                 value={commentText}
                 onChangeText={setCommentText}
                 multiline
@@ -95,7 +105,7 @@ export default function PostScreen() {
                 <IconSymbol
                   name="arrow.up.circle.fill"
                   size={28}
-                  color={commentText.trim() && !submitting ? '#B647FF' : '#dfaeffff'}
+                  color={commentText.trim() && !submitting ? c.accent : scheme === 'dark' ? '#5C3E7D' : '#dfaeffff'}
                 />
               </Pressable>
             </ThemedView>
@@ -111,7 +121,7 @@ export default function PostScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (c: Palette) => StyleSheet.create({
   container: {
     padding: 16,
     gap: 12,
@@ -123,7 +133,7 @@ const styles = StyleSheet.create({
     gap: 8,
     paddingVertical: 12,
     borderRadius: 16,
-    backgroundColor: '#B647FF',
+    backgroundColor: c.accent,
   },
   aiButtonText: {
     fontWeight: '700',
@@ -133,7 +143,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
-    borderColor: '#E9C8FF',
+    borderColor: c.accentFaint,
     borderWidth: 2,
     borderRadius: 16,
     paddingHorizontal: 12,
@@ -146,9 +156,10 @@ const styles = StyleSheet.create({
     maxHeight: 96,
     paddingTop: 0,
     paddingBottom: 0,
+    color: c.text,
   },
   composerError: {
-    color: '#b91c1c',
+    color: c.danger,
     marginBottom: 8,
   },
 });

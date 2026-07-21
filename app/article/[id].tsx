@@ -3,7 +3,10 @@ import CommentList from '@/components/commentComponent';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { IconSymbol } from '@/components/ui/icon-symbol';
+import { type Palette } from '@/constants/theme';
+import { usePalette } from '@/hooks/use-palette';
 import { api } from '@/lib/api';
+import { tapMedium } from '@/lib/haptics';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import * as WebBrowser from 'expo-web-browser';
 import { useEffect, useMemo, useState } from 'react';
@@ -11,6 +14,8 @@ import { Keyboard, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleS
 
 export default function ArticleScreen() {
   const router = useRouter();
+  const { c, scheme } = usePalette();
+  const styles = useMemo(() => makeStyles(c), [c]);
   const { id } = useLocalSearchParams();
   const articleId = useMemo(() => (Array.isArray(id) ? id[0] : id) as string | undefined, [id]);
 
@@ -45,6 +50,7 @@ export default function ArticleScreen() {
     if (!content || submitting || !articleId) return;
     setCommentError(null);
     try {
+      tapMedium();
       setSubmitting(true);
       await api('/comments', { body: { article_id: articleId, content } });
       setCommentText('');
@@ -120,7 +126,7 @@ export default function ArticleScreen() {
             style={({ pressed }) => [styles.readButton, { opacity: pressed ? 0.7 : 1 }]}
           >
             <ThemedText style={styles.readButtonText}>Read full article at {article.source}</ThemedText>
-            <IconSymbol name="square.and.arrow.up" size={18} color="#b647ff" />
+            <IconSymbol name="square.and.arrow.up" size={18} color={c.accent} />
           </Pressable>
 
           {/* Comments */}
@@ -131,7 +137,7 @@ export default function ArticleScreen() {
             <ThemedView style={styles.composer}>
               <TextInput
                 placeholder="Add a comment..."
-                placeholderTextColor="#8f8f8f"
+                placeholderTextColor={c.muted}
                 value={commentText}
                 onChangeText={setCommentText}
                 multiline
@@ -145,7 +151,7 @@ export default function ArticleScreen() {
                 <IconSymbol
                   name="arrow.up.circle.fill"
                   size={28}
-                  color={commentText.trim() && !submitting ? '#B647FF' : '#dfaeffff'}
+                  color={commentText.trim() && !submitting ? c.accent : scheme === 'dark' ? '#5C3E7D' : '#dfaeffff'}
                 />
               </Pressable>
             </ThemedView>
@@ -161,7 +167,7 @@ export default function ArticleScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (c: Palette) => StyleSheet.create({
   container: {
     padding: 16,
     gap: 12,
@@ -173,7 +179,7 @@ const styles = StyleSheet.create({
     gap: 8,
     paddingVertical: 12,
     borderRadius: 16,
-    backgroundColor: '#B647FF',
+    backgroundColor: c.accent,
   },
   aiButtonText: {
     fontWeight: '700',
@@ -187,18 +193,18 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     borderRadius: 16,
     borderWidth: 2,
-    borderColor: '#E9C8FF',
-    backgroundColor: '#f8effcff',
+    borderColor: c.accentFaint,
+    backgroundColor: c.card,
   },
   readButtonText: {
     fontWeight: '700',
-    color: '#b647ff',
+    color: c.accent,
   },
   composer: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
-    borderColor: '#E9C8FF',
+    borderColor: c.accentFaint,
     borderWidth: 2,
     borderRadius: 16,
     paddingHorizontal: 12,
@@ -211,9 +217,10 @@ const styles = StyleSheet.create({
     maxHeight: 96,
     paddingTop: 0,
     paddingBottom: 0,
+    color: c.text,
   },
   composerError: {
-    color: '#b91c1c',
+    color: c.danger,
     marginBottom: 8,
   },
 });

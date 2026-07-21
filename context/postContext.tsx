@@ -1,17 +1,24 @@
 import { PostType } from '@/components/postComponent';
 import { api } from '@/lib/api';
-import { createContext, useCallback, useContext, useEffect, useState } from 'react';
+import { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
 import { useAuth } from './authContext';
 
 export type VoteDirection = 'up' | 'down' | null;
 
 type PostContextType = {
   posts: PostType[];
-  setPosts: (posts: PostType[]) => void;
+  setPosts: React.Dispatch<React.SetStateAction<PostType[]>>;
   isLoading: boolean;
   error: string | null;
   refresh: () => Promise<void>;
   vote: (postId: string, direction: VoteDirection) => Promise<void>;
+  /** Load the next page; resolves with the newly appended posts. */
+  loadMorePosts: () => Promise<PostType[]>;
+  hasMorePosts: boolean;
+  /** Bumps whenever the post list is reset (refresh), NOT on appends. */
+  postsEpoch: number;
+  /** Fetch a single post into the context if it isn't already loaded. */
+  ensurePost: (id: string) => Promise<void>;
 };
 
 const PostContext = createContext<PostContextType | null>(null);
@@ -49,21 +56,66 @@ const applyVote = (post: PostType, direction: VoteDirection): PostType => {
   return { ...post, upvotes, downvotes, myVote: direction };
 };
 
+// Posts page in from the API instead of loading the whole table — the feed
+// appends pages on scroll, exactly like articles already do.
+const POSTS_PAGE = 30;
+
 export function PostProvider({ children }: { children: React.ReactNode }) {
   const [posts, setPosts] = useState<PostType[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [hasMorePosts, setHasMorePosts] = useState(true);
+  const [postsEpoch, setPostsEpoch] = useState(0);
   const { isAuthenticated } = useAuth();
+
+  const postsRef = useRef<PostType[]>([]);
+  useEffect(() => { postsRef.current = posts; }, [posts]);
+  const loadingMoreRef = useRef(false);
 
   const refresh = useCallback(async () => {
     try {
-      const rows = await api<any[]>('/posts');
+      const rows = await api<any[]>(`/posts?limit=${POSTS_PAGE}&offset=0`);
       setPosts(rows.map(mapPost));
+      setHasMorePosts(rows.length === POSTS_PAGE);
+      setPostsEpoch((e) => e + 1);
       setError(null);
     } catch (err: any) {
       setError(err?.message ?? 'Failed to load posts');
     } finally {
       setIsLoading(false);
+    }
+  }, []);
+
+  const loadMorePosts = useCallback(async (): Promise<PostType[]> => {
+    if (loadingMoreRef.current) return [];
+    loadingMoreRef.current = true;
+    try {
+      const rows = await api<any[]>(`/posts?limit=${POSTS_PAGE}&offset=${postsRef.current.length}`);
+      setHasMorePosts(rows.length === POSTS_PAGE);
+      const fresh = rows.map(mapPost);
+      setPosts((prev) => {
+        const seen = new Set(prev.map((p) => p.id));
+        return [...prev, ...fresh.filter((p) => !seen.has(p.id))];
+      });
+      return fresh;
+    } catch (err: any) {
+      console.log('Error loading more posts:', err?.message);
+      return [];
+    } finally {
+      loadingMoreRef.current = false;
+    }
+  }, []);
+
+  // Content reached by direct navigation (search results, deep links,
+  // profile tabs) may not be in the paged feed yet.
+  const ensurePost = useCallback(async (id: string) => {
+    if (postsRef.current.some((p) => p.id === id)) return;
+    try {
+      const row = await api<any>(`/posts/${id}`);
+      const mapped = mapPost(row);
+      setPosts((prev) => (prev.some((p) => p.id === id) ? prev : [...prev, mapped]));
+    } catch (err: any) {
+      console.log('Error fetching post:', err?.message);
     }
   }, []);
 
@@ -94,7 +146,7 @@ export function PostProvider({ children }: { children: React.ReactNode }) {
   );
 
   return (
-    <PostContext.Provider value={{ posts, setPosts, isLoading, error, refresh, vote }}>
+    <PostContext.Provider value={{ posts, setPosts, isLoading, error, refresh, vote, loadMorePosts, hasMorePosts, postsEpoch, ensurePost }}>
       {children}
     </PostContext.Provider>
   );

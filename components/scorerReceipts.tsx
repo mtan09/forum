@@ -2,6 +2,9 @@ import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import Spectrum from '@/components/spectrum';
+import { type Palette } from '@/constants/theme';
+import { usePalette } from '@/hooks/use-palette';
+import { useMemo } from 'react';
 import { Dimensions, Modal, Pressable, ScrollView, StyleSheet } from 'react-native';
 
 const screenWidth = Dimensions.get('window').width;
@@ -67,6 +70,8 @@ type Props = {
 };
 
 export default function ScorerReceipts({ visible, onClose, position, signals, kind = 'post' }: Props) {
+  const { c } = usePalette();
+  const styles = useMemo(() => makeStyles(c), [c]);
   const parsed = parse(signals);
   const leanHits = parsed.framing.filter((f) => f.side === 'left' || f.side === 'right');
   const loadedHits = parsed.framing.filter((f) => f.side === 'loaded');
@@ -78,7 +83,7 @@ export default function ScorerReceipts({ visible, onClose, position, signals, ki
           <ThemedView style={styles.handle} />
           <ScrollView showsVerticalScrollIndicator={false}>
             <ThemedView style={styles.header}>
-              <IconSymbol name="checkmark.seal.fill" size={20} color="#B647FF" />
+              <IconSymbol name="checkmark.seal.fill" size={20} color={c.accent} />
               <ThemedText type="defaultSemiBold" style={styles.title}>Why this placement?</ThemedText>
             </ThemedView>
 
@@ -90,7 +95,7 @@ export default function ScorerReceipts({ visible, onClose, position, signals, ki
               <ThemedView style={styles.block}>
                 <ThemedText style={styles.blockLabel}>Started from the outlet</ThemedText>
                 <ThemedText style={styles.blockBody}>
-                  This source's baseline rating is {bandLabel(parsed.prior).toLowerCase()} ({parsed.prior.toFixed(2)}).
+                  This source&apos;s baseline rating is {bandLabel(parsed.prior).toLowerCase()} ({parsed.prior.toFixed(2)}).
                   The text below moved it from there.
                 </ThemedText>
               </ThemedView>
@@ -175,14 +180,14 @@ export default function ScorerReceipts({ visible, onClose, position, signals, ki
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (c: Palette) => StyleSheet.create({
   backdrop: {
     flex: 1,
     backgroundColor: 'rgba(0,0,0,0.4)',
     justifyContent: 'flex-end',
   },
   sheet: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: c.overlayCard,
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
     paddingHorizontal: 24,
@@ -195,7 +200,7 @@ const styles = StyleSheet.create({
     width: 40,
     height: 4,
     borderRadius: 2,
-    backgroundColor: '#D8D8D8',
+    backgroundColor: c.faint,
     marginBottom: 16,
   },
   header: {
@@ -211,7 +216,7 @@ const styles = StyleSheet.create({
   band: {
     fontSize: 15,
     fontWeight: '700',
-    color: '#5A5A5A',
+    color: c.subtle,
     marginTop: 4,
     marginBottom: 8,
   },
@@ -221,7 +226,7 @@ const styles = StyleSheet.create({
   blockLabel: {
     fontSize: 13,
     fontWeight: '800',
-    color: '#8D8D8D',
+    color: c.muted,
     textTransform: 'uppercase',
     letterSpacing: 0.5,
     marginBottom: 8,
@@ -229,7 +234,7 @@ const styles = StyleSheet.create({
   blockBody: {
     fontSize: 15,
     lineHeight: 21,
-    color: '#3A3A3A',
+    color: c.text,
   },
   chips: {
     flexDirection: 'row',
@@ -241,13 +246,13 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     paddingVertical: 5,
   },
-  chipLeft: { backgroundColor: '#E8F0FE' },
-  chipRight: { backgroundColor: '#FDE8E8' },
-  chipLoaded: { backgroundColor: '#F1E8FB' },
+  chipLeft: { backgroundColor: c.blueBg },
+  chipRight: { backgroundColor: c.redBg },
+  chipLoaded: { backgroundColor: c.accentSoftBg },
   chipText: { fontSize: 14, fontWeight: '700' },
-  chipTextLeft: { color: '#2563EB' },
-  chipTextRight: { color: '#DC2626' },
-  chipTextLoaded: { color: '#9A00FF' },
+  chipTextLeft: { color: c.blue },
+  chipTextRight: { color: c.red },
+  chipTextLoaded: { color: c.accentDeep },
   facts: {
     marginTop: 20,
     gap: 8,
@@ -258,23 +263,23 @@ const styles = StyleSheet.create({
   },
   factKey: {
     fontSize: 14,
-    color: '#8D8D8D',
+    color: c.muted,
   },
   factVal: {
     fontSize: 14,
     fontWeight: '700',
-    color: '#3A3A3A',
+    color: c.text,
   },
   footer: {
     marginTop: 24,
     fontSize: 13,
     lineHeight: 19,
-    color: '#8D8D8D',
+    color: c.muted,
     fontStyle: 'italic',
   },
   closeBtn: {
     marginTop: 20,
-    backgroundColor: '#B647FF',
+    backgroundColor: c.accent,
     borderRadius: 14,
     paddingVertical: 14,
     alignItems: 'center',

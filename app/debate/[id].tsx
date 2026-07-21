@@ -4,7 +4,10 @@ import { StanceShareCard } from '@/components/shareCards';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { IconSymbol } from '@/components/ui/icon-symbol';
+import { type Palette } from '@/constants/theme';
+import { usePalette } from '@/hooks/use-palette';
 import { api } from '@/lib/api';
+import { selectTick, tapLight, tapMedium } from '@/lib/haptics';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useMemo, useState } from 'react';
@@ -26,15 +29,18 @@ type DebateDetail = {
   distribution: Distribution;
 };
 
-const KIND_META = {
-  biggest: { label: 'Biggest story', color: '#9A00FF', bg: '#F1E8FB' },
-  contested: { label: 'Most divided', color: '#DC2626', bg: '#FDE8E8' },
-  trending: { label: 'Trending', color: '#B45309', bg: '#FEF3C7' },
-} as const;
+const kindMeta = (c: Palette) => ({
+  biggest: { label: 'Biggest story', color: c.accentDeep, bg: c.accentSoftBg },
+  contested: { label: 'Most divided', color: c.red, bg: c.redBg },
+  trending: { label: 'Trending', color: c.amber, bg: c.amberBg },
+} as const);
 
 // The spectrum track: tap anywhere to place (or move) your pin
 function SpectrumTrack({ pin, onPlace }: { pin: number | null; onPlace: (p: number) => void }) {
+  const { c } = usePalette();
+  const styles = useMemo(() => makeStyles(c), [c]);
   const handlePress = (e: GestureResponderEvent) => {
+    selectTick();
     const x = e.nativeEvent.locationX;
     onPlace(Math.min(Math.max(x / TRACK_WIDTH, 0), 1));
   };
@@ -61,6 +67,8 @@ function SpectrumTrack({ pin, onPlace }: { pin: number | null; onPlace: (p: numb
 }
 
 function Histogram({ dist, myPosition }: { dist: Distribution; myPosition: number }) {
+  const { c } = usePalette();
+  const styles = useMemo(() => makeStyles(c), [c]);
   const max = Math.max(...dist.bins, 1);
   const myBin = Math.min(Math.floor(myPosition * 10), 9);
   return (
@@ -72,7 +80,7 @@ function Histogram({ dist, myPosition }: { dist: Distribution; myPosition: numbe
               styles.histBar,
               {
                 height: 6 + (n / max) * 64,
-                backgroundColor: i === myBin ? '#9A00FF' : '#D8C2F5',
+                backgroundColor: i === myBin ? c.accentDeep : c.barTrack,
               },
             ]}
           />
@@ -83,6 +91,9 @@ function Histogram({ dist, myPosition }: { dist: Distribution; myPosition: numbe
 }
 
 export default function DebateScreen() {
+  const { c, scheme } = usePalette();
+  const styles = useMemo(() => makeStyles(c), [c]);
+  const KIND_META = useMemo(() => kindMeta(c), [c]);
   const { id } = useLocalSearchParams();
   const debateId = useMemo(() => (Array.isArray(id) ? id[0] : id) as string | undefined, [id]);
   const router = useRouter();
@@ -109,6 +120,7 @@ export default function DebateScreen() {
   const submitPosition = async () => {
     if (pending == null || !debateId || submitting) return;
     try {
+      tapMedium();
       setSubmitting(true);
       const res = await api<{ my_position: number; distribution: Distribution }>(
         `/debates/${debateId}/vote`,
@@ -136,6 +148,7 @@ export default function DebateScreen() {
     const content = commentText.trim();
     if (!content || postingComment || !debateId) return;
     try {
+      tapMedium();
       setPostingComment(true);
       await api('/comments', { body: { debate_id: debateId, content } });
       setCommentText('');
@@ -186,7 +199,7 @@ export default function DebateScreen() {
               style={({ pressed }) => [styles.coverageLink, { opacity: pressed ? 0.7 : 1 }]}
             >
               <ThemedText style={styles.coverageLinkText}>Read the coverage first</ThemedText>
-              <IconSymbol name="chevron.right" size={14} color="#b647ff" />
+              <IconSymbol name="chevron.right" size={14} color={c.accent} />
             </Pressable>
           )}
 
@@ -237,10 +250,10 @@ export default function DebateScreen() {
                   </Pressable>
                 )}
                 <Pressable
-                  onPress={() => setShareOpen(true)}
+                  onPress={() => { tapLight(); setShareOpen(true); }}
                   style={({ pressed }) => [styles.shareStance, { opacity: pressed ? 0.7 : 1 }]}
                 >
-                  <IconSymbol name="square.and.arrow.up" size={16} color="#B647FF" />
+                  <IconSymbol name="square.and.arrow.up" size={16} color={c.accent} />
                   <ThemedText style={styles.shareStanceText}>Share my stance</ThemedText>
                 </Pressable>
               </>
@@ -255,7 +268,7 @@ export default function DebateScreen() {
             <ThemedView style={styles.composer}>
               <TextInput
                 placeholder={hasVoted ? 'Make your case...' : 'Take a stance to join the thread...'}
-                placeholderTextColor="#8f8f8f"
+                placeholderTextColor={c.muted}
                 value={commentText}
                 onChangeText={setCommentText}
                 multiline
@@ -269,7 +282,7 @@ export default function DebateScreen() {
                 <IconSymbol
                   name="arrow.up.circle.fill"
                   size={28}
-                  color={hasVoted && commentText.trim() && !postingComment ? '#B647FF' : '#dfaeffff'}
+                  color={hasVoted && commentText.trim() && !postingComment ? c.accent : scheme === 'dark' ? '#5C3E7D' : '#dfaeffff'}
                 />
               </Pressable>
             </ThemedView>
@@ -297,7 +310,7 @@ export default function DebateScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (c: Palette) => StyleSheet.create({
   container: {
     padding: 16,
     gap: 12,
@@ -324,14 +337,14 @@ const styles = StyleSheet.create({
     gap: 4,
   },
   coverageLinkText: {
-    color: '#b647ff',
+    color: c.accent,
     fontWeight: '700',
   },
   stanceCard: {
     borderRadius: 16,
     borderWidth: 1,
-    borderColor: '#E4DCFF',
-    backgroundColor: '#F5F2FF',
+    borderColor: c.cardBorder,
+    backgroundColor: c.card,
     padding: 16,
     gap: 12,
   },
@@ -339,7 +352,7 @@ const styles = StyleSheet.create({
     fontWeight: '800',
   },
   stanceHint: {
-    color: '#8D8D8D',
+    color: c.muted,
     fontSize: 13,
     lineHeight: 18,
   },
@@ -361,7 +374,7 @@ const styles = StyleSheet.create({
     borderRadius: 7,
     backgroundColor: '#FFFFFF',
     borderWidth: 2,
-    borderColor: '#1a1a1a',
+    borderColor: c.text,
   },
   trackLabels: {
     flexDirection: 'row',
@@ -370,12 +383,12 @@ const styles = StyleSheet.create({
     backgroundColor: 'transparent',
   },
   trackLabel: {
-    color: '#8D8D8D',
+    color: c.muted,
     fontSize: 12,
     fontWeight: '600',
   },
   lockButton: {
-    backgroundColor: '#B647FF',
+    backgroundColor: c.accent,
     borderRadius: 12,
     paddingVertical: 12,
     alignItems: 'center',
@@ -392,7 +405,7 @@ const styles = StyleSheet.create({
     paddingVertical: 4,
   },
   shareStanceText: {
-    color: '#B647FF',
+    color: c.accent,
     fontWeight: '800',
     fontSize: 14,
   },
@@ -418,7 +431,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
-    borderColor: '#E9C8FF',
+    borderColor: c.accentFaint,
     borderWidth: 2,
     borderRadius: 16,
     paddingHorizontal: 12,
@@ -431,5 +444,6 @@ const styles = StyleSheet.create({
     maxHeight: 96,
     paddingTop: 0,
     paddingBottom: 0,
+    color: c.text,
   },
 });

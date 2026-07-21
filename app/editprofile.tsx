@@ -1,17 +1,22 @@
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { IconSymbol } from '@/components/ui/icon-symbol';
+import { type Palette } from '@/constants/theme';
 import { useAuth } from '@/context/authContext';
+import { usePalette } from '@/hooks/use-palette';
 import { api, uploadImage } from '@/lib/api';
+import { notifySuccess, tapLight, tapMedium } from '@/lib/haptics';
 import * as ImagePicker from 'expo-image-picker';
 import { useRouter } from 'expo-router';
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Dimensions, Image, ImageBackground, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, TextInput } from 'react-native';
 
 const screenWidth = Dimensions.get('window').width;
 
 export default function EditProfile() {
   const router = useRouter();
+  const { c } = usePalette();
+  const styles = useMemo(() => makeStyles(c), [c]);
   const { user, refreshUser } = useAuth();
 
   const [username, setUsername] = useState(user?.username ?? '');
@@ -23,6 +28,7 @@ export default function EditProfile() {
   const [error, setError] = useState<string | null>(null);
 
   const pick = async (setter: (uri: string) => void) => {
+    tapLight();
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: 'images' as const,
       allowsEditing: false,
@@ -40,6 +46,7 @@ export default function EditProfile() {
       return;
     }
     try {
+      tapMedium();
       setSaving(true);
       const body: Record<string, string | null> = {};
       if (trimmed !== user?.username) body.username = trimmed;
@@ -50,6 +57,7 @@ export default function EditProfile() {
       if (Object.keys(body).length > 0) {
         await api('/users/me', { method: 'PATCH', body });
         await refreshUser();
+        notifySuccess();
       }
       router.back();
     } catch (e: any) {
@@ -123,7 +131,7 @@ export default function EditProfile() {
               multiline
               maxLength={200}
               placeholder="Tell people about yourself..."
-              placeholderTextColor="#8f8f8f"
+              placeholderTextColor={c.muted}
             />
             <ThemedText style={styles.charCount}>{bio.length}/200</ThemedText>
 
@@ -135,7 +143,7 @@ export default function EditProfile() {
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (c: Palette) => StyleSheet.create({
   screen: {
     flex: 1,
   },
@@ -152,11 +160,11 @@ const styles = StyleSheet.create({
     fontSize: 17,
   },
   cancelText: {
-    color: '#8D8D8D',
+    color: c.muted,
     fontWeight: '600',
   },
   saveText: {
-    color: '#B647FF',
+    color: c.accent,
     fontWeight: '800',
   },
   header: {
@@ -181,7 +189,7 @@ const styles = StyleSheet.create({
     width: 88,
     height: 88,
     borderRadius: 44,
-    borderColor: '#FFF',
+    borderColor: c.background,
     borderWidth: 4,
   },
   avatarHint: {
@@ -197,17 +205,18 @@ const styles = StyleSheet.create({
   label: {
     fontWeight: '700',
     fontSize: 13,
-    color: '#5A5A5A',
+    color: c.subtle,
     marginTop: 10,
   },
   input: {
     borderWidth: 2,
-    borderColor: '#E9C8FF',
+    borderColor: c.accentFaint,
     borderRadius: 12,
     paddingHorizontal: 12,
     paddingVertical: 10,
     fontSize: 16,
     fontWeight: '600',
+    color: c.text,
   },
   bioInput: {
     minHeight: 88,
@@ -215,11 +224,11 @@ const styles = StyleSheet.create({
   },
   charCount: {
     alignSelf: 'flex-end',
-    color: '#8D8D8D',
+    color: c.muted,
     fontSize: 12,
   },
   errorText: {
-    color: '#B3261E',
+    color: c.danger,
     fontWeight: '600',
     marginTop: 8,
   },

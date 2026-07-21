@@ -1,4 +1,6 @@
-import React, { useState } from 'react';
+import { type Palette } from '@/constants/theme';
+import { usePalette } from '@/hooks/use-palette';
+import React, { useMemo, useState } from 'react';
 import { Pressable, StyleSheet, ViewStyle } from 'react-native';
 import { ThemedText } from './themed-text';
 import { ThemedView } from './themed-view';
@@ -17,6 +19,8 @@ export function CustomDropdown({
   onValueChange,
   containerStyle 
 }: CustomDropdownProps) {
+  const { c } = usePalette();
+  const styles = useMemo(() => makeStyles(c), [c]);
   const [isOpen, setIsOpen] = useState(false);
 
   return (
@@ -29,7 +33,7 @@ export function CustomDropdown({
         <IconSymbol 
           name={isOpen ? "chevron.up" : "chevron.right"} 
           size={16} 
-          color="#592EDC" 
+          color={c.onAccentFaint}
         />
       </Pressable>
 
@@ -63,7 +67,7 @@ export function CustomDropdown({
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (c: Palette) => StyleSheet.create({
   container: {
     position: 'relative',
     zIndex: 1,
@@ -72,7 +76,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    backgroundColor: '#E9C8FF',
+    backgroundColor: c.accentFaint,
     paddingHorizontal: 12,
     paddingVertical: 8,
     borderRadius: 16,
@@ -87,7 +91,7 @@ const styles = StyleSheet.create({
     bottom: "100%",
     left: 0,
     right: 0,
-    backgroundColor: 'white',
+    backgroundColor: c.overlayCard,
     borderRadius: 16,
     marginTop: 4,
     shadowColor: '#000',
@@ -99,21 +103,21 @@ const styles = StyleSheet.create({
   option: {
     padding: 12,
     borderBottomWidth: 1,
-    borderBottomColor: '#f0f0f0',
+    borderBottomColor: c.border,
   },
   selectedOption: {
-    backgroundColor: '#f5f0ff',
+    backgroundColor: c.accentSoftBg,
   },
   optionText: {
     fontSize: 14,
   },
   selectedOptionText: {
-    color: '#B647FF',
+    color: c.accent,
     fontWeight: '600',
   },
   optionsContainer: {
     borderRadius: 16,
     overflow: 'hidden',
-    backgroundColor: 'white',
+    backgroundColor: c.overlayCard,
   },
 });

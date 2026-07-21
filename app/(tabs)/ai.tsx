@@ -2,11 +2,13 @@ import { CustomDropdown } from '@/components/customDropdown';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { IconSymbol } from '@/components/ui/icon-symbol';
+import { type Palette } from '@/constants/theme';
+import { usePalette } from '@/hooks/use-palette';
 import { API_URL, getToken } from '@/lib/api';
 import Markdown from '@ronradtke/react-native-markdown-display';
 import { useLocalSearchParams } from 'expo-router';
 import { fetch as expoFetch } from 'expo/fetch';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Animated, Dimensions, Image, Keyboard, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, TextInput } from 'react-native';
 
 const screenWidth = Dimensions.get('window').width;
@@ -24,6 +26,8 @@ type Message = {
 };
 
 const AnimatedLoadingDots = () => {
+  const { c } = usePalette();
+  const styles = useMemo(() => makeStyles(c), [c]);
   const dot1 = useRef(new Animated.Value(0)).current;
   const dot2 = useRef(new Animated.Value(0)).current;
   const dot3 = useRef(new Animated.Value(0)).current;
@@ -70,6 +74,10 @@ const AnimatedLoadingDots = () => {
 };
 
 export default function AI() {
+
+  const { c, scheme } = usePalette();
+  const styles = useMemo(() => makeStyles(c), [c]);
+  const markdownStyles = useMemo(() => makeMarkdownStyles(c), [c]);
 
   const [inputText, setInputText] = useState('');
 
@@ -281,7 +289,7 @@ export default function AI() {
           <ScrollView
             ref={scrollRef}
             style={styles.chatContainer}
-            contentContainerStyle={styles.chatContent}
+            contentContainerStyle={[styles.chatContent, subject ? styles.chatContentWithSubject : null]}
             showsVerticalScrollIndicator={true}
             keyboardDismissMode="on-drag"
             keyboardShouldPersistTaps="handled"
@@ -300,26 +308,26 @@ export default function AI() {
                     <Pressable
                       onPress={() => setActiveLean('Left')}
                     >
-                      <ThemedView style={[styles.lean, {borderBottomLeftRadius: 16, borderTopLeftRadius: 16, backgroundColor: activeLean === 'Left' ? '#b647ff' : '#E9C8FF'}]}>
+                      <ThemedView style={[styles.lean, {borderBottomLeftRadius: 16, borderTopLeftRadius: 16, backgroundColor: activeLean === 'Left' ? c.accent : c.accentFaint}]}>
                         <ThemedText style={styles.leanText}>Left</ThemedText>
                       </ThemedView>
-                        
+
                     </Pressable>
                     <Pressable
                       onPress={() => setActiveLean('Center')}
                     >
-                      <ThemedView style={[styles.lean, {borderLeftColor: 'white', borderRightColor: 'white', borderLeftWidth: 1, borderRightWidth: 1, backgroundColor: activeLean === 'Center' ? '#b647ff' : '#E9C8FF'}]}>
+                      <ThemedView style={[styles.lean, {borderLeftColor: c.background, borderRightColor: c.background, borderLeftWidth: 1, borderRightWidth: 1, backgroundColor: activeLean === 'Center' ? c.accent : c.accentFaint}]}>
                         <ThemedText style={styles.leanText}>Center</ThemedText>
                       </ThemedView>
-                        
+
                     </Pressable>
                     <Pressable
                       onPress={() => setActiveLean('Right')}
                     >
-                      <ThemedView style={[styles.lean, {borderBottomRightRadius: 16, borderTopRightRadius: 16, backgroundColor: activeLean === 'Right' ? '#b647ff' : '#E9C8FF'}]}>
+                      <ThemedView style={[styles.lean, {borderBottomRightRadius: 16, borderTopRightRadius: 16, backgroundColor: activeLean === 'Right' ? c.accent : c.accentFaint}]}>
                         <ThemedText style={styles.leanText}>Right</ThemedText>
                       </ThemedView>
-                        
+
                     </Pressable>
                   </ThemedView>
                 ) : null}
@@ -401,7 +409,7 @@ export default function AI() {
               value={inputText}
               onChangeText={setInputText}
               placeholder={subject ? `Ask about this ${subject.kind}...` : "Ask forumAI a question..."}
-              placeholderTextColor='#8f8f8f'
+              placeholderTextColor={c.muted}
               multiline
               style={styles.textInput}
               scrollEnabled={true}
@@ -417,7 +425,7 @@ export default function AI() {
                 setHasStarted(true);
               }}
             >
-              <IconSymbol name="arrow.up.circle.fill" size={32} color={canSend ? "#B647FF" : "#dfaeffff"} />
+              <IconSymbol name="arrow.up.circle.fill" size={32} color={canSend ? c.accent : scheme === 'dark' ? '#5C3E7D' : '#dfaeffff'} />
             </Pressable>
           </ThemedView>  
 
@@ -429,7 +437,7 @@ export default function AI() {
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (c: Palette) => StyleSheet.create({
   container: {
     flex: 1,
     alignItems: 'center',
@@ -453,7 +461,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: 8,
     alignItems: 'flex-start',
-    borderColor: '#E9C8FF',
+    borderColor: c.accentFaint,
     borderRadius: 16,
     borderWidth: 2,
     paddingHorizontal: 8,
@@ -466,8 +474,7 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     fontSize: 16,
     maxHeight: 64,
-    // borderColor: 'black',
-    // borderWidth: 2,
+    color: c.text,
   },
   // pickerContainer: {
   //   flexDirection: 'row',
@@ -476,7 +483,7 @@ const styles = StyleSheet.create({
   picker: {
     width: 200,
     height: 20,
-    backgroundColor: '#E9C8FF',
+    backgroundColor: c.accentFaint,
     borderRadius: 16,
   },
   option: {
@@ -491,7 +498,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-    backgroundColor: '#F1E8FB',
+    backgroundColor: c.accentSoftBg,
     borderRadius: 16,
     paddingHorizontal: 12,
     paddingVertical: 6,
@@ -499,7 +506,7 @@ const styles = StyleSheet.create({
   },
   subjectChipText: {
     flexShrink: 1,
-    color: '#7A1FD0',
+    color: c.onAccentFaint,
     fontWeight: '600',
     fontSize: 13,
     lineHeight: 18,
@@ -509,7 +516,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     width: screenWidth,
-    backgroundColor: 'white',
+    backgroundColor: c.background,
     paddingVertical: 8,
   },
   inputContainerActive: {
@@ -521,7 +528,7 @@ const styles = StyleSheet.create({
     position: 'absolute',
     top: 60,
     flexDirection: 'row',
-    borderBottomColor: '#c6c6c6ff',
+    borderBottomColor: c.border,
     borderBottomWidth: 1,
     width: '100%',
     paddingHorizontal: 16,
@@ -546,20 +553,20 @@ const styles = StyleSheet.create({
   },
   aiMessage: {
     alignSelf: 'flex-start',
-    backgroundColor: '#f8effcff',
+    backgroundColor: c.card,
     paddingVertical: 10,
     paddingHorizontal: 14,
     borderRadius: 16,
     width: '100%',
     borderWidth: 1,
-    borderColor: '#e0d9fb',
+    borderColor: c.cardBorder,
   },
   userText: {
     color: 'white',
     fontWeight: '600',
   },
   aiErrorText: {
-    color: '#B3261E',
+    color: c.danger,
     fontWeight: '600',
   },
   chatContainer: {
@@ -573,6 +580,11 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 8,
     paddingBottom: 112, // some extra space above the input
+  },
+  // The subject chip makes the (absolutely-positioned) input bar taller, so
+  // lift the last of the response clear of it when a post/article is attached
+  chatContentWithSubject: {
+    paddingBottom: 156,
   },
   leanContainer: {
     flexDirection: 'row',
@@ -617,16 +629,16 @@ const styles = StyleSheet.create({
 
 // Styles for the markdown-rendered AI answers — tuned so streamed responses
 // read as short scannable paragraphs instead of a slab of text.
-const markdownStyles = StyleSheet.create({
-  body: { color: '#1a1a1a', fontSize: 15, lineHeight: 22 },
+const makeMarkdownStyles = (c: Palette) => StyleSheet.create({
+  body: { color: c.text, fontSize: 15, lineHeight: 22 },
   paragraph: { marginTop: 0, marginBottom: 10 },
-  strong: { fontWeight: '700', color: '#7A1FD0' },
+  strong: { fontWeight: '700', color: c.onAccentFaint },
   em: { fontStyle: 'italic' },
   bullet_list: { marginBottom: 10 },
   ordered_list: { marginBottom: 10 },
   list_item: { marginBottom: 4 },
-  blockquote: { backgroundColor: '#F1E8FB', borderLeftColor: '#B647FF', borderLeftWidth: 3, paddingHorizontal: 10, borderRadius: 6 },
-  code_inline: { backgroundColor: '#EFE3FB', borderRadius: 4, paddingHorizontal: 4 },
+  blockquote: { backgroundColor: c.accentSoftBg, borderLeftColor: c.accent, borderLeftWidth: 3, paddingHorizontal: 10, borderRadius: 6 },
+  code_inline: { backgroundColor: c.accentSoftBg, borderRadius: 4, paddingHorizontal: 4 },
   heading1: { fontSize: 17, fontWeight: '800', marginBottom: 6 },
   heading2: { fontSize: 16, fontWeight: '800', marginBottom: 6 },
   heading3: { fontSize: 15, fontWeight: '800', marginBottom: 6 },

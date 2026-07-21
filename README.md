@@ -18,12 +18,16 @@ A political discussion social media app built with Expo / React Native. The feed
   - **Trajectory** — a sparkline of where your dot sat over recent months, so a converged placement still shows its arc
   - Content tabs: Posts, Comments, Upvoted, and Saved (real bookmarks)
   - Settings live behind a gear button (not a tab)
-- **Shareable cards** — export a branded image of your lean or a debate stance to the native share sheet (the app's growth loop)
-- **Moderation** — report posts/articles/comments/users, and block users (blocked accounts vanish from feed, comments, and search); managed under Settings → Blocked accounts
-- **Posting**: text + image posts; persistent up/downvotes; nested comments with replies; real bookmarks
+- **Follows + Following feed** — follow anyone from their profile; a Following tab in the feed shows just their posts, and follower counts live on every profile
+- **Direct messages** — a full DM inbox (envelope on your profile) with per-thread unread badges, optimistic sends, and block-aware delivery
+- **Shareable cards** — export a branded image of your lean or a debate stance to the native share sheet; post shares link to web share pages with rich previews and an open-in-app button
+- **Moderation** — report posts/articles/comments/users, and block users (blocked accounts vanish from feed, comments, search, and DMs); admins get a report-review queue (Settings → Moderation) with hide/ban/dismiss actions
+- **Onboarding** — new accounts pick interests and follow suggested active users before landing in the feed
+- **Push notifications** — replies, upvotes, and DMs notify for real (Expo push; requires a dev/production build), gated by per-user server-side toggles in Settings
+- **Posting**: text + image posts (server-resized, EXIF-stripped); persistent up/downvotes; nested comments with replies; real bookmarks
 - **forumAI**: a specialized chatbot that streams every answer from three perspectives (Left / Center / Right), grounded in the app's own article corpus (RAG), with in-session conversation memory and an "Ask forumAI" entry point from article and post pages
   - "Explain like I'm: …" framing selector (student, policymaker, skeptic, …)
-- **Settings** — account (edit profile, change password, email), notification toggles incl. a **daily Floor reminder** (real local notification), privacy (private account, show-lean, blocked accounts), content, and account deletion
+- **Settings** — account (edit profile, change password, email verification + password reset by emailed code), **Appearance (Light / Dark / Match system)**, real notification toggles incl. a **daily Floor reminder**, privacy (blocked accounts), Terms + Privacy pages, and account deletion
 
 ## Architecture
 
@@ -40,19 +44,24 @@ Key directories:
 ```
 app/               screens (expo-router file-based routing)
   (tabs)/          feed, The Floor, forumAI, search, profile
-  auth/            landing, login, create account
+  auth/            landing, login, create account, verification/reset flows
   post/[id]        post detail + comments
   article/[id]     article detail
   summary/[id]     subtopic summary screen
   debate/[id]      a Floor room: stance track, distribution, thread
   user/[id]        public profile (spectrum + posts)
   source/[name]    news source detail page
+  messages, dm/    direct-message inbox and conversation threads
+  onboarding       interest selection + suggested follows for new accounts
+  admin            report review and moderation actions
   settings, blocked, editprofile, changepassword
 components/        post/article/comment cards, spectrum bar + trail,
                   scorer receipts, share cards, report/block menu, carousels
-context/          authContext (session), postContext (feed + votes)
+context/          authContext (session), postContext (feed + votes),
+                  themeContext (Light / Dark / Match system preference)
 lib/api.ts        API client: fetch wrapper, token storage, image upload
-lib/notifications.ts  daily Floor reminder scheduling
+lib/notifications.ts  Expo push registration/routing + Floor reminders
+lib/sentry.ts     env-gated crash reporting (no-op without a DSN)
 ```
 
 ## Getting started
@@ -85,6 +94,8 @@ EXPO_PUBLIC_API_URL=https://your-api.example.com
 
 > forumAI requires `OPENAI_API_KEY` in `forum-api/.env`; the endpoint returns a clear error until it's set.
 
+Local `.env` files are gitignored. Keep deployed API and Sentry values in local/EAS environment configuration; never commit them.
+
 ## Development
 
 ```bash
@@ -92,6 +103,8 @@ npx expo start       # dev server (i = iOS simulator, a = Android, w = web)
 npm run lint         # eslint
 npx tsc --noEmit     # typecheck
 ```
+
+CI (GitHub Actions) runs typecheck + lint on every push. See **[LAUNCH.md](LAUNCH.md)** for the App Store launch checklist — deployment, EAS builds, and the account setup (Apple/Resend/Sentry/Railway) each feature is env-gated behind.
 
 Backend (`../forum-api`):
 
@@ -101,7 +114,7 @@ npm run typecheck
 npm run seed:expand  # idempotent — safe to re-run
 ```
 
-Schema changes go in `forum-api/schema.sql` (idempotent `IF NOT EXISTS` statements) with a matching numbered file in `forum-api/migrations/`, applied with `psql forum -f migrations/00N-name.sql`.
+Schema changes go in `../forum-api/schema.sql` (idempotent `IF NOT EXISTS` statements) with a matching numbered file in `../forum-api/migrations/`, applied with `psql forum -f migrations/00N-name.sql`.
 
 ## Troubleshooting
 

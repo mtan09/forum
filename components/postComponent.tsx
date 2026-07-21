@@ -1,10 +1,12 @@
 import ScalableImage from '@/components/scalable-image';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
+import { type Palette } from '@/constants/theme';
+import { usePalette } from '@/hooks/use-palette';
 import { useRelativeTime } from '@/hooks/useRelativeTime';
 import { api } from '@/lib/api';
 import { useRouter } from 'expo-router';
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Dimensions, Image, Pressable, StyleSheet } from 'react-native';
 import ContentActions from './contentActions';
 import PostActions from './post-actions';
@@ -49,6 +51,8 @@ type Props = {
 export default function Post({ post }: Props) {
 
   const router = useRouter();
+  const { c } = usePalette();
+  const styles = useMemo(() => makeStyles(c), [c]);
   const timeAgo = useRelativeTime(post.timestamp);
   const [receiptsOpen, setReceiptsOpen] = useState(false);
   const [hidden, setHidden] = useState(false);
@@ -91,7 +95,7 @@ export default function Post({ post }: Props) {
                 />
                 <ThemedView>
                   <ThemedText type="defaultSemiBold" style={{fontWeight: 800, fontSize: 18}}>{user.username}</ThemedText>
-                  <ThemedText style={{color: '#8D8D8D', fontSize: 14}}>{timeAgo}</ThemedText>
+                  <ThemedText style={{color: c.muted, fontSize: 14}}>{timeAgo}</ThemedText>
                 </ThemedView>
               </ThemedView>
             </Pressable>
@@ -133,6 +137,8 @@ export default function Post({ post }: Props) {
           <Pressable
             onPress={() => setReceiptsOpen(true)}
             style={({ pressed }) => ({ opacity: pressed ? 0.6 : 1 })}
+            accessibilityRole="button"
+            accessibilityLabel="Why this placement? Show scoring receipts"
           >
             <Spectrum width={(screenWidth - 32)} height={20} position={post.position}/>
           </Pressable>
@@ -156,7 +162,7 @@ export default function Post({ post }: Props) {
   )
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (c: Palette) => StyleSheet.create({
   container: {
     gap: 8,
     flexDirection: 'column',
@@ -167,7 +173,7 @@ const styles = StyleSheet.create({
   },
   postContent: {
     paddingVertical: 16,
-    borderColor: "#c6c6c6ff",
+    borderColor: c.border,
     borderBottomWidth: 1,
   },
   avatar: {
@@ -185,7 +191,7 @@ const styles = StyleSheet.create({
     fontSize: 16,
   },
   hashtags: {
-    color: '#B647FF',
+    color: c.accent,
     fontSize: 14,
     fontWeight: '600',
     marginBottom: 8,

@@ -3,9 +3,11 @@ import ImageCarousel from '@/components/imageCarousel';
 import Spectrum from '@/components/spectrum';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
+import { type Palette } from '@/constants/theme';
+import { usePalette } from '@/hooks/use-palette';
 import { api } from '@/lib/api';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Dimensions, Image, Pressable, ScrollView, StyleSheet } from 'react-native';
 
 const screenWidth =  Dimensions.get('window').width;
@@ -38,18 +40,20 @@ function parsePerspectives(text: string): Perspective[] | null {
   });
 }
 
-const LEAN_STYLE: Record<Perspective['lean'], { label: string; color: string; bg: string }> = {
-  left:   { label: 'Left',   color: '#2563EB', bg: '#E8F0FE' },
-  center: { label: 'Center', color: '#6B7280', bg: '#F1F1F3' },
-  right:  { label: 'Right',  color: '#DC2626', bg: '#FDE8E8' },
-};
+const leanStyle = (c: Palette): Record<Perspective['lean'], { label: string; color: string; bg: string }> => ({
+  left:   { label: 'Left',   color: c.blue, bg: c.blueBg },
+  center: { label: 'Center', color: c.subtle, bg: c.inputBg },
+  right:  { label: 'Right',  color: c.red, bg: c.redBg },
+});
 
 export default function SummaryScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
+  const { c } = usePalette();
+  const styles = useMemo(() => makeStyles(c), [c]);
+  const LEAN_STYLE = useMemo(() => leanStyle(c), [c]);
 
   const [ summary, setSummary ] = useState<Summary | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
   const [ articles, setArticles ] = useState<ArticleType[]>([]);
 
   const [ images, setImages ] = useState<string[]>([]);
@@ -89,8 +93,6 @@ export default function SummaryScreen() {
         );
       } catch (err: any) {
         console.log('Error fetching summary:', err?.message);
-      } finally {
-        setIsLoading(false);
       }
     };
 
@@ -108,12 +110,12 @@ export default function SummaryScreen() {
     <ScrollView showsVerticalScrollIndicator={false}>
       <ThemedView style={ styles.container }>
 
-        <ThemedText style={{ fontSize: 24, fontWeight: '800', lineHeight: 32, color: '#9A00FF', marginTop: 8 }}>
+        <ThemedText style={{ fontSize: 24, fontWeight: '800', lineHeight: 32, color: c.accentDeep, marginTop: 8 }}>
           {summary?.title}
         </ThemedText>
 
         <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ maxHeight: 24, marginBottom: 8 }}>
-          <ThemedText numberOfLines={1} ellipsizeMode="clip" style={{ color: '#9A00FF' }}>{text}   •   {text}</ThemedText>
+          <ThemedText numberOfLines={1} ellipsizeMode="clip" style={{ color: c.accentDeep }}>{text}   •   {text}</ThemedText>
         </ScrollView>
 
         {images && images.length > 0 && (
@@ -220,7 +222,7 @@ export default function SummaryScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (c: Palette) => StyleSheet.create({
   container: {
     flex: 1,
     padding: 16,
@@ -228,7 +230,7 @@ const styles = StyleSheet.create({
     marginBottom: 32,
   },
   summary: {
-    backgroundColor: "#E9C8FF",
+    backgroundColor: c.accentFaint,
     borderRadius: 16,
     padding: 16,
     marginBottom: 8,
@@ -275,15 +277,15 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   coverageCount: {
-    color: '#8D8D8D',
+    color: c.muted,
     fontSize: 13,
   },
   articleCard: {
     borderRadius: 16,
     padding: 12,
-    backgroundColor: '#F5F2FF',
+    backgroundColor: c.card,
     borderWidth: 1,
-    borderColor: '#E4DCFF',
+    borderColor: c.cardBorder,
   },
   articleImage: {
     width: '100%',
@@ -292,7 +294,7 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   articleImagePlaceholder: {
-    backgroundColor: '#E9C8FF',
+    backgroundColor: c.accentFaint,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -300,10 +302,10 @@ const styles = StyleSheet.create({
     fontSize: 44,
     lineHeight: 52,
     fontWeight: '800',
-    color: '#9A00FF',
+    color: c.onAccentFaint,
   },
   articleSource: {
-    color: '#B647FF',
+    color: c.accent,
     marginBottom: 4,
     fontWeight: '700',
   },

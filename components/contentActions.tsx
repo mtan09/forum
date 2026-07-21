@@ -1,9 +1,11 @@
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { IconSymbol } from '@/components/ui/icon-symbol';
+import { type Palette } from '@/constants/theme';
 import { useAuth } from '@/context/authContext';
+import { usePalette } from '@/hooks/use-palette';
 import { api } from '@/lib/api';
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Alert, Modal, Pressable, StyleSheet } from 'react-native';
 
 // A small "•••" overflow menu for user-generated content. Report works on
@@ -36,9 +38,11 @@ export default function ContentActions({
   targetId,
   authorId,
   authorName,
-  color = '#8D8D8D',
+  color,
   onBlocked,
 }: Props) {
+  const { c } = usePalette();
+  const styles = useMemo(() => makeStyles(c), [c]);
   const { user } = useAuth();
   const [menuOpen, setMenuOpen] = useState(false);
   const [reasonOpen, setReasonOpen] = useState(false);
@@ -82,9 +86,11 @@ export default function ContentActions({
       <Pressable
         onPress={() => setMenuOpen(true)}
         hitSlop={10}
+        accessibilityRole="button"
+        accessibilityLabel="More options"
         style={({ pressed }) => ({ opacity: pressed ? 0.5 : 1 })}
       >
-        <IconSymbol name="ellipsis" size={20} color={color} />
+        <IconSymbol name="ellipsis" size={20} color={color ?? c.muted} />
       </Pressable>
 
       {/* Overflow sheet */}
@@ -96,7 +102,7 @@ export default function ContentActions({
               style={({ pressed }) => [styles.action, pressed && styles.actionPressed]}
               onPress={() => { setMenuOpen(false); setReasonOpen(true); }}
             >
-              <IconSymbol name="flag" size={20} color="#DC2626" />
+              <IconSymbol name="flag" size={20} color={c.red} />
               <ThemedText style={styles.actionText}>Report</ThemedText>
             </Pressable>
             {canBlock && (
@@ -104,7 +110,7 @@ export default function ContentActions({
                 style={({ pressed }) => [styles.action, pressed && styles.actionPressed]}
                 onPress={confirmBlock}
               >
-                <IconSymbol name="hand.raised" size={20} color="#DC2626" />
+                <IconSymbol name="hand.raised" size={20} color={c.red} />
                 <ThemedText style={styles.actionText}>Block {authorName ?? 'user'}</ThemedText>
               </Pressable>
             )}
@@ -146,14 +152,14 @@ export default function ContentActions({
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (c: Palette) => StyleSheet.create({
   backdrop: {
     flex: 1,
     backgroundColor: 'rgba(0,0,0,0.4)',
     justifyContent: 'flex-end',
   },
   sheet: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: c.overlayCard,
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
     paddingHorizontal: 20,
@@ -165,7 +171,7 @@ const styles = StyleSheet.create({
     width: 40,
     height: 4,
     borderRadius: 2,
-    backgroundColor: '#D8D8D8',
+    backgroundColor: c.faint,
     marginBottom: 12,
   },
   reasonTitle: {
@@ -181,7 +187,7 @@ const styles = StyleSheet.create({
     paddingVertical: 16,
     paddingHorizontal: 4,
     borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: '#EDEDED',
+    borderBottomColor: c.border,
   },
   actionPressed: {
     opacity: 0.5,
@@ -198,6 +204,6 @@ const styles = StyleSheet.create({
   cancelText: {
     fontSize: 16,
     fontWeight: '800',
-    color: '#8D8D8D',
+    color: c.muted,
   },
 });

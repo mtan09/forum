@@ -1,6 +1,9 @@
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { useRef } from 'react';
+import { type Palette } from '@/constants/theme';
+import { usePalette } from '@/hooks/use-palette';
+import { tapMedium } from '@/lib/haptics';
+import { useMemo, useRef } from 'react';
 import { Alert, Modal, Pressable, StyleSheet, View } from 'react-native';
 import { captureRef } from 'react-native-view-shot';
 import * as Sharing from 'expo-sharing';
@@ -16,10 +19,13 @@ type Props = {
 };
 
 export default function ShareCardModal({ visible, onClose, children, hint }: Props) {
+  const { c } = usePalette();
+  const styles = useMemo(() => makeStyles(c), [c]);
   const cardRef = useRef<View>(null);
 
   const share = async () => {
     try {
+      tapMedium();
       const uri = await captureRef(cardRef, { format: 'png', quality: 1 });
       if (!(await Sharing.isAvailableAsync())) {
         Alert.alert('Sharing unavailable', 'This device can’t share right now.');
@@ -56,14 +62,14 @@ export default function ShareCardModal({ visible, onClose, children, hint }: Pro
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (c: Palette) => StyleSheet.create({
   backdrop: {
     flex: 1,
     backgroundColor: 'rgba(0,0,0,0.5)',
     justifyContent: 'flex-end',
   },
   sheet: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: c.overlayCard,
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
     paddingHorizontal: 20,
@@ -75,7 +81,7 @@ const styles = StyleSheet.create({
     width: 40,
     height: 4,
     borderRadius: 2,
-    backgroundColor: '#D8D8D8',
+    backgroundColor: c.faint,
     marginBottom: 20,
   },
   cardMount: {
@@ -83,14 +89,14 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
   hint: {
-    color: '#8D8D8D',
+    color: c.muted,
     fontSize: 13,
     marginTop: 16,
     textAlign: 'center',
   },
   shareBtn: {
     marginTop: 20,
-    backgroundColor: '#B647FF',
+    backgroundColor: c.accent,
     borderRadius: 14,
     paddingVertical: 14,
     alignItems: 'center',
@@ -108,7 +114,7 @@ const styles = StyleSheet.create({
     alignSelf: 'stretch',
   },
   cancelText: {
-    color: '#8D8D8D',
+    color: c.muted,
     fontWeight: '700',
     fontSize: 15,
   },

@@ -8,13 +8,18 @@ import SpectrumTrail, { TrailPoint } from '@/components/spectrumTrail';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { IconSymbol } from '@/components/ui/icon-symbol';
+import { type Palette } from '@/constants/theme';
 import { useAuth } from '@/context/authContext';
 import { mapPost } from '@/context/postContext';
+import { usePalette } from '@/hooks/use-palette';
 import { useRelativeTime } from '@/hooks/useRelativeTime';
-import { api } from '@/lib/api';
+import { api, uploadImage } from '@/lib/api';
+import { notifySuccess, selectTick, tapLight } from '@/lib/haptics';
+import * as ImagePicker from 'expo-image-picker';
+import { onTabRefresh } from '@/lib/tabRefresh';
 import { useFocusEffect, useRouter } from 'expo-router';
-import { useCallback, useState } from 'react';
-import { ActivityIndicator, Dimensions, Image, Pressable, ScrollView, StyleSheet } from 'react-native';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { ActivityIndicator, Alert, Dimensions, Image, Pressable, ScrollView, StyleSheet } from 'react-native';
 
 const screenWidth = Dimensions.get('window').width;
 
@@ -63,6 +68,8 @@ const mapMixed = (rows: any[]): MixedItem[] =>
 
 function CommentItem({ comment }: { comment: CommentRow }) {
   const router = useRouter();
+  const { c } = usePalette();
+  const styles = useMemo(() => makeStyles(c), [c]);
   const timeAgo = useRelativeTime(comment.created_at);
   const target = comment.parent_kind === 'article'
     ? `/article/${comment.article_id}`
@@ -88,12 +95,40 @@ function CommentItem({ comment }: { comment: CommentRow }) {
 
 export default function Profile() {
   const router = useRouter();
+  const { c } = usePalette();
+  const styles = useMemo(() => makeStyles(c), [c]);
 
   // profile data comes from the auth session (/users/me)
-  const { user: profile } = useAuth();
+  const { user: profile, refreshUser } = useAuth();
+
+  // Banner picker: tap the camera on the header image to choose a new
+  // banner — uploads and saves immediately (also editable in Edit Profile)
+  const [bannerUploading, setBannerUploading] = useState(false);
+  const pickBanner = async () => {
+    tapLight();
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: 'images' as const,
+      allowsEditing: false,
+      quality: 0.9,
+    });
+    if (result.canceled || bannerUploading) return;
+    try {
+      setBannerUploading(true);
+      const url = await uploadImage(result.assets[0].uri);
+      await api('/users/me', { method: 'PATCH', body: { header_url: url } });
+      await refreshUser();
+      notifySuccess();
+    } catch (err: any) {
+      Alert.alert('Could not update banner', err?.message ?? 'Please try again.');
+    } finally {
+      setBannerUploading(false);
+    }
+  };
 
   const [spectrum, setSpectrum] = useState<SpectrumData | null>(null);
   const [trail, setTrail] = useState<TrailPoint[]>([]);
+  const [followCounts, setFollowCounts] = useState<{ followers: number; following: number } | null>(null);
+  const [unreadDms, setUnreadDms] = useState(0);
   const [shareOpen, setShareOpen] = useState(false);
 
   const [activeTab, setActiveTab] = useState<Tab>('Posts');
@@ -134,12 +169,32 @@ export default function Profile() {
       api<{ points: TrailPoint[] }>('/users/me/spectrum/history')
         .then((data) => { if (active) setTrail(data.points ?? []); })
         .catch((err) => console.log('Error fetching spectrum history:', err?.message));
+      api<{ unread: number }>('/messages/unread-count')
+        .then((data) => { if (active) setUnreadDms(data.unread ?? 0); })
+        .catch(() => {});
+      if (profile?.id) {
+        api<{ follower_count?: number; following_count?: number }>(`/users/${profile.id}`)
+          .then((u) => {
+            if (active) setFollowCounts({ followers: u.follower_count ?? 0, following: u.following_count ?? 0 });
+          })
+          .catch(() => {});
+      }
       loadTab(activeTab);
       return () => { active = false; };
-    }, [activeTab, loadTab])
+    }, [activeTab, loadTab, profile?.id])
   );
 
+  // Re-tapping the profile tab button jumps to the top and reloads the open tab
+  const scrollRef = useRef<ScrollView>(null);
+  useEffect(() => {
+    return onTabRefresh('profile', () => {
+      scrollRef.current?.scrollTo({ y: 0, animated: true });
+      loadTab(activeTab);
+    });
+  }, [loadTab, activeTab]);
+
   const switchTab = (tab: Tab) => {
+    selectTick();
     setActiveTab(tab);
     loadTab(tab);
   };
@@ -177,7 +232,7 @@ export default function Profile() {
   };
 
   return (
-    <ScrollView>
+    <ScrollView ref={scrollRef}>
       <ScalableImage
         source={
           profile?.header_url
@@ -188,13 +243,44 @@ export default function Profile() {
         dimension={screenWidth}
         height={200}
       />
+      {/* Change the banner right from the profile */}
+      <Pressable
+        onPress={pickBanner}
+        style={({ pressed }) => [styles.bannerButton, { opacity: pressed ? 0.7 : 1 }]}
+        hitSlop={8}
+        accessibilityRole="button"
+        accessibilityLabel="Change banner photo"
+      >
+        {bannerUploading ? (
+          <ActivityIndicator size="small" color="#FFFFFF" />
+        ) : (
+          <IconSymbol name="camera.fill" size={18} color="#FFFFFF" />
+        )}
+      </Pressable>
       {/* Settings moved off the tab bar — the gear lives here now */}
       <Pressable
         onPress={() => router.push('/settings')}
         style={({ pressed }) => [styles.settingsButton, { opacity: pressed ? 0.7 : 1 }]}
         hitSlop={8}
+        accessibilityRole="button"
+        accessibilityLabel="Settings"
       >
         <IconSymbol name="gearshape.fill" size={20} color="#FFFFFF" />
+      </Pressable>
+      {/* DM inbox */}
+      <Pressable
+        onPress={() => router.push('/messages')}
+        style={({ pressed }) => [styles.inboxButton, { opacity: pressed ? 0.7 : 1 }]}
+        hitSlop={8}
+        accessibilityRole="button"
+        accessibilityLabel="Messages"
+      >
+        <IconSymbol name="envelope.fill" size={18} color="#FFFFFF" />
+        {unreadDms > 0 && (
+          <ThemedView style={styles.inboxBadge}>
+            <ThemedText style={styles.inboxBadgeText}>{unreadDms > 9 ? '9+' : unreadDms}</ThemedText>
+          </ThemedView>
+        )}
       </Pressable>
 
       <ThemedView style={styles.container}>
@@ -210,11 +296,16 @@ export default function Profile() {
         </ThemedView>
 
         <ThemedText type="defaultSemiBold" style={styles.username}>{profile?.username}</ThemedText>
+        {followCounts && (
+          <ThemedText style={styles.joinedText}>
+            {followCounts.followers} follower{followCounts.followers === 1 ? '' : 's'} · {followCounts.following} following
+          </ThemedText>
+        )}
 
         {profile?.bio ? <ThemedText>{profile.bio}</ThemedText> : null}
         {joined && (
           <ThemedView style={styles.joinedRow}>
-            <IconSymbol name="calendar" size={14} color="#8D8D8D" />
+            <IconSymbol name="calendar" size={14} color={c.muted} />
             <ThemedText style={styles.joinedText}>Joined {joined}</ThemedText>
           </ThemedView>
         )}
@@ -256,10 +347,10 @@ export default function Profile() {
 
           {spectrum && totalSignals > 0 && (
             <Pressable
-              onPress={() => setShareOpen(true)}
+              onPress={() => { tapLight(); setShareOpen(true); }}
               style={({ pressed }) => [styles.shareLean, { opacity: pressed ? 0.7 : 1 }]}
             >
-              <IconSymbol name="square.and.arrow.up" size={16} color="#B647FF" />
+              <IconSymbol name="square.and.arrow.up" size={16} color={c.accent} />
               <ThemedText style={styles.shareLeanText}>Share my lean</ThemedText>
             </Pressable>
           )}
@@ -298,7 +389,7 @@ export default function Profile() {
       </ThemedView>
 
       {tabLoading && (
-        <ActivityIndicator style={{ marginVertical: 24 }} color="#B647FF" />
+        <ActivityIndicator style={{ marginVertical: 24 }} color={c.accent} />
       )}
 
       {!tabLoading && activeTab === 'Posts' && (
@@ -332,7 +423,7 @@ export default function Profile() {
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (c: Palette) => StyleSheet.create({
   container: {
     flex: 1,
     padding: 16,
@@ -341,6 +432,49 @@ const styles = StyleSheet.create({
   settingsButton: {
     position: 'absolute',
     top: 56,
+    right: 16,
+    zIndex: 10,
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    backgroundColor: 'rgba(0,0,0,0.35)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  inboxButton: {
+    position: 'absolute',
+    top: 56,
+    right: 62,
+    zIndex: 10,
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    backgroundColor: 'rgba(0,0,0,0.35)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  inboxBadge: {
+    position: 'absolute',
+    top: -4,
+    right: -4,
+    minWidth: 18,
+    height: 18,
+    borderRadius: 9,
+    backgroundColor: c.accent,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 4,
+  },
+  inboxBadgeText: {
+    color: '#FFFFFF',
+    fontSize: 10,
+    fontWeight: '800',
+    lineHeight: 12,
+  },
+  // bottom-right corner of the 200-tall banner
+  bannerButton: {
+    position: 'absolute',
+    top: 152,
     right: 16,
     zIndex: 10,
     width: 38,
@@ -360,7 +494,7 @@ const styles = StyleSheet.create({
     width: 108,
     height: 108,
     borderRadius: 54,
-    borderColor: '#FFF',
+    borderColor: c.background,
     borderWidth: 8,
   },
   username: {
@@ -374,15 +508,15 @@ const styles = StyleSheet.create({
     gap: 4,
   },
   joinedText: {
-    color: '#8D8D8D',
+    color: c.muted,
     fontSize: 13,
   },
   spectrumCard: {
     marginTop: 8,
     borderRadius: 16,
     borderWidth: 1,
-    borderColor: '#E4DCFF',
-    backgroundColor: '#F5F2FF',
+    borderColor: c.cardBorder,
+    backgroundColor: c.card,
     padding: 16,
     gap: 10,
   },
@@ -393,7 +527,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'transparent',
   },
   leanBadge: {
-    backgroundColor: '#B647FF',
+    backgroundColor: c.accent,
     borderRadius: 10,
     paddingHorizontal: 10,
     paddingVertical: 3,
@@ -405,12 +539,12 @@ const styles = StyleSheet.create({
     lineHeight: 16,
   },
   sampleText: {
-    color: '#5A5A5A',
+    color: c.subtle,
     fontSize: 13,
     lineHeight: 18,
   },
   methodText: {
-    color: '#8D8D8D',
+    color: c.muted,
     fontSize: 12,
     lineHeight: 17,
   },
@@ -423,17 +557,17 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     borderRadius: 12,
     borderWidth: 1.5,
-    borderColor: '#E4DCFF',
+    borderColor: c.cardBorder,
   },
   shareLeanText: {
-    color: '#B647FF',
+    color: c.accent,
     fontWeight: '800',
     fontSize: 14,
   },
   tabBar: {
     flexDirection: 'row',
     borderBottomWidth: 1,
-    borderBottomColor: '#c6c6c6ff',
+    borderBottomColor: c.border,
   },
   tabButton: {
     flex: 1,
@@ -443,10 +577,10 @@ const styles = StyleSheet.create({
   tabLabel: {
     fontWeight: '600',
     fontSize: 14,
-    color: '#8D8D8D',
+    color: c.muted,
   },
   tabLabelActive: {
-    color: '#B647FF',
+    color: c.accent,
     fontWeight: '800',
   },
   tabIndicator: {
@@ -456,11 +590,11 @@ const styles = StyleSheet.create({
     width: '60%',
     borderTopLeftRadius: 3,
     borderTopRightRadius: 3,
-    backgroundColor: '#B647FF',
+    backgroundColor: c.accent,
   },
   emptyText: {
     textAlign: 'center',
-    color: '#8D8D8D',
+    color: c.muted,
     marginVertical: 24,
     paddingHorizontal: 32,
   },
@@ -468,11 +602,11 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 12,
     borderBottomWidth: 1,
-    borderBottomColor: '#c6c6c6ff',
+    borderBottomColor: c.border,
     gap: 4,
   },
   commentContext: {
-    color: '#B647FF',
+    color: c.accent,
     fontSize: 13,
     fontWeight: '600',
   },
@@ -481,7 +615,7 @@ const styles = StyleSheet.create({
     lineHeight: 21,
   },
   commentMeta: {
-    color: '#8D8D8D',
+    color: c.muted,
     fontSize: 13,
   },
 });

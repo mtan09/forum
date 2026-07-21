@@ -1,10 +1,14 @@
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { IconSymbol } from '@/components/ui/icon-symbol';
+import { type Palette } from '@/constants/theme';
+import { usePalette } from '@/hooks/use-palette';
 import { api } from '@/lib/api';
+import { onTabRefresh } from '@/lib/tabRefresh';
 import { useFocusEffect, useRouter } from 'expo-router';
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Pressable, RefreshControl, ScrollView, StyleSheet } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 // The Floor: the app's live rooms. One debate per daily pick — the
 // biggest story and the most divided one — each with a shared thread.
@@ -21,14 +25,18 @@ export type Debate = {
 
 type RecapDebate = Debate & { distribution: { bins: number[]; median: number | null } };
 
-const KIND_META: Record<Debate['kind'], { label: string; color: string; bg: string }> = {
-  biggest: { label: 'Biggest story', color: '#9A00FF', bg: '#F1E8FB' },
-  contested: { label: 'Most divided', color: '#DC2626', bg: '#FDE8E8' },
-  trending: { label: 'Trending', color: '#B45309', bg: '#FEF3C7' },
-};
+const kindMeta = (c: Palette): Record<Debate['kind'], { label: string; color: string; bg: string }> => ({
+  biggest: { label: 'Biggest story', color: c.accentDeep, bg: c.accentSoftBg },
+  contested: { label: 'Most divided', color: c.red, bg: c.redBg },
+  trending: { label: 'Trending', color: c.amber, bg: c.amberBg },
+});
 
 export default function DebateTab() {
   const router = useRouter();
+  const insets = useSafeAreaInsets();
+  const { c } = usePalette();
+  const styles = useMemo(() => makeStyles(c), [c]);
+  const KIND_META = useMemo(() => kindMeta(c), [c]);
   const [debates, setDebates] = useState<Debate[] | null>(null);
   const [recap, setRecap] = useState<RecapDebate[]>([]);
   const [refreshing, setRefreshing] = useState(false);
@@ -52,18 +60,39 @@ export default function DebateTab() {
     }, [load])
   );
 
-  const onRefresh = async () => {
+  const onRefresh = useCallback(async () => {
     setRefreshing(true);
     await load();
     setRefreshing(false);
-  };
+  }, [load]);
+
+  // Re-tapping The Floor's tab button jumps to the top and reloads
+  const scrollRef = useRef<ScrollView>(null);
+  useEffect(() => {
+    return onTabRefresh('debate', () => {
+      scrollRef.current?.scrollTo({ y: 0, animated: true });
+      onRefresh();
+    });
+  }, [onRefresh]);
 
   const today = new Date().toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' });
 
   return (
     <ScrollView
+      ref={scrollRef}
       contentContainerStyle={styles.container}
-      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
+      refreshControl={
+        <RefreshControl
+          refreshing={refreshing}
+          onRefresh={onRefresh}
+          tintColor="#B647FF"      // iOS: branded purple spinner
+          colors={['#B647FF']}     // Android
+          // The scroll view starts at the very top of the screen, so without
+          // this the spinner draws up behind the status bar / notch and is
+          // invisible. Push it into the visible area below the safe inset.
+          progressViewOffset={insets.top + 16}
+        />
+      }
     >
       <ThemedText type="title" style={styles.title}>The Floor</ThemedText>
       <ThemedText style={styles.subtitle}>{today} · pick a room, take a stance</ThemedText>
@@ -131,16 +160,18 @@ export default function DebateTab() {
   );
 }
 
-function landedLabel(median: number | null): { text: string; color: string } {
-  if (median == null) return { text: 'No verdict', color: '#8D8D8D' };
-  if (median < 0.45) return { text: 'Room leaned left', color: '#2563EB' };
-  if (median > 0.55) return { text: 'Room leaned right', color: '#DC2626' };
-  return { text: 'Room split the center', color: '#6B7280' };
+function landedLabel(median: number | null, c: Palette): { text: string; color: string } {
+  if (median == null) return { text: 'No verdict', color: c.muted };
+  if (median < 0.45) return { text: 'Room leaned left', color: c.blue };
+  if (median > 0.55) return { text: 'Room leaned right', color: c.red };
+  return { text: 'Room split the center', color: c.subtle };
 }
 
 function RecapCard({ room }: { room: RecapDebate }) {
+  const { c } = usePalette();
+  const styles = useMemo(() => makeStyles(c), [c]);
   const max = Math.max(...room.distribution.bins, 1);
-  const landed = landedLabel(room.distribution.median);
+  const landed = landedLabel(room.distribution.median, c);
   const myBin = room.my_position != null ? Math.min(Math.floor(room.my_position * 10), 9) : -1;
   return (
     <ThemedView style={styles.recapCard}>
@@ -151,7 +182,7 @@ function RecapCard({ room }: { room: RecapDebate }) {
             <ThemedView
               style={[
                 styles.recapBar,
-                { height: 4 + (n / max) * 32, backgroundColor: i === myBin ? '#9A00FF' : '#D8C2F5' },
+                { height: 4 + (n / max) * 32, backgroundColor: i === myBin ? c.accentDeep : c.barTrack },
               ]}
             />
           </ThemedView>
@@ -168,7 +199,7 @@ function RecapCard({ room }: { room: RecapDebate }) {
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (c: Palette) => StyleSheet.create({
   container: {
     paddingTop: 88,
     paddingHorizontal: 16,
@@ -176,17 +207,17 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   title: {
-    color: '#B647FF',
+    color: c.accent,
   },
   subtitle: {
-    color: '#8D8D8D',
+    color: c.muted,
     marginBottom: 8,
   },
   card: {
     borderRadius: 16,
     borderWidth: 1,
-    borderColor: '#E4DCFF',
-    backgroundColor: '#F5F2FF',
+    borderColor: c.cardBorder,
+    backgroundColor: c.card,
     padding: 16,
     gap: 10,
   },
@@ -213,7 +244,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'transparent',
   },
   cardStats: {
-    color: '#8D8D8D',
+    color: c.muted,
     fontSize: 13,
   },
   cardCta: {
@@ -223,34 +254,34 @@ const styles = StyleSheet.create({
     backgroundColor: 'transparent',
   },
   cardCtaText: {
-    color: '#B647FF',
+    color: c.accent,
     fontWeight: '700',
     fontSize: 14,
   },
   emptyCard: {
     borderRadius: 16,
     borderWidth: 1,
-    borderColor: '#E4DCFF',
-    backgroundColor: '#F5F2FF',
+    borderColor: c.cardBorder,
+    backgroundColor: c.card,
     padding: 24,
   },
   emptyText: {
-    color: '#5A5A5A',
+    color: c.subtle,
     textAlign: 'center',
     lineHeight: 20,
   },
   recapHeader: {
     fontWeight: '800',
     fontSize: 16,
-    color: '#5A5A5A',
+    color: c.subtle,
     marginTop: 20,
     marginBottom: 2,
   },
   recapCard: {
     borderRadius: 16,
     borderWidth: 1,
-    borderColor: '#EAEAEA',
-    backgroundColor: '#FAFAFA',
+    borderColor: c.border,
+    backgroundColor: c.surface,
     padding: 16,
     gap: 10,
   },
@@ -288,7 +319,7 @@ const styles = StyleSheet.create({
     fontWeight: '800',
   },
   recapStats: {
-    color: '#8D8D8D',
+    color: c.muted,
     fontSize: 12,
   },
 });

@@ -1,10 +1,15 @@
 import ScalableImage from '@/components/scalable-image';
+import { type Palette } from '@/constants/theme';
 import { useAuth } from '@/context/authContext';
+import { usePalette } from '@/hooks/use-palette';
+import { tapMedium } from '@/lib/haptics';
 import { useRouter } from 'expo-router';
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { ActivityIndicator, KeyboardAvoidingView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 
 export default function CreateAccount() {
+  const { c } = usePalette();
+  const styles = useMemo(() => makeStyles(c), [c]);
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -22,6 +27,7 @@ export default function CreateAccount() {
     if (password !== confirm) return setErr('Passwords do not match.');
 
     try {
+      tapMedium();
       setLoading(true);
       await signUp(name.trim(), email.trim(), password);
       // root layout redirects to the feed once the session is set
@@ -54,6 +60,7 @@ export default function CreateAccount() {
         autoCapitalize="none"
         autoCorrect={false}
         style={styles.input}
+        placeholderTextColor={c.muted}
         editable={!loading}
       />
       <TextInput
@@ -63,6 +70,7 @@ export default function CreateAccount() {
         autoCapitalize="none"
         keyboardType="email-address"
         style={styles.input}
+        placeholderTextColor={c.muted}
         editable={!loading}
       />
       <TextInput
@@ -71,6 +79,7 @@ export default function CreateAccount() {
         onChangeText={setPassword}
         secureTextEntry
         style={styles.input}
+        placeholderTextColor={c.muted}
         editable={!loading}
       />
       <TextInput
@@ -79,6 +88,7 @@ export default function CreateAccount() {
         onChangeText={setConfirm}
         secureTextEntry
         style={styles.input}
+        placeholderTextColor={c.muted}
         editable={!loading}
       />
 
@@ -105,8 +115,8 @@ export default function CreateAccount() {
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, padding: 24, gap: 12, backgroundColor: '#fff', justifyContent: 'center' },
+const makeStyles = (c: Palette) => StyleSheet.create({
+  container: { flex: 1, padding: 24, gap: 12, backgroundColor: c.background, justifyContent: 'center' },
   title: { 
     fontSize: 28, 
     fontWeight: '800', 
@@ -116,10 +126,11 @@ const styles = StyleSheet.create({
   },
   input: {
     borderWidth: 1,
-    borderColor: '#ddd',
+    borderColor: c.border,
     paddingHorizontal: 12,
     paddingVertical: 10,
     borderRadius: 16,
+    color: c.text,
   },
   button: {
     backgroundColor: '#b647ff',
@@ -138,9 +149,9 @@ const styles = StyleSheet.create({
   },
   buttonDisabled: { opacity: 0.6 },
   buttonText: { color: '#fff', fontWeight: '600' },
-  error: { color: '#b91c1c', marginBottom: 4 },
+  error: { color: c.danger, marginBottom: 4 },
   footer: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 12 },
-  footerText: { color: '#6b7280' },
+  footerText: { color: c.subtle },
   link: { color: '#b647ff', fontWeight: '600' },
   image: {
     alignSelf: 'center',

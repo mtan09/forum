@@ -2,10 +2,13 @@ import ContentActions from '@/components/contentActions';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { IconSymbol } from '@/components/ui/icon-symbol';
+import { type Palette } from '@/constants/theme';
+import { usePalette } from '@/hooks/use-palette';
+import { tapLight, tapMedium } from '@/lib/haptics';
 import { useRelativeTime } from '@/hooks/useRelativeTime';
 import { api } from '@/lib/api';
 import { useRouter } from 'expo-router';
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, Image, Keyboard, Pressable, StyleSheet, TextInput, View } from 'react-native';
 
 export type Comment = {
@@ -44,6 +47,8 @@ export default function CommentList({
 	indent = 0,
 	refreshKey = 0,
 }: CommentListProps) {
+	const { c } = usePalette();
+	const styles = useMemo(() => makeStyles(c), [c]);
 	const [comments, setComments] = useState<Comment[]>([]);
 	const [loading, setLoading] = useState(false);
 	const [error, setError] = useState<string | null>(null);
@@ -128,6 +133,8 @@ export default function CommentList({
 type VoteDirection = 'up' | 'down' | null;
 
 function CommentItem({ comment }: { comment: Comment }) {
+	const { c, scheme } = usePalette();
+	const styles = useMemo(() => makeStyles(c), [c]);
 	const [showReplies, setShowReplies] = useState(false);
 	const [replyOpen, setReplyOpen] = useState(false);
 	const [replyText, setReplyText] = useState('');
@@ -154,6 +161,7 @@ function CommentItem({ comment }: { comment: Comment }) {
 	};
 
 	const vote = async (direction: VoteDirection) => {
+		tapLight();
 		const prev = votes;
 		setVotes(applyVote(prev, direction));
 		try {
@@ -172,6 +180,7 @@ function CommentItem({ comment }: { comment: Comment }) {
 		const content = replyText.trim();
 		if (!content || replySubmitting) return;
 		try {
+			tapMedium();
 			setReplySubmitting(true);
 			await api('/comments', { body: { parent_comment_id: comment.id, content } });
 			setReplyText('');
@@ -225,15 +234,15 @@ function CommentItem({ comment }: { comment: Comment }) {
 			{/* Actions: votes, reply, replies toggle */}
 			<View style={styles.commentActions}>
 				<Pressable onPress={() => vote(isUpvoted ? null : 'up')} style={styles.voteButton}>
-					<IconSymbol name={isUpvoted ? 'arrowshape.up.fill' : 'arrowshape.up'} size={16} color={isUpvoted ? '#14DD78' : '#8D8D8D'} />
+					<IconSymbol name={isUpvoted ? 'arrowshape.up.fill' : 'arrowshape.up'} size={16} color={isUpvoted ? c.green : c.muted} />
 					<ThemedText style={[styles.voteCount, isUpvoted && { color: '#14DD78' }]}>{votes.up}</ThemedText>
 				</Pressable>
 				<Pressable onPress={() => vote(isDownvoted ? null : 'down')} style={styles.voteButton}>
-					<IconSymbol name={isDownvoted ? 'arrowshape.down.fill' : 'arrowshape.down'} size={16} color={isDownvoted ? '#FF0080' : '#8D8D8D'} />
+					<IconSymbol name={isDownvoted ? 'arrowshape.down.fill' : 'arrowshape.down'} size={16} color={isDownvoted ? '#FF0080' : c.muted} />
 					<ThemedText style={[styles.voteCount, isDownvoted && { color: '#FF0080' }]}>{votes.down}</ThemedText>
 				</Pressable>
 				<Pressable onPress={() => setReplyOpen((o) => !o)} style={styles.voteButton}>
-					<IconSymbol name="bubble" size={15} color="#8D8D8D" />
+					<IconSymbol name="bubble" size={15} color={c.muted} />
 					<ThemedText style={styles.replyLabel}>Reply</ThemedText>
 				</Pressable>
 				{replyCount > 0 && (
@@ -250,7 +259,7 @@ function CommentItem({ comment }: { comment: Comment }) {
 				<View style={styles.replyComposer}>
 					<TextInput
 						placeholder={`Reply to ${comment.username ?? 'comment'}...`}
-						placeholderTextColor="#8f8f8f"
+						placeholderTextColor={c.muted}
 						value={replyText}
 						onChangeText={setReplyText}
 						multiline
@@ -262,7 +271,7 @@ function CommentItem({ comment }: { comment: Comment }) {
 						<IconSymbol
 							name="arrow.up.circle.fill"
 							size={24}
-							color={replyText.trim() && !replySubmitting ? '#B647FF' : '#dfaeffff'}
+							color={replyText.trim() && !replySubmitting ? c.accent : scheme === 'dark' ? '#5C3E7D' : '#dfaeffff'}
 						/>
 					</Pressable>
 				</View>
@@ -276,16 +285,16 @@ function CommentItem({ comment }: { comment: Comment }) {
 	);
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (c: Palette) => StyleSheet.create({
 	container: {
 		gap: 8,
 	},
 	empty: {
-		color: '#8D8D8D',
+		color: c.muted,
 		fontStyle: 'italic',
 	},
 	error: {
-		color: '#ff4d4f',
+		color: c.danger,
 	},
 	actionsRow: {
 		flexDirection: 'row',
@@ -298,15 +307,15 @@ const styles = StyleSheet.create({
 		paddingVertical: 8,
 		borderRadius: 12,
 		borderWidth: 1,
-		borderColor: '#c6c6c6ff',
+		borderColor: c.border,
 	},
 	buttonText: {
 		fontWeight: '600',
-    color: '#592EDC',
+    color: c.accent,
 	},
 	comment: {
 		borderLeftWidth: 2,
-		borderLeftColor: '#e5e5e5',
+		borderLeftColor: c.border,
 		paddingLeft: 10,
 		gap: 6,
 		paddingVertical: 2,
@@ -327,7 +336,7 @@ const styles = StyleSheet.create({
 		fontWeight: '700',
 	},
 	timestamp: {
-		color: '#8D8D8D',
+		color: c.muted,
 		fontSize: 12,
 		fontWeight: '400',
 	},
@@ -346,23 +355,23 @@ const styles = StyleSheet.create({
 	},
 	voteCount: {
 		fontSize: 13,
-		color: '#8D8D8D',
+		color: c.muted,
 	},
 	replyLabel: {
 		fontSize: 13,
-		color: '#8D8D8D',
+		color: c.muted,
 		fontWeight: '600',
 	},
 	repliesToggle: {
 		fontSize: 13,
-		color: '#B647FF',
+		color: c.accent,
 		fontWeight: '600',
 	},
 	replyComposer: {
 		flexDirection: 'row',
 		alignItems: 'center',
 		gap: 8,
-		borderColor: '#E9C8FF',
+		borderColor: c.accentFaint,
 		borderWidth: 1.5,
 		borderRadius: 12,
 		paddingHorizontal: 10,
@@ -374,5 +383,6 @@ const styles = StyleSheet.create({
 		maxHeight: 80,
 		paddingTop: 0,
 		paddingBottom: 0,
+		color: c.text,
 	},
 });

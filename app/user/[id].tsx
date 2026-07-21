@@ -5,9 +5,12 @@ import Spectrum from '@/components/spectrum';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { IconSymbol } from '@/components/ui/icon-symbol';
+import { type Palette } from '@/constants/theme';
 import { useAuth } from '@/context/authContext';
 import { mapPost } from '@/context/postContext';
+import { usePalette } from '@/hooks/use-palette';
 import { api } from '@/lib/api';
+import { notifyWarning, tapLight } from '@/lib/haptics';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useMemo, useState } from 'react';
 import { Alert, Dimensions, Image, Pressable, ScrollView, StyleSheet } from 'react-native';
@@ -22,6 +25,9 @@ type PublicUser = {
   header_url?: string | null;
   created_at?: string;
   blocked_by_me?: boolean;
+  followed_by_me?: boolean;
+  follower_count?: number;
+  following_count?: number;
 };
 
 type SpectrumData = {
@@ -38,6 +44,8 @@ function leanLabel(position: number): string {
 }
 
 export default function PublicProfile() {
+  const { c } = usePalette();
+  const styles = useMemo(() => makeStyles(c), [c]);
   const { id } = useLocalSearchParams();
   const userId = useMemo(() => (Array.isArray(id) ? id[0] : id) as string | undefined, [id]);
   const router = useRouter();
@@ -48,11 +56,30 @@ export default function PublicProfile() {
   const [posts, setPosts] = useState<PostType[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [blocked, setBlocked] = useState(false);
+  const [following, setFollowing] = useState(false);
+  const [followerCount, setFollowerCount] = useState(0);
 
   const isSelf = !!me && me.id === userId;
 
+  // Optimistic follow/unfollow with rollback
+  const toggleFollow = async () => {
+    if (!userId) return;
+    tapLight();
+    const next = !following;
+    setFollowing(next);
+    setFollowerCount((n) => Math.max(0, n + (next ? 1 : -1)));
+    try {
+      await api(`/users/${userId}/follow`, next ? { body: {} } : { method: 'DELETE' });
+    } catch (err: any) {
+      setFollowing(!next);
+      setFollowerCount((n) => Math.max(0, n + (next ? -1 : 1)));
+      Alert.alert('Could not update follow', err?.message ?? 'Please try again.');
+    }
+  };
+
   const toggleBlock = async () => {
     if (!userId) return;
+    notifyWarning();
     if (blocked) {
       setBlocked(false);
       try {
@@ -97,6 +124,8 @@ export default function PublicProfile() {
         if (!active) return;
         setUser(u);
         setBlocked(!!u.blocked_by_me);
+        setFollowing(!!u.followed_by_me);
+        setFollowerCount(u.follower_count ?? 0);
         setSpectrum(s);
         setPosts(p.map(mapPost));
       })
@@ -155,28 +184,47 @@ export default function PublicProfile() {
                 <ThemedText style={styles.unblockText}>Unblock</ThemedText>
               </Pressable>
             ) : (
-              <ContentActions
-                targetKind="user"
-                targetId={user.id}
-                authorId={user.id}
-                authorName={user.username}
-                onBlocked={() => setBlocked(true)}
-              />
+              <ThemedView style={styles.actionsRow}>
+                <Pressable
+                  onPress={() => { tapLight(); router.push(`/dm/${user.id}`); }}
+                  style={styles.messageBtn}
+                >
+                  <IconSymbol name="envelope" size={16} color={c.accent} />
+                </Pressable>
+                <Pressable
+                  onPress={toggleFollow}
+                  style={[styles.followBtn, following && styles.followingBtn]}
+                >
+                  <ThemedText style={[styles.followText, following && styles.followingText]}>
+                    {following ? 'Following' : 'Follow'}
+                  </ThemedText>
+                </Pressable>
+                <ContentActions
+                  targetKind="user"
+                  targetId={user.id}
+                  authorId={user.id}
+                  authorName={user.username}
+                  onBlocked={() => setBlocked(true)}
+                />
+              </ThemedView>
             )
           )}
         </ThemedView>
+        <ThemedText style={styles.followCounts}>
+          {followerCount} follower{followerCount === 1 ? '' : 's'} · {user.following_count ?? 0} following
+        </ThemedText>
         {blocked && (
           <ThemedView style={styles.blockedBanner}>
-            <IconSymbol name="hand.raised.fill" size={14} color="#B4530E" />
+            <IconSymbol name="hand.raised.fill" size={14} color={c.amber} />
             <ThemedText style={styles.blockedText}>
-              You've blocked this user. Their posts and comments are hidden across the app.
+              You&apos;ve blocked this user. Their posts and comments are hidden across the app.
             </ThemedText>
           </ThemedView>
         )}
         {user.bio ? <ThemedText>{user.bio}</ThemedText> : null}
         {joined && (
           <ThemedView style={styles.joinedRow}>
-            <IconSymbol name="calendar" size={14} color="#8D8D8D" />
+            <IconSymbol name="calendar" size={14} color={c.muted} />
             <ThemedText style={styles.joinedText}>Joined {joined}</ThemedText>
           </ThemedView>
         )}
@@ -220,7 +268,7 @@ export default function PublicProfile() {
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (c: Palette) => StyleSheet.create({
   container: {
     padding: 16,
     gap: 10,
@@ -235,7 +283,7 @@ const styles = StyleSheet.create({
     width: 88,
     height: 88,
     borderRadius: 44,
-    borderColor: '#FFF',
+    borderColor: c.background,
     borderWidth: 6,
   },
   usernameRow: {
@@ -244,19 +292,54 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
   },
+  actionsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  messageBtn: {
+    borderWidth: 1.5,
+    borderColor: c.accent,
+    borderRadius: 12,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+  },
+  followBtn: {
+    backgroundColor: c.accent,
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 6,
+  },
+  followingBtn: {
+    backgroundColor: 'transparent',
+    borderWidth: 1.5,
+    borderColor: c.accent,
+  },
+  followText: {
+    color: '#FFFFFF',
+    fontWeight: '800',
+    fontSize: 14,
+  },
+  followingText: {
+    color: c.accent,
+  },
+  followCounts: {
+    color: c.muted,
+    fontSize: 13,
+  },
   username: {
     fontWeight: '800',
     fontSize: 22,
   },
   unblockBtn: {
     borderWidth: 1.5,
-    borderColor: '#DC2626',
+    borderColor: c.red,
     borderRadius: 12,
     paddingHorizontal: 14,
     paddingVertical: 6,
   },
   unblockText: {
-    color: '#DC2626',
+    color: c.red,
     fontWeight: '800',
     fontSize: 14,
   },
@@ -264,14 +347,14 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-    backgroundColor: '#FEF3C7',
+    backgroundColor: c.amberBg,
     borderRadius: 12,
     paddingHorizontal: 12,
     paddingVertical: 8,
   },
   blockedText: {
     flex: 1,
-    color: '#B4530E',
+    color: c.amber,
     fontSize: 13,
     lineHeight: 18,
   },
@@ -281,15 +364,15 @@ const styles = StyleSheet.create({
     gap: 4,
   },
   joinedText: {
-    color: '#8D8D8D',
+    color: c.muted,
     fontSize: 13,
   },
   spectrumCard: {
     marginTop: 4,
     borderRadius: 16,
     borderWidth: 1,
-    borderColor: '#E4DCFF',
-    backgroundColor: '#F5F2FF',
+    borderColor: c.cardBorder,
+    backgroundColor: c.card,
     padding: 16,
     gap: 10,
   },
@@ -300,7 +383,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'transparent',
   },
   leanBadge: {
-    backgroundColor: '#B647FF',
+    backgroundColor: c.accent,
     borderRadius: 10,
     paddingHorizontal: 10,
     paddingVertical: 3,
@@ -312,7 +395,7 @@ const styles = StyleSheet.create({
     lineHeight: 16,
   },
   sampleText: {
-    color: '#5A5A5A',
+    color: c.subtle,
     fontSize: 13,
     lineHeight: 18,
   },
@@ -320,11 +403,11 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingBottom: 8,
     borderBottomWidth: 1,
-    borderBottomColor: '#c6c6c6ff',
+    borderBottomColor: c.border,
   },
   emptyText: {
     textAlign: 'center',
-    color: '#8D8D8D',
+    color: c.muted,
     marginVertical: 24,
   },
 });

@@ -1,8 +1,11 @@
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
+import { type Palette } from '@/constants/theme';
+import { usePalette } from '@/hooks/use-palette';
 import { api } from '@/lib/api';
+import { tapLight } from '@/lib/haptics';
 import { useRouter } from 'expo-router';
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, Alert, Image, Pressable, ScrollView, StyleSheet } from 'react-native';
 
 type BlockedUser = {
@@ -15,6 +18,8 @@ type BlockedUser = {
 
 export default function BlockedAccounts() {
   const router = useRouter();
+  const { c } = usePalette();
+  const styles = useMemo(() => makeStyles(c), [c]);
   const [users, setUsers] = useState<BlockedUser[] | null>(null);
 
   const load = async () => {
@@ -29,6 +34,7 @@ export default function BlockedAccounts() {
   useEffect(() => { load(); }, []);
 
   const unblock = (u: BlockedUser) => {
+    tapLight();
     Alert.alert(`Unblock ${u.username}?`, 'Their posts and comments will be visible again.', [
       { text: 'Cancel', style: 'cancel' },
       {
@@ -49,7 +55,7 @@ export default function BlockedAccounts() {
   if (users === null) {
     return (
       <ThemedView style={styles.center}>
-        <ActivityIndicator color="#B647FF" />
+        <ActivityIndicator color={c.accent} />
       </ThemedView>
     );
   }
@@ -58,7 +64,7 @@ export default function BlockedAccounts() {
     <ScrollView contentContainerStyle={styles.container}>
       {users.length === 0 ? (
         <ThemedText style={styles.empty}>
-          You haven't blocked anyone. Blocked accounts disappear from your feed, comments, and search.
+          You haven&apos;t blocked anyone. Blocked accounts disappear from your feed, comments, and search.
         </ThemedText>
       ) : (
         users.map((u) => (
@@ -86,12 +92,12 @@ export default function BlockedAccounts() {
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (c: Palette) => StyleSheet.create({
   center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   container: { padding: 16, gap: 4 },
   empty: {
     textAlign: 'center',
-    color: '#8D8D8D',
+    color: c.muted,
     marginTop: 40,
     paddingHorizontal: 24,
     lineHeight: 20,
@@ -111,13 +117,13 @@ const styles = StyleSheet.create({
   },
   avatar: { width: 44, height: 44, borderRadius: 22 },
   username: { fontWeight: '700', fontSize: 16 },
-  bio: { color: '#8D8D8D', fontSize: 13 },
+  bio: { color: c.muted, fontSize: 13 },
   unblockBtn: {
     borderWidth: 1.5,
-    borderColor: '#DC2626',
+    borderColor: c.red,
     borderRadius: 12,
     paddingHorizontal: 14,
     paddingVertical: 6,
   },
-  unblockText: { color: '#DC2626', fontWeight: '800', fontSize: 14 },
+  unblockText: { color: c.red, fontWeight: '800', fontSize: 14 },
 });

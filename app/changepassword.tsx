@@ -1,12 +1,17 @@
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
+import { type Palette } from '@/constants/theme';
+import { usePalette } from '@/hooks/use-palette';
 import { api } from '@/lib/api';
+import { notifySuccess, tapMedium } from '@/lib/haptics';
 import { useRouter } from 'expo-router';
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Alert, KeyboardAvoidingView, Platform, Pressable, StyleSheet, TextInput } from 'react-native';
 
 export default function ChangePassword() {
   const router = useRouter();
+  const { c } = usePalette();
+  const styles = useMemo(() => makeStyles(c), [c]);
 
   const [current, setCurrent] = useState('');
   const [next, setNext] = useState('');
@@ -23,10 +28,12 @@ export default function ChangePassword() {
       return;
     }
     try {
+      tapMedium();
       setSubmitting(true);
       await api('/auth/change-password', {
         body: { current_password: current, new_password: next },
       });
+      notifySuccess();
       Alert.alert('Password changed', 'Your password has been updated.');
       router.back();
     } catch (e: any) {
@@ -87,7 +94,7 @@ export default function ChangePassword() {
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (c: Palette) => StyleSheet.create({
   screen: {
     flex: 1,
   },
@@ -104,11 +111,11 @@ const styles = StyleSheet.create({
     fontSize: 17,
   },
   cancelText: {
-    color: '#8D8D8D',
+    color: c.muted,
     fontWeight: '600',
   },
   saveText: {
-    color: '#B647FF',
+    color: c.accent,
     fontWeight: '800',
   },
   form: {
@@ -118,24 +125,25 @@ const styles = StyleSheet.create({
   label: {
     fontWeight: '700',
     fontSize: 13,
-    color: '#5A5A5A',
+    color: c.subtle,
     marginTop: 10,
   },
   input: {
     borderWidth: 2,
-    borderColor: '#E9C8FF',
+    borderColor: c.accentFaint,
     borderRadius: 12,
     paddingHorizontal: 12,
     paddingVertical: 10,
     fontSize: 16,
     fontWeight: '600',
+    color: c.text,
   },
   hint: {
-    color: '#8D8D8D',
+    color: c.muted,
     fontSize: 12,
   },
   errorText: {
-    color: '#B3261E',
+    color: c.danger,
     fontWeight: '600',
     marginTop: 8,
   },

@@ -3,10 +3,13 @@ import Post from '@/components/postComponent';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { IconSymbol } from '@/components/ui/icon-symbol';
+import { type Palette } from '@/constants/theme';
 import { mapPost } from '@/context/postContext';
+import { usePalette } from '@/hooks/use-palette';
 import { api } from '@/lib/api';
+import { onTabRefresh } from '@/lib/tabRefresh';
 import { useRouter } from 'expo-router';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Image, Keyboard, Pressable, ScrollView, StyleSheet, TextInput } from 'react-native';
 
 type SearchResults = {
@@ -18,19 +21,29 @@ type SearchResults = {
 
 const EMPTY: SearchResults = { users: [], sources: [], posts: [], articles: [] };
 
-function leanTag(lean: number | null) {
+function leanTag(lean: number | null, c: Palette) {
   if (lean == null) return null;
-  if (lean < 0.4) return { label: 'Left', color: '#2563EB', bg: '#E8F0FE' };
-  if (lean > 0.6) return { label: 'Right', color: '#DC2626', bg: '#FDE8E8' };
-  return { label: 'Center', color: '#6B7280', bg: '#F1F1F3' };
+  if (lean < 0.4) return { label: 'Left', color: c.blue, bg: c.blueBg };
+  if (lean > 0.6) return { label: 'Right', color: c.red, bg: c.redBg };
+  return { label: 'Center', color: c.subtle, bg: c.inputBg };
 }
 
 export default function SearchTab() {
   const router = useRouter();
+  const { c } = usePalette();
+  const styles = useMemo(() => makeStyles(c), [c]);
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<SearchResults>(EMPTY);
   const [loading, setLoading] = useState(false);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Re-tapping the search tab button jumps back to the top of the results
+  const scrollRef = useRef<ScrollView>(null);
+  useEffect(() => {
+    return onTabRefresh('search', () => {
+      scrollRef.current?.scrollTo({ y: 0, animated: true });
+    });
+  }, []);
 
   // Debounced search-as-you-type
   useEffect(() => {
@@ -61,26 +74,26 @@ export default function SearchTab() {
     <ThemedView style={styles.screen}>
       {/* Search box */}
       <ThemedView style={styles.searchBox}>
-        <IconSymbol name="magnifyingglass" size={18} color="#8D8D8D" />
+        <IconSymbol name="magnifyingglass" size={18} color={c.muted} />
         <TextInput
           value={query}
           onChangeText={setQuery}
           placeholder="Search posts, articles, sources, people..."
-          placeholderTextColor="#8f8f8f"
+          placeholderTextColor={c.muted}
           style={styles.searchInput}
           autoCapitalize="none"
           autoCorrect={false}
           returnKeyType="search"
         />
         {query.length > 0 && (
-          <Pressable onPress={() => { setQuery(''); Keyboard.dismiss(); }} hitSlop={8}>
-            <IconSymbol name="x.circle.fill" size={18} color="#C6C6C6" />
+          <Pressable accessibilityRole="button" accessibilityLabel="Clear search" onPress={() => { setQuery(''); Keyboard.dismiss(); }} hitSlop={8}>
+            <IconSymbol name="x.circle.fill" size={18} color={c.faint} />
           </Pressable>
         )}
       </ThemedView>
 
-      <ScrollView keyboardShouldPersistTaps="handled" keyboardDismissMode="on-drag">
-        {loading && <ActivityIndicator style={{ marginTop: 24 }} color="#B647FF" />}
+      <ScrollView ref={scrollRef} keyboardShouldPersistTaps="handled" keyboardDismissMode="on-drag">
+        {loading && <ActivityIndicator style={{ marginTop: 24 }} color={c.accent} />}
 
         {!loading && query.trim().length >= 2 && !hasAny && (
           <ThemedText style={styles.emptyText}>No results for “{query.trim()}”.</ThemedText>
@@ -96,7 +109,7 @@ export default function SearchTab() {
           <>
             <ThemedText style={styles.sectionHeader}>Sources</ThemedText>
             {results.sources.map((s) => {
-              const tag = leanTag(s.lean);
+              const tag = leanTag(s.lean, c);
               return (
                 <Pressable
                   key={s.name}
@@ -180,7 +193,7 @@ export default function SearchTab() {
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (c: Palette) => StyleSheet.create({
   screen: {
     flex: 1,
     paddingTop: 88,
@@ -192,7 +205,7 @@ const styles = StyleSheet.create({
     marginHorizontal: 16,
     marginBottom: 8,
     borderWidth: 2,
-    borderColor: '#E9C8FF',
+    borderColor: c.accentFaint,
     borderRadius: 16,
     paddingHorizontal: 12,
     paddingVertical: 10,
@@ -202,6 +215,7 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
     paddingVertical: 0,
+    color: c.text,
   },
   sectionHeader: {
     marginTop: 12,
@@ -209,7 +223,7 @@ const styles = StyleSheet.create({
     marginLeft: 16,
     fontSize: 13,
     fontWeight: '800',
-    color: '#8D8D8D',
+    color: c.muted,
     textTransform: 'uppercase',
     letterSpacing: 0.5,
   },
@@ -220,7 +234,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 10,
     borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: '#E4DCFF',
+    borderBottomColor: c.cardBorder,
     gap: 8,
   },
   rowTitle: {
@@ -233,7 +247,7 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   rowMeta: {
-    color: '#8D8D8D',
+    color: c.muted,
     fontSize: 13,
   },
   tag: {
@@ -259,7 +273,7 @@ const styles = StyleSheet.create({
   },
   emptyText: {
     textAlign: 'center',
-    color: '#8D8D8D',
+    color: c.muted,
     marginTop: 32,
     paddingHorizontal: 32,
     lineHeight: 20,

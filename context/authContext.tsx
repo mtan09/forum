@@ -1,10 +1,15 @@
+import AsyncStorage from '@react-native-async-storage/async-storage'
 import React, { createContext, ReactNode, useContext, useEffect, useMemo, useState } from 'react'
 import { api, getToken, setToken } from '../lib/api'
+
+const ONBOARDING_KEY = 'forum.needsOnboarding'
 
 export type AuthUser = {
   id: string
   username: string
   email?: string
+  email_verified?: boolean
+  is_admin?: boolean
   avatar_url?: string | null
   bio?: string | null
   header_url?: string | null
@@ -22,6 +27,9 @@ type AuthContextType = {
   signUp: (username: string, email: string, password: string) => Promise<void>
   signOut: () => Promise<void>
   refreshUser: () => Promise<void>
+  /** True right after signup until the welcome flow completes. */
+  needsOnboarding: boolean
+  completeOnboarding: () => void
 }
 
 const AuthContext = createContext<AuthContextType>({
@@ -33,11 +41,20 @@ const AuthContext = createContext<AuthContextType>({
   signUp: async () => {},
   signOut: async () => {},
   refreshUser: async () => {},
+  needsOnboarding: false,
+  completeOnboarding: () => {},
 })
 
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [user, setUser] = useState<AuthUser | null>(null)
   const [loading, setLoading] = useState(true)
+  const [needsOnboarding, setNeedsOnboarding] = useState(false)
+
+  useEffect(() => {
+    AsyncStorage.getItem(ONBOARDING_KEY)
+      .then((v) => setNeedsOnboarding(v === '1'))
+      .catch(() => {})
+  }, [])
 
   useEffect(() => {
     let isMounted = true
@@ -79,7 +96,16 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       body: { username, email, password },
     })
     await setToken(token)
+    // Brand-new account → run the welcome flow (persisted so an app
+    // restart mid-onboarding comes back to it)
+    setNeedsOnboarding(true)
+    AsyncStorage.setItem(ONBOARDING_KEY, '1').catch(() => {})
     setUser(me)
+  }
+
+  const completeOnboarding = () => {
+    setNeedsOnboarding(false)
+    AsyncStorage.removeItem(ONBOARDING_KEY).catch(() => {})
   }
 
   const signOut = async () => {
@@ -103,8 +129,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       signUp,
       signOut,
       refreshUser,
+      needsOnboarding,
+      completeOnboarding,
     }),
-    [user, loading]
+    [user, loading, needsOnboarding]
   )
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>

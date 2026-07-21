@@ -4,16 +4,29 @@
     "slug": "forum",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/images/forumlogo.png",
+    "icon": "./assets/images/icon-store.png",
     "scheme": "forum",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.michaeltan.forum",
+      "buildNumber": "1",
+      "infoPlist": {
+        "NSPhotoLibraryUsageDescription": "Lets you attach photos to posts and set your profile picture and banner.",
+        "ITSAppUsesNonExemptEncryption": false
+      }
     },
     "android": {
       "edgeToEdgeEnabled": true,
-      "predictiveBackGestureEnabled": false
+      "predictiveBackGestureEnabled": false,
+      "package": "com.michaeltan.forum",
+      "versionCode": 1,
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/images/adaptive-icon.png",
+        "backgroundColor": "#B647FF"
+      },
+      "permissions": []
     },
     "web": {
       "output": "static",

@@ -6,6 +6,8 @@ import { ThemedView } from '@/components/themed-view';
 import { type Palette } from '@/constants/theme';
 import { usePalette } from '@/hooks/use-palette';
 import { api } from '@/lib/api';
+import { getDisplayableArticleMedia } from '@/lib/article-media';
+import { getPerspectiveTone, type PerspectiveName } from '@/lib/perspective-colors';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useMemo, useState } from 'react';
 import { Dimensions, Image, Pressable, ScrollView, StyleSheet } from 'react-native';
@@ -13,6 +15,7 @@ import { Dimensions, Image, Pressable, ScrollView, StyleSheet } from 'react-nati
 const screenWidth =  Dimensions.get('window').width;
 const MAX_IMAGES = 6;
 const MAX_ARTICLES = 12;
+const MAX_PERSPECTIVE_CHARS = 280;
 
 type Summary = {
   title: string;
@@ -26,6 +29,15 @@ type Summary = {
 // quote" paragraphs — so it parses cleanly into perspective cards.
 type Perspective = { lean: 'left' | 'center' | 'right'; source: string; quote: string };
 
+function readableExcerpt(text: string): string {
+  const clean = text.trim();
+  if (clean.length <= MAX_PERSPECTIVE_CHARS) return clean;
+  const slice = clean.slice(0, MAX_PERSPECTIVE_CHARS - 1).trimEnd();
+  const lastSpace = slice.lastIndexOf(' ');
+  const cut = lastSpace >= MAX_PERSPECTIVE_CHARS * 0.6 ? slice.slice(0, lastSpace) : slice;
+  return `${cut.trimEnd()}…`;
+}
+
 function parsePerspectives(text: string): Perspective[] | null {
   const matches = [...text.matchAll(/From the (left|center|right) \(([^)]+)\):\s*/gi)];
   if (matches.length === 0) return null;
@@ -35,23 +47,16 @@ function parsePerspectives(text: string): Perspective[] | null {
     return {
       lean: m[1].toLowerCase() as Perspective['lean'],
       source: m[2],
-      quote: text.slice(start, end).trim(),
+      quote: readableExcerpt(text.slice(start, end)),
     };
   });
 }
-
-const leanStyle = (c: Palette): Record<Perspective['lean'], { label: string; color: string; bg: string }> => ({
-  left:   { label: 'Left',   color: c.blue, bg: c.blueBg },
-  center: { label: 'Center', color: c.subtle, bg: c.inputBg },
-  right:  { label: 'Right',  color: c.red, bg: c.redBg },
-});
 
 export default function SummaryScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
   const { c } = usePalette();
   const styles = useMemo(() => makeStyles(c), [c]);
-  const LEAN_STYLE = useMemo(() => leanStyle(c), [c]);
 
   const [ summary, setSummary ] = useState<Summary | null>(null);
   const [ articles, setArticles ] = useState<ArticleType[]>([]);
@@ -87,7 +92,7 @@ export default function SummaryScreen() {
         setArticles(data.articles ?? []);
         setImages(
           (data.articles ?? [])
-            .map((a) => a.media)
+            .map((a) => getDisplayableArticleMedia(a.media, a.url))
             .filter((u): u is string => Boolean(u))
             .slice(0, MAX_IMAGES)
         );
@@ -110,7 +115,7 @@ export default function SummaryScreen() {
     <ScrollView showsVerticalScrollIndicator={false}>
       <ThemedView style={ styles.container }>
 
-        <ThemedText style={{ fontSize: 24, fontWeight: '800', lineHeight: 32, color: c.accentDeep, marginTop: 8 }}>
+        <ThemedText style={styles.title}>
           {summary?.title}
         </ThemedText>
 
@@ -126,12 +131,13 @@ export default function SummaryScreen() {
         {perspectives ? (
           <ThemedView style={styles.perspectives}>
             {perspectives.map((p) => {
-              const s = LEAN_STYLE[p.lean];
+              const label = `${p.lean.charAt(0).toUpperCase()}${p.lean.slice(1)}` as PerspectiveName;
+              const tone = getPerspectiveTone(label, c);
               return (
-                <ThemedView key={p.lean} style={[styles.perspectiveCard, { backgroundColor: s.bg, borderLeftColor: s.color }]}>
+                <ThemedView key={p.lean} style={[styles.perspectiveCard, { backgroundColor: tone.background, borderLeftColor: tone.color }]}>
                   <ThemedView style={styles.perspectiveHeader}>
-                    <ThemedView style={[styles.leanTag, { backgroundColor: s.color }]}>
-                      <ThemedText style={styles.leanTagText}>{s.label}</ThemedText>
+                    <ThemedView style={[styles.leanTag, { backgroundColor: tone.color }]}>
+                      <ThemedText style={styles.leanTagText}>{tone.label}</ThemedText>
                     </ThemedView>
                     <ThemedText type="defaultSemiBold" style={styles.perspectiveSource}>{p.source}</ThemedText>
                   </ThemedView>
@@ -179,7 +185,9 @@ export default function SummaryScreen() {
                 paddingHorizontal: (screenWidth - screenWidth * 0.68) / 2 - 16,
               }}
             >
-              {shownArticles.map((item) => (
+              {shownArticles.map((item) => {
+                const media = getDisplayableArticleMedia(item.media, item.url);
+                return (
                 <Pressable
                   key={item.id}
                   onPress={() => router.push(`/article/${item.id}`)}
@@ -189,13 +197,13 @@ export default function SummaryScreen() {
                     {/* Image frame always renders at the same size; a
                         lettered placeholder fills in when there's no media
                         (or the media URL turns out to be dead) */}
-                    {item.media && !failedMedia.has(item.media) ? (
+                    {media && !failedMedia.has(media) ? (
                       <Image
-                        source={{ uri: item.media }}
+                        source={{ uri: media }}
                         style={styles.articleImage}
                         resizeMode="cover"
                         onError={() =>
-                          setFailedMedia((prev) => new Set(prev).add(item.media!))
+                          setFailedMedia((prev) => new Set(prev).add(media))
                         }
                       />
                     ) : (
@@ -211,7 +219,8 @@ export default function SummaryScreen() {
                     </ThemedText>
                   </ThemedView>
                 </Pressable>
-              ))}
+                );
+              })}
             </ScrollView>
           </ThemedView>
         )}
@@ -228,6 +237,13 @@ const makeStyles = (c: Palette) => StyleSheet.create({
     padding: 16,
     gap: 8,
     marginBottom: 32,
+  },
+  title: {
+    fontSize: 26,
+    fontWeight: '800',
+    lineHeight: 32,
+    color: c.primary,
+    marginTop: 8,
   },
   summary: {
     backgroundColor: c.accentFaint,
@@ -257,7 +273,7 @@ const makeStyles = (c: Palette) => StyleSheet.create({
     paddingVertical: 2,
   },
   leanTagText: {
-    color: '#FFFFFF',
+    color: c.onPrimary,
     fontSize: 12,
     fontWeight: '800',
     lineHeight: 16,
@@ -305,7 +321,7 @@ const makeStyles = (c: Palette) => StyleSheet.create({
     color: c.onAccentFaint,
   },
   articleSource: {
-    color: c.accent,
+    color: c.primary,
     marginBottom: 4,
     fontWeight: '700',
   },

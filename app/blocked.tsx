@@ -55,7 +55,7 @@ export default function BlockedAccounts() {
   if (users === null) {
     return (
       <ThemedView style={styles.center}>
-        <ActivityIndicator color={c.accent} />
+        <ActivityIndicator color={c.primary} />
       </ThemedView>
     );
   }

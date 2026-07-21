@@ -78,14 +78,14 @@ function Row({ label, value, onPress, danger, chevron }: {
 }
 
 function ToggleRow({ label, value, onChange }: { label: string; value: boolean; onChange: (v: boolean) => void }) {
-  const { styles } = useStyles();
+  const { styles, c } = useStyles();
   return (
     <ThemedView style={styles.row}>
       <ThemedText style={styles.rowLabel}>{label}</ThemedText>
       <Switch
         value={value}
         onValueChange={(v) => { tapLight(); onChange(v); }}
-        trackColor={{ true: '#B647FF' }}
+        trackColor={{ true: c.primary }}
       />
     </ThemedView>
   );
@@ -371,7 +371,7 @@ const makeStyles = (c: Palette) => StyleSheet.create({
   },
   segmentSelected: {
     backgroundColor: c.accentFaint,
-    borderColor: c.accent,
+    borderColor: c.primary,
   },
   segmentText: {
     fontSize: 13,

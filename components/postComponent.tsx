@@ -53,6 +53,7 @@ export default function Post({ post }: Props) {
   const router = useRouter();
   const { c } = usePalette();
   const styles = useMemo(() => makeStyles(c), [c]);
+  const contentWidth = screenWidth - 32;
   const timeAgo = useRelativeTime(post.timestamp);
   const [receiptsOpen, setReceiptsOpen] = useState(false);
   const [hidden, setHidden] = useState(false);
@@ -125,7 +126,7 @@ export default function Post({ post }: Props) {
               <ScalableImage
                 source={{uri: post.media}}
                 type='width'
-                dimension={screenWidth - 32}
+                dimension={contentWidth}
                 style={styles.media}
               />
             )}
@@ -140,7 +141,7 @@ export default function Post({ post }: Props) {
             accessibilityRole="button"
             accessibilityLabel="Why this placement? Show scoring receipts"
           >
-            <Spectrum width={(screenWidth - 32)} height={20} position={post.position}/>
+            <Spectrum width={contentWidth} height={20} position={post.position}/>
           </Pressable>
         )}
 
@@ -182,7 +183,7 @@ const makeStyles = (c: Palette) => StyleSheet.create({
     borderRadius: 25,
   },
   content: {
-    width: screenWidth - 32, // 50 (avatar) + 12*2 (padding) + 8 (gap)
+    width: screenWidth - 32,
   },
   text: {
     flexShrink: 1,
@@ -191,7 +192,7 @@ const makeStyles = (c: Palette) => StyleSheet.create({
     fontSize: 16,
   },
   hashtags: {
-    color: c.accent,
+    color: c.primary,
     fontSize: 14,
     fontWeight: '600',
     marginBottom: 8,

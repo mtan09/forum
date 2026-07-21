@@ -83,7 +83,7 @@ export default function ScorerReceipts({ visible, onClose, position, signals, ki
           <ThemedView style={styles.handle} />
           <ScrollView showsVerticalScrollIndicator={false}>
             <ThemedView style={styles.header}>
-              <IconSymbol name="checkmark.seal.fill" size={20} color={c.accent} />
+              <IconSymbol name="checkmark.seal.fill" size={20} color={c.primary} />
               <ThemedText type="defaultSemiBold" style={styles.title}>Why this placement?</ThemedText>
             </ThemedView>
 
@@ -183,7 +183,7 @@ export default function ScorerReceipts({ visible, onClose, position, signals, ki
 const makeStyles = (c: Palette) => StyleSheet.create({
   backdrop: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.4)',
+    backgroundColor: c.scrim,
     justifyContent: 'flex-end',
   },
   sheet: {
@@ -279,13 +279,13 @@ const makeStyles = (c: Palette) => StyleSheet.create({
   },
   closeBtn: {
     marginTop: 20,
-    backgroundColor: c.accent,
+    backgroundColor: c.primary,
     borderRadius: 14,
     paddingVertical: 14,
     alignItems: 'center',
   },
   closeText: {
-    color: '#FFFFFF',
+    color: c.onPrimary,
     fontWeight: '800',
     fontSize: 16,
   },

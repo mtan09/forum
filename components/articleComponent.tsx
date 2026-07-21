@@ -1,11 +1,14 @@
 import ScalableImage from '@/components/scalable-image';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
+import { IconSymbol } from '@/components/ui/icon-symbol';
 import { type Palette } from '@/constants/theme';
 import { usePalette } from '@/hooks/use-palette';
 import { useRelativeTime } from '@/hooks/useRelativeTime';
+import { getDisplayableArticleMedia } from '@/lib/article-media';
+import { getPerspectiveToneForPosition } from '@/lib/perspective-colors';
 import { useRouter } from 'expo-router';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Dimensions, Image, Pressable, StyleSheet } from 'react-native';
 import ArticleActions from './article-actions';
 import ScorerReceipts from './scorerReceipts';
@@ -60,22 +63,25 @@ export default function Article({ article }: Props) {
 
   const { c } = usePalette();
   const styles = useMemo(() => makeStyles(c), [c]);
+  const contentWidth = screenWidth - 32;
   const timeAgo = useRelativeTime(article.published_at);
 
   // Articles are identified by their OUTLET's published lean (a small
   // Left/Center/Right tag by the source name), not per-article spectrums.
   const sourceLean = article.source_lean ?? article.political_lean;
-  const leanTag =
-    sourceLean == null ? null :
-    sourceLean < 0.4 ? { label: 'Left',   color: c.blue, bg: c.blueBg } :
-    sourceLean > 0.6 ? { label: 'Right',  color: c.red, bg: c.redBg } :
-                       { label: 'Center', color: c.subtle, bg: c.inputBg };
+  const leanTag = getPerspectiveToneForPosition(sourceLean, c);
 
   const router = useRouter();
   const [logoFailed, setLogoFailed] = useState(false);
+  const [mediaFailed, setMediaFailed] = useState(false);
   const [receiptsOpen, setReceiptsOpen] = useState(false);
   const logo = logoUrl(article.url);
+  const media = getDisplayableArticleMedia(article.media, article.url);
   const receiptPosition = article.political_lean ?? article.source_lean ?? null;
+
+  useEffect(() => {
+    setMediaFailed(false);
+  }, [media]);
 
   return (
     <ThemedView style={styles.post}>
@@ -109,7 +115,7 @@ export default function Article({ article }: Props) {
                     onPress={() => receiptPosition != null && setReceiptsOpen(true)}
                     style={({ pressed }) => ({ opacity: pressed ? 0.6 : 1 })}
                   >
-                    <ThemedView style={[styles.leanTag, { backgroundColor: leanTag.bg }]}>
+                    <ThemedView style={[styles.leanTag, { backgroundColor: leanTag.background }]}>
                       <ThemedText style={[styles.leanTagText, { color: leanTag.color }]}>{leanTag.label}</ThemedText>
                     </ThemedView>
                   </Pressable>
@@ -125,15 +131,22 @@ export default function Article({ article }: Props) {
             <ThemedText style={styles.text}>{article.title}</ThemedText>
 
             {/* Post media (if any) */}
-            {article.media && (
+            {media && !mediaFailed && (
               // <ThemedView style={styles.mediaContainer}>
                 <ScalableImage
-                  source={{uri: article.media}}
+                  source={{uri: media}}
                   type='width'
-                  dimension={screenWidth - 32}
+                  dimension={contentWidth}
                   style={styles.media}
+                  onError={() => setMediaFailed(true)}
                 />
               // </ThemedView>
+            )}
+            {media && mediaFailed && (
+              <ThemedView style={styles.mediaFallback}>
+                <IconSymbol name="photo" size={24} color={c.muted} />
+                <ThemedText style={styles.mediaFallbackText}>Image unavailable</ThemedText>
+              </ThemedView>
             )}
 
           </ThemedView>
@@ -163,10 +176,6 @@ const makeStyles = (c: Palette) => StyleSheet.create({
   container: {
     gap: 8,
     flexDirection: 'column',
-    // borderTopWidth: 1,
-    // borderBottomWidth: 1,
-    // borderTopColor: "#8D8D8D",
-    // borderBottomColor: "#8D8D8D"
   },
   post: {
     paddingHorizontal: 16,
@@ -181,7 +190,7 @@ const makeStyles = (c: Palette) => StyleSheet.create({
     width: 50,
     aspectRatio: 1,
     borderRadius: 25,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: c.mediaSurface,
     borderWidth: 1,
     borderColor: c.border,
   },
@@ -200,7 +209,7 @@ const makeStyles = (c: Palette) => StyleSheet.create({
     color: c.onAccentFaint,
   },
   content: {
-    width: screenWidth - 32, // 50 (avatar) + 12*2 (padding) + 8 (gap)
+    width: screenWidth - 32,
   },
   text: {
     flexShrink: 1,
@@ -230,5 +239,19 @@ const makeStyles = (c: Palette) => StyleSheet.create({
   media: {
     borderRadius: 16,
     marginBottom: 8,
+  },
+  mediaFallback: {
+    width: screenWidth - 32,
+    aspectRatio: 16 / 9,
+    borderRadius: 16,
+    marginBottom: 8,
+    backgroundColor: c.inputBg,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+  },
+  mediaFallbackText: {
+    color: c.muted,
+    fontSize: 12,
   },
 });

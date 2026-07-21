@@ -99,7 +99,7 @@ export default function EditProfile() {
           <Pressable onPress={() => pick(setPickedHeader)}>
             <ImageBackground source={headerSource} style={styles.header}>
               <ThemedView style={styles.imageHint}>
-                <IconSymbol name="camera.fill" size={16} color="#FFFFFF" />
+                <IconSymbol name="camera.fill" size={16} color={c.onImage} />
               </ThemedView>
             </ImageBackground>
           </Pressable>
@@ -108,7 +108,7 @@ export default function EditProfile() {
           <Pressable onPress={() => pick(setPickedAvatar)} style={styles.avatarWrap}>
             <Image source={avatarSource} style={styles.avatar} />
             <ThemedView style={[styles.imageHint, styles.avatarHint]}>
-              <IconSymbol name="camera.fill" size={14} color="#FFFFFF" />
+              <IconSymbol name="camera.fill" size={14} color={c.onImage} />
             </ThemedView>
           </Pressable>
 
@@ -164,7 +164,7 @@ const makeStyles = (c: Palette) => StyleSheet.create({
     fontWeight: '600',
   },
   saveText: {
-    color: c.accent,
+    color: c.primary,
     fontWeight: '800',
   },
   header: {
@@ -174,7 +174,7 @@ const makeStyles = (c: Palette) => StyleSheet.create({
     justifyContent: 'flex-end',
   },
   imageHint: {
-    backgroundColor: 'rgba(0,0,0,0.45)',
+    backgroundColor: c.imageControlBg,
     borderRadius: 14,
     padding: 6,
     margin: 10,

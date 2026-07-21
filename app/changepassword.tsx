@@ -115,7 +115,7 @@ const makeStyles = (c: Palette) => StyleSheet.create({
     fontWeight: '600',
   },
   saveText: {
-    color: c.accent,
+    color: c.primary,
     fontWeight: '800',
   },
   form: {

@@ -48,7 +48,7 @@ function SpectrumTrack({ pin, onPlace }: { pin: number | null; onPlace: (p: numb
     <Pressable onPress={handlePress}>
       <ThemedView style={styles.trackWrap}>
         <LinearGradient
-          colors={['#2563EB', '#8B5CF6', '#EF4444']}
+          colors={[c.blue, c.primary, c.red]}
           locations={[0, 0.5, 1]}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 0 }}
@@ -91,7 +91,7 @@ function Histogram({ dist, myPosition }: { dist: Distribution; myPosition: numbe
 }
 
 export default function DebateScreen() {
-  const { c, scheme } = usePalette();
+  const { c } = usePalette();
   const styles = useMemo(() => makeStyles(c), [c]);
   const KIND_META = useMemo(() => kindMeta(c), [c]);
   const { id } = useLocalSearchParams();
@@ -199,7 +199,7 @@ export default function DebateScreen() {
               style={({ pressed }) => [styles.coverageLink, { opacity: pressed ? 0.7 : 1 }]}
             >
               <ThemedText style={styles.coverageLinkText}>Read the coverage first</ThemedText>
-              <IconSymbol name="chevron.right" size={14} color={c.accent} />
+              <IconSymbol name="chevron.right" size={14} color={c.primary} />
             </Pressable>
           )}
 
@@ -253,7 +253,7 @@ export default function DebateScreen() {
                   onPress={() => { tapLight(); setShareOpen(true); }}
                   style={({ pressed }) => [styles.shareStance, { opacity: pressed ? 0.7 : 1 }]}
                 >
-                  <IconSymbol name="square.and.arrow.up" size={16} color={c.accent} />
+                  <IconSymbol name="square.and.arrow.up" size={16} color={c.primary} />
                   <ThemedText style={styles.shareStanceText}>Share my stance</ThemedText>
                 </Pressable>
               </>
@@ -282,7 +282,7 @@ export default function DebateScreen() {
                 <IconSymbol
                   name="arrow.up.circle.fill"
                   size={28}
-                  color={hasVoted && commentText.trim() && !postingComment ? c.accent : scheme === 'dark' ? '#5C3E7D' : '#dfaeffff'}
+                  color={hasVoted && commentText.trim() && !postingComment ? c.primary : c.primaryDisabled}
                 />
               </Pressable>
             </ThemedView>
@@ -337,7 +337,7 @@ const makeStyles = (c: Palette) => StyleSheet.create({
     gap: 4,
   },
   coverageLinkText: {
-    color: c.accent,
+    color: c.primary,
     fontWeight: '700',
   },
   stanceCard: {
@@ -372,7 +372,7 @@ const makeStyles = (c: Palette) => StyleSheet.create({
     width: 14,
     height: 28,
     borderRadius: 7,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: c.spectrumThumb,
     borderWidth: 2,
     borderColor: c.text,
   },
@@ -388,13 +388,13 @@ const makeStyles = (c: Palette) => StyleSheet.create({
     fontWeight: '600',
   },
   lockButton: {
-    backgroundColor: c.accent,
+    backgroundColor: c.primary,
     borderRadius: 12,
     paddingVertical: 12,
     alignItems: 'center',
   },
   lockButtonText: {
-    color: '#FFFFFF',
+    color: c.onPrimary,
     fontWeight: '800',
   },
   shareStance: {
@@ -405,7 +405,7 @@ const makeStyles = (c: Palette) => StyleSheet.create({
     paddingVertical: 4,
   },
   shareStanceText: {
-    color: c.accent,
+    color: c.primary,
     fontWeight: '800',
     fontSize: 14,
   },

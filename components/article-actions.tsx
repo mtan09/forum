@@ -5,10 +5,8 @@ import { usePalette } from '@/hooks/use-palette';
 import { notifySuccess, tapLight } from '@/lib/haptics';
 import { api } from '@/lib/api';
 import { useEffect, useState } from 'react';
-import { Dimensions, Pressable, Share, StyleSheet } from 'react-native';
+import { Pressable, Share, StyleSheet } from 'react-native';
 import { type ArticleType } from './articleComponent';
-
-const screenWidth = Dimensions.get('window').width;
 
 type VoteDirection = 'up' | 'down' | null;
 type VoteState = { upvotes: number; downvotes: number; myVote: VoteDirection };
@@ -96,20 +94,20 @@ export default function ArticleActions({ article }: { article: ArticleType }) {
     <ThemedView style={styles.container}>
 
       {/* Upvote */}
-      <Pressable accessibilityRole="button" accessibilityLabel={isUpvoted ? 'Remove upvote' : 'Upvote'} onPress={() => { tapLight(); vote(isUpvoted ? null : 'up'); }}>
-        <ThemedView style={[styles.reactions, styles.upvote]}>
-          <IconSymbol name={isUpvoted ? "arrowshape.up.fill" : "arrowshape.up"} size={20} color={isUpvoted ? c.green : c.muted} />
-          <ThemedText style={{color: isUpvoted ? c.green : c.muted}}>
+      <Pressable style={styles.upvote} accessibilityRole="button" accessibilityLabel={isUpvoted ? 'Remove upvote' : 'Upvote'} onPress={() => { tapLight(); vote(isUpvoted ? null : 'up'); }}>
+        <ThemedView style={styles.reactions}>
+          <IconSymbol name={isUpvoted ? "arrowshape.up.fill" : "arrowshape.up"} size={20} color={isUpvoted ? c.voteUp : c.textMuted} />
+          <ThemedText style={{color: isUpvoted ? c.voteUp : c.textMuted}}>
             {state.upvotes === 0 ? 0 : `+${formatCount(state.upvotes)}`}
           </ThemedText>
         </ThemedView>
       </Pressable>
 
       {/* Downvote */}
-      <Pressable accessibilityRole="button" accessibilityLabel={isDownvoted ? 'Remove downvote' : 'Downvote'} onPress={() => { tapLight(); vote(isDownvoted ? null : 'down'); }}>
-        <ThemedView style={[styles.reactions, styles.downvote]}>
-          <IconSymbol name={isDownvoted ? "arrowshape.down.fill" : "arrowshape.down"} size={20} color={isDownvoted ? "#FF0080" : c.muted} />
-          <ThemedText style={{color: isDownvoted ? "#FF0080" : c.muted}}>
+      <Pressable style={styles.downvote} accessibilityRole="button" accessibilityLabel={isDownvoted ? 'Remove downvote' : 'Downvote'} onPress={() => { tapLight(); vote(isDownvoted ? null : 'down'); }}>
+        <ThemedView style={styles.reactions}>
+          <IconSymbol name={isDownvoted ? "arrowshape.down.fill" : "arrowshape.down"} size={20} color={isDownvoted ? c.voteDown : c.textMuted} />
+          <ThemedText style={{color: isDownvoted ? c.voteDown : c.textMuted}}>
             {state.downvotes === 0 ? 0 : `-${formatCount(state.downvotes)}`}
           </ThemedText>
         </ThemedView>
@@ -124,7 +122,7 @@ export default function ArticleActions({ article }: { article: ArticleType }) {
       {/* Bookmark */}
       <ThemedView style={[styles.reactions, styles.bookmark]}>
         <Pressable accessibilityRole="button" accessibilityLabel={isBookmarked ? 'Remove bookmark' : 'Bookmark'} onPress={toggleBookmark}>
-          <IconSymbol name={isBookmarked ? "bookmark.fill" : "bookmark"} size={20} color={isBookmarked ? "#FFD000" : c.muted} />
+          <IconSymbol name={isBookmarked ? "bookmark.fill" : "bookmark"} size={20} color={isBookmarked ? c.bookmark : c.textMuted} />
         </Pressable>
       </ThemedView>
 
@@ -141,6 +139,7 @@ export default function ArticleActions({ article }: { article: ArticleType }) {
 const styles = StyleSheet.create({
   container: {
     flexDirection: 'row',
+    width: '100%',
   },
   reactions: {
     flexDirection: 'row',
@@ -149,20 +148,20 @@ const styles = StyleSheet.create({
     gap: 4,
   },
   upvote: {
-    width: (screenWidth-32)/4,
+    flex: 2,
   },
   downvote: {
-    width: (screenWidth-32)/4,
+    flex: 2,
   },
   comments: {
-    width: (screenWidth-32)/4,
+    flex: 2,
   },
   bookmark: {
-   width: (screenWidth-32)/8,
+   flex: 1,
    justifyContent: 'flex-end'
   },
   share: {
-    width: (screenWidth-32)/8,
+    flex: 1,
     justifyContent: 'flex-end',
   },
 });

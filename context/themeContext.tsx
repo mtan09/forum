@@ -24,8 +24,8 @@ export function ThemeModeProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     AsyncStorage.getItem(STORAGE_KEY)
-      .then((v) => {
-        if (v === 'light' || v === 'dark' || v === 'system') setPreferenceState(v);
+      .then((themeValue) => {
+        if (themeValue === 'light' || themeValue === 'dark' || themeValue === 'system') setPreferenceState(themeValue);
       })
       .finally(() => setHydrated(true));
   }, []);

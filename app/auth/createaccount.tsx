@@ -97,7 +97,7 @@ export default function CreateAccount() {
         disabled={loading}
         style={[styles.button, loading && styles.buttonDisabled]}
       >
-        {loading ? <ActivityIndicator color="#fff" /> : <Text style={styles.buttonText}>Create account</Text>}
+        {loading ? <ActivityIndicator color={c.onPrimary} /> : <Text style={styles.buttonText}>Create account</Text>}
       </TouchableOpacity>
 
       <View style={styles.footer}>
@@ -122,7 +122,7 @@ const makeStyles = (c: Palette) => StyleSheet.create({
     fontWeight: '800', 
     marginBottom: 8,
     textAlign: 'center',
-    color: '#b647ff'
+    color: c.primary,
   },
   input: {
     borderWidth: 1,
@@ -131,14 +131,15 @@ const makeStyles = (c: Palette) => StyleSheet.create({
     paddingVertical: 10,
     borderRadius: 16,
     color: c.text,
+    backgroundColor: c.surfaceMuted,
   },
   button: {
-    backgroundColor: '#b647ff',
+    backgroundColor: c.primary,
     paddingVertical: 14,
     borderRadius: 16,
     alignItems: 'center',
     marginTop: 8,
-    shadowColor: '#000',
+    shadowColor: c.shadow,
     shadowOffset: {
       width: 0,
       height: 2,
@@ -148,11 +149,11 @@ const makeStyles = (c: Palette) => StyleSheet.create({
     elevation: 5,
   },
   buttonDisabled: { opacity: 0.6 },
-  buttonText: { color: '#fff', fontWeight: '600' },
+  buttonText: { color: c.onPrimary, fontWeight: '600' },
   error: { color: c.danger, marginBottom: 4 },
   footer: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 12 },
   footerText: { color: c.subtle },
-  link: { color: '#b647ff', fontWeight: '600' },
+  link: { color: c.primary, fontWeight: '600' },
   image: {
     alignSelf: 'center',
   }

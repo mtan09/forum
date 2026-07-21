@@ -60,7 +60,8 @@
             "./assets/fonts/SF-Pro-Rounded-Heavy.otf"
           ]
         }
-      ]
+      ],
+      "expo-web-browser"
     ],
     "experiments": {
       "typedRoutes": true,

@@ -65,7 +65,7 @@ export default function ShareCardModal({ visible, onClose, children, hint }: Pro
 const makeStyles = (c: Palette) => StyleSheet.create({
   backdrop: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.5)',
+    backgroundColor: c.scrim,
     justifyContent: 'flex-end',
   },
   sheet: {
@@ -96,14 +96,14 @@ const makeStyles = (c: Palette) => StyleSheet.create({
   },
   shareBtn: {
     marginTop: 20,
-    backgroundColor: c.accent,
+    backgroundColor: c.primary,
     borderRadius: 14,
     paddingVertical: 14,
     alignItems: 'center',
     alignSelf: 'stretch',
   },
   shareText: {
-    color: '#FFFFFF',
+    color: c.onPrimary,
     fontWeight: '800',
     fontSize: 16,
   },

@@ -4,8 +4,7 @@ import { StatusBar } from 'expo-status-bar';
 
 import { IconSymbol } from '@/components/ui/icon-symbol';
 
-import { Colors } from '@/constants/theme';
-import { useColorScheme } from '@/hooks/use-color-scheme';
+import { usePalette } from '@/hooks/use-palette';
 
 import { PostProvider } from '../context/postContext';
 
@@ -40,8 +39,7 @@ export default function RootLayout() {
 // Splitting this out lets useColorScheme see ThemeModeProvider, so the
 // navigation chrome + status bar follow the in-app appearance setting.
 function ThemedShell() {
-  const colorScheme = useColorScheme();
-  const c = Colors[colorScheme ?? 'light'];
+  const { c, scheme: colorScheme } = usePalette();
   const base = colorScheme === 'dark' ? DarkTheme : DefaultTheme;
   const navTheme = {
     ...base,
@@ -68,6 +66,7 @@ function AppNavigator() {
   const { session, loading, needsOnboarding } = useAuth();
   const pathname = usePathname();
   const router = useRouter();
+  const { c } = usePalette();
 
   // Once signed in: register this device for push and route notification
   // taps to the content they reference. (No-ops inside Expo Go.)
@@ -101,7 +100,7 @@ function AppNavigator() {
     <PostProvider>
         <Stack
           screenOptions={{
-            headerTintColor: "#b647ff",
+            headerTintColor: c.primary,
             // header title color comes from the navigation theme, so it
             // flips with light/dark automatically
             //
@@ -121,45 +120,37 @@ function AppNavigator() {
                     paddingRight: 12,
                   })}
                 >
-                  <IconSymbol name="chevron.left" size={22} color="#b647ff" />
-                  <Text style={{ color: '#b647ff', fontSize: 17 }}>Back</Text>
+                  <IconSymbol name="chevron.left" size={22} color={c.primary} />
+                  <Text style={{ color: c.primary, fontSize: 17 }}>Back</Text>
                 </Pressable>
               ) : null,
           }}
         >
-          {session === null && (
-            <Stack.Screen
-              name="auth/landingpage"
-              options={{ headerShown: false }}
-            />
-          )}
-          {session === null && (
-            <Stack.Screen
-              name="auth/login"
-              options={{ 
-                title: 'Login',
-                headerBackTitle: "Back",
-              }}
-            />
-          )}
-          {session === null && (
-            <Stack.Screen
-              name="auth/createaccount"
-              options={{ 
-                title: 'Sign Up',
-                headerBackTitle: "Back",
-              }}
-            />
-          )}
-          {session === null && (
-            <Stack.Screen
-              name="auth/forgotpassword"
-              options={{
-                title: 'Reset Password',
-                headerBackTitle: "Back",
-              }}
-            />
-          )}
+          <Stack.Screen
+            name="auth/landingpage"
+            options={{ headerShown: false }}
+          />
+          <Stack.Screen
+            name="auth/login"
+            options={{
+              title: 'Login',
+              headerBackTitle: "Back",
+            }}
+          />
+          <Stack.Screen
+            name="auth/createaccount"
+            options={{
+              title: 'Sign Up',
+              headerBackTitle: "Back",
+            }}
+          />
+          <Stack.Screen
+            name="auth/forgotpassword"
+            options={{
+              title: 'Reset Password',
+              headerBackTitle: "Back",
+            }}
+          />
 
           <Stack.Screen 
             name="(tabs)" 
@@ -169,8 +160,14 @@ function AppNavigator() {
           <Stack.Screen
             name="createpost"
             options={{
-              presentation: 'modal',
+              presentation: 'formSheet',
               headerShown: false,
+              sheetAllowedDetents: [0.9],
+              sheetInitialDetentIndex: 0,
+              sheetGrabberVisible: true,
+              sheetCornerRadius: 24,
+              sheetLargestUndimmedDetentIndex: 'none',
+              contentStyle: { backgroundColor: c.surfaceRaised },
             }}
           />
           <Stack.Screen
@@ -246,6 +243,10 @@ function AppNavigator() {
               title: 'Messages',
               headerBackTitle: "Back",
             }}
+          />
+          <Stack.Screen
+            name="following"
+            options={{ title: 'Following feed', headerBackTitle: "Back" }}
           />
           <Stack.Screen
             name="dm/[userId]"

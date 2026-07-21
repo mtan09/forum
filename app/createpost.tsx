@@ -2,7 +2,6 @@ import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { type Palette } from '@/constants/theme';
-import { useAuth } from '@/context/authContext';
 import { usePosts } from '@/context/postContext';
 import { usePalette } from '@/hooks/use-palette';
 import { api, uploadImage } from '@/lib/api';
@@ -16,10 +15,7 @@ export default function CreatePost() {
   const router = useRouter();
   const { c } = usePalette();
   const styles = useMemo(() => makeStyles(c), [c]);
-  const { user } = useAuth();
   const { refresh } = usePosts();
-
-  const info = user ? { username: user.username, avatar_url: user.avatar_url ?? null } : null;
 
   const [post, setPost] = useState<{
     content: string;
@@ -82,7 +78,7 @@ export default function CreatePost() {
       setTagInput('');
       setPickedImage(null);
       notifySuccess();
-      router.back();
+      dismissComposer();
     } catch (e: any) {
       setErr(e?.message ?? 'Something went wrong.');
     } finally {
@@ -111,6 +107,18 @@ export default function CreatePost() {
   };
 
   const removePickedImage = () => setPickedImage(null);
+  const canPost = !loading && Boolean(post.content.trim() || pickedImage);
+
+  const dismissComposer = () => {
+    Keyboard.dismiss();
+    if (router.canGoBack()) router.back();
+    else router.replace('/');
+  };
+
+  const closeComposer = () => {
+    tapLight();
+    dismissComposer();
+  };
 
   return(
     <Pressable style={{ flex: 1 }} onPress={Keyboard.dismiss} accessible={false}>
@@ -124,19 +132,16 @@ export default function CreatePost() {
         >
           <ThemedView style={styles.header}>
             <ThemedText type="title" style={styles.headerTitle}>Create Post</ThemedText>
+            <Pressable
+              onPress={closeComposer}
+              style={({ pressed }) => [styles.closeButton, { opacity: pressed ? 0.65 : 1 }]}
+              accessibilityRole="button"
+              accessibilityLabel="Close create post"
+              hitSlop={8}
+            >
+              <IconSymbol name="xmark" size={22} color={c.textSecondary} />
+            </Pressable>
           </ThemedView>
-
-          {info && (
-            <ThemedView style={styles.authorContainer}>
-              {info.avatar_url && (
-                <Image
-                  source={{ uri: info.avatar_url }}
-                  style={styles.avatar}
-                />
-              )}
-              <ThemedText style={styles.authorName}>{info.username}</ThemedText>
-            </ThemedView>
-          )}
 
           <TextInput
             placeholder="What do you want to post?"
@@ -163,7 +168,7 @@ export default function CreatePost() {
                 resizeMode="cover"
               />
               <Pressable onPress={removePickedImage} style={styles.removeButton}>
-                <IconSymbol name="x.circle.fill" size={28} color={c.accent} />
+                <IconSymbol name="x.circle.fill" size={28} color={c.primary} />
               </Pressable>
             </View>
           )}
@@ -176,17 +181,17 @@ export default function CreatePost() {
 
           <ThemedView style={styles.actionContainer}>
             <Pressable onPress={pickImage} style={styles.secondaryButton}>
-              <IconSymbol name="photo" size={20} color={c.accent} />
+              <IconSymbol name="photo" size={20} color={c.primary} />
               <ThemedText style={styles.secondaryButtonText}>Add Image</ThemedText>
             </Pressable>
 
-            <ThemedView>
+            <ThemedView style={styles.tagSection}>
               {hashtags.length > 0 && (
                 <View style={styles.tagChips}>
                   {hashtags.map((tag) => (
                     <Pressable key={tag} onPress={() => removeTag(tag)} style={styles.tagChip}>
                       <ThemedText style={styles.tagChipText}>#{tag}</ThemedText>
-                      <IconSymbol name="x.circle.fill" size={16} color={c.accent} />
+                      <IconSymbol name="x.circle.fill" size={16} color={c.primary} />
                     </Pressable>
                   ))}
                 </View>
@@ -210,14 +215,14 @@ export default function CreatePost() {
             onPress={handlePost}
             style={[
               styles.primaryButton,
-              loading || (!post.content.trim() && !pickedImage) ? styles.primaryButtonDisabled : null
+              !canPost ? styles.primaryButtonDisabled : null
             ]}
-            disabled={loading || (!post.content.trim() && !pickedImage)}
+            disabled={!canPost}
           >
-            <ThemedText style={styles.primaryButtonText}>
+            <ThemedText style={[styles.primaryButtonText, !canPost && styles.primaryButtonTextDisabled]}>
               {loading ? 'Posting...' : 'Post'}
             </ThemedText>
-            {!loading && <IconSymbol name="arrow.up.circle.fill" size={20} color="white" />}
+            {!loading && <IconSymbol name="paperplane.fill" size={19} color={canPost ? c.onPrimary : c.textDisabled} />}
           </Pressable>
         </ThemedView>
       </ThemedView>
@@ -228,7 +233,7 @@ export default function CreatePost() {
 const makeStyles = (c: Palette) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: c.background,
+    backgroundColor: c.surfaceRaised,
   },
   scrollView: {
     flex: 1,
@@ -239,33 +244,27 @@ const makeStyles = (c: Palette) => StyleSheet.create({
     paddingBottom: 120,
   },
   header: {
-    marginBottom: 24,
-    marginTop: 60,
-  },
-  headerTitle: {
-    color: c.accent,
-    fontWeight: '800',
-  },
-  authorContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
-    marginBottom: 20,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    backgroundColor: c.card,
-    borderRadius: 12,
+    justifyContent: 'space-between',
+    marginBottom: 24,
+    marginTop: 26,
+    backgroundColor: 'transparent',
+  },
+  headerTitle: {
+    color: c.primary,
+    fontWeight: '800',
+  },
+  closeButton: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: c.surfaceMuted,
     borderWidth: 1,
-    borderColor: c.cardBorder,
-  },
-  avatar: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-  },
-  authorName: {
-    fontWeight: '600',
-    fontSize: 14,
+    borderColor: c.border,
+    transform: [{ translateY: -3 }],
   },
   input: {
     width: '100%',
@@ -280,6 +279,7 @@ const makeStyles = (c: Palette) => StyleSheet.create({
     fontWeight: '600',
     textAlignVertical: 'top',
     color: c.text,
+    backgroundColor: c.background,
   },
   imageContainer: {
     width: '100%',
@@ -313,6 +313,10 @@ const makeStyles = (c: Palette) => StyleSheet.create({
   actionContainer: {
     gap: 12,
     marginBottom: 20,
+    backgroundColor: 'transparent',
+  },
+  tagSection: {
+    backgroundColor: 'transparent',
   },
   tagChips: {
     flexDirection: 'row',
@@ -332,7 +336,7 @@ const makeStyles = (c: Palette) => StyleSheet.create({
     borderColor: c.accentFaint,
   },
   tagChipText: {
-    color: c.accent,
+    color: c.primary,
     fontWeight: '700',
     fontSize: 14,
   },
@@ -346,6 +350,7 @@ const makeStyles = (c: Palette) => StyleSheet.create({
     fontSize: 15,
     fontWeight: '600',
     color: c.text,
+    backgroundColor: c.background,
   },
   secondaryButton: {
     flexDirection: 'row',
@@ -362,7 +367,7 @@ const makeStyles = (c: Palette) => StyleSheet.create({
   secondaryButtonText: {
     fontWeight: '700',
     fontSize: 16,
-    color: c.accent,
+    color: c.primary,
   },
   bottomContainer: {
     position: 'absolute',
@@ -371,7 +376,7 @@ const makeStyles = (c: Palette) => StyleSheet.create({
     right: 0,
     paddingHorizontal: 16,
     paddingVertical: 16,
-    backgroundColor: c.background,
+    backgroundColor: c.surfaceRaised,
     borderTopWidth: 1,
     borderTopColor: c.cardBorder,
   },
@@ -383,15 +388,17 @@ const makeStyles = (c: Palette) => StyleSheet.create({
     paddingVertical: 14,
     paddingHorizontal: 24,
     borderRadius: 16,
-    backgroundColor: c.accent,
+    backgroundColor: c.primary,
   },
   primaryButtonDisabled: {
-    backgroundColor: c.accentFaint,
-    opacity: 0.6,
+    backgroundColor: c.surfaceMuted,
   },
   primaryButtonText: {
-    color: 'white',
+    color: c.onPrimary,
     fontWeight: '800',
     fontSize: 16,
+  },
+  primaryButtonTextDisabled: {
+    color: c.textDisabled,
   },
 });

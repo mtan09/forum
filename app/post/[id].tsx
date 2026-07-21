@@ -14,7 +14,7 @@ import { Keyboard, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleS
 
 export default function PostScreen() {
   const router = useRouter();
-  const { c, scheme } = usePalette();
+  const { c } = usePalette();
   const styles = useMemo(() => makeStyles(c), [c]);
   const { id } = useLocalSearchParams();
   const { posts, refresh, ensurePost } = usePosts();
@@ -79,7 +79,7 @@ export default function PostScreen() {
             }
             style={({ pressed }) => [styles.aiButton, { opacity: pressed ? 0.7 : 1 }]}
           >
-            <IconSymbol name="sparkles" size={18} color="#FFFFFF" />
+            <IconSymbol name="sparkles" size={18} color={c.onPrimary} />
             <ThemedText style={styles.aiButtonText}>Ask forumAI about this post</ThemedText>
           </Pressable>
 
@@ -105,7 +105,7 @@ export default function PostScreen() {
                 <IconSymbol
                   name="arrow.up.circle.fill"
                   size={28}
-                  color={commentText.trim() && !submitting ? c.accent : scheme === 'dark' ? '#5C3E7D' : '#dfaeffff'}
+                  color={commentText.trim() && !submitting ? c.primary : c.primaryDisabled}
                 />
               </Pressable>
             </ThemedView>
@@ -133,11 +133,11 @@ const makeStyles = (c: Palette) => StyleSheet.create({
     gap: 8,
     paddingVertical: 12,
     borderRadius: 16,
-    backgroundColor: c.accent,
+    backgroundColor: c.primary,
   },
   aiButtonText: {
     fontWeight: '700',
-    color: '#FFFFFF',
+    color: c.onPrimary,
   },
   composer: {
     flexDirection: 'row',

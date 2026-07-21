@@ -189,7 +189,7 @@ export default function PublicProfile() {
                   onPress={() => { tapLight(); router.push(`/dm/${user.id}`); }}
                   style={styles.messageBtn}
                 >
-                  <IconSymbol name="envelope" size={16} color={c.accent} />
+                  <IconSymbol name="envelope" size={16} color={c.primary} />
                 </Pressable>
                 <Pressable
                   onPress={toggleFollow}
@@ -299,13 +299,13 @@ const makeStyles = (c: Palette) => StyleSheet.create({
   },
   messageBtn: {
     borderWidth: 1.5,
-    borderColor: c.accent,
+    borderColor: c.primary,
     borderRadius: 12,
     paddingHorizontal: 10,
     paddingVertical: 6,
   },
   followBtn: {
-    backgroundColor: c.accent,
+    backgroundColor: c.primary,
     borderRadius: 12,
     paddingHorizontal: 16,
     paddingVertical: 6,
@@ -313,15 +313,15 @@ const makeStyles = (c: Palette) => StyleSheet.create({
   followingBtn: {
     backgroundColor: 'transparent',
     borderWidth: 1.5,
-    borderColor: c.accent,
+    borderColor: c.primary,
   },
   followText: {
-    color: '#FFFFFF',
+    color: c.onPrimary,
     fontWeight: '800',
     fontSize: 14,
   },
   followingText: {
-    color: c.accent,
+    color: c.primary,
   },
   followCounts: {
     color: c.muted,
@@ -383,13 +383,13 @@ const makeStyles = (c: Palette) => StyleSheet.create({
     backgroundColor: 'transparent',
   },
   leanBadge: {
-    backgroundColor: c.accent,
+    backgroundColor: c.primary,
     borderRadius: 10,
     paddingHorizontal: 10,
     paddingVertical: 3,
   },
   leanBadgeText: {
-    color: '#FFFFFF',
+    color: c.onPrimary,
     fontWeight: '800',
     fontSize: 12,
     lineHeight: 16,

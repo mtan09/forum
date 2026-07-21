@@ -85,8 +85,8 @@ export default function DebateTab() {
         <RefreshControl
           refreshing={refreshing}
           onRefresh={onRefresh}
-          tintColor="#B647FF"      // iOS: branded purple spinner
-          colors={['#B647FF']}     // Android
+          tintColor={c.primary}
+          colors={[c.primary]}
           // The scroll view starts at the very top of the screen, so without
           // this the spinner draws up behind the status bar / notch and is
           // invisible. Push it into the visible area below the safe inset.
@@ -126,13 +126,13 @@ export default function DebateTab() {
                   {debate.total_votes} voice{debate.total_votes === 1 ? '' : 's'} · {debate.comment_count} comment{debate.comment_count === 1 ? '' : 's'}
                 </ThemedText>
                 <ThemedView style={styles.cardCta}>
-                  <ThemedText style={[styles.cardCtaText, joined && { color: '#14DD78' }]}>
+                  <ThemedText style={[styles.cardCtaText, joined && { color: c.success }]}>
                     {joined ? 'You’re in' : 'Take a stance'}
                   </ThemedText>
                   <IconSymbol
                     name={joined ? 'checkmark.circle.fill' : 'chevron.right'}
                     size={16}
-                    color={joined ? '#14DD78' : '#B647FF'}
+                    color={joined ? c.success : c.primary}
                   />
                 </ThemedView>
               </ThemedView>
@@ -207,7 +207,7 @@ const makeStyles = (c: Palette) => StyleSheet.create({
     gap: 12,
   },
   title: {
-    color: c.accent,
+    color: c.primary,
   },
   subtitle: {
     color: c.muted,
@@ -254,7 +254,7 @@ const makeStyles = (c: Palette) => StyleSheet.create({
     backgroundColor: 'transparent',
   },
   cardCtaText: {
-    color: c.accent,
+    color: c.primary,
     fontWeight: '700',
     fontSize: 14,
   },

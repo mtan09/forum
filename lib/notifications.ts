@@ -75,13 +75,20 @@ export async function registerForPush(): Promise<void> {
 
     const projectId =
       Constants.expoConfig?.extra?.eas?.projectId ?? Constants.easConfig?.projectId;
-    const token = (await Notifications.getExpoPushTokenAsync(projectId ? { projectId } : undefined))
-      .data;
+    // Local Expo manifests do not have an EAS project id until `eas init`
+    // has linked the app. Push is unavailable in that state, so skip cleanly
+    // instead of invoking Expo's token API and producing a noisy warning.
+    if (!projectId) return;
+
+    const token = (await Notifications.getExpoPushTokenAsync({ projectId })).data;
     await api('/users/me/push-token', { body: { token, platform: Platform.OS } });
     await AsyncStorage.setItem(PUSH_TOKEN_KEY, token);
   } catch (err: any) {
-    // Expected in Expo Go — remote push needs a dev build
-    console.log('[push] registration skipped:', err?.message);
+    const message = String(err?.message ?? 'Unknown push registration error');
+    // Expo Go cannot register remote push on current SDKs. That is an
+    // expected capability gap; surface other failures so they remain visible.
+    if (/expo go|development build/i.test(message)) return;
+    console.warn('[push] registration failed:', message);
   }
 }
 

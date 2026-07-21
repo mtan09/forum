@@ -23,7 +23,10 @@ const MAPPING = {
   'brain.fill': 'psychology',
   brain: 'psychology',
   magnifyingglass: 'search',
+  'newspaper.fill': 'article',
+  'arrow.up.right': 'north-east',
   'person.fill': 'person',
+  'person.2.fill': 'people',
   person: 'person-outline',
   'chevron.left': 'chevron-left',
   'chevron.right': 'chevron-right',
@@ -41,6 +44,7 @@ const MAPPING = {
   'square.and.arrow.up': 'ios-share',
   'arrow.up.circle.fill': 'arrow-circle-up',
   'x.circle.fill': 'cancel',
+  xmark: 'close',
   plus: 'add',
   ellipsis: 'more-horiz',
 

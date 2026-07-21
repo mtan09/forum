@@ -1,12 +1,16 @@
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
+import { type Palette } from '@/constants/theme';
+import { usePalette } from '@/hooks/use-palette';
 import { useRouter } from 'expo-router';
+import { useMemo } from 'react';
 import { Dimensions, Image, Pressable, StyleSheet } from 'react-native';
 
 const screenWidth = Dimensions.get('window').width;
 
 export default function Landing() {
-
+  const { c } = usePalette();
+  const styles = useMemo(() => makeStyles(c), [c]);
   const router = useRouter();
 
   return(
@@ -23,14 +27,10 @@ export default function Landing() {
           }}
           style={({ pressed }) => [
             styles.createButton,
-            { backgroundColor: pressed ? '#d7d7d7ff' : 'white' }
+            { opacity: pressed ? 0.82 : 1 }
           ]}
         >
-          <ThemedText style={{
-            fontWeight: '800',
-            color: '#b647ff',
-            fontSize: 18,
-          }}>
+          <ThemedText style={styles.createButtonText}>
             Get started
           </ThemedText>
         </Pressable>
@@ -46,7 +46,7 @@ export default function Landing() {
             <ThemedText 
               style={[
                 styles.login,
-                { color: pressed ? '#d7d7d7ff' : 'white' }
+                { opacity: pressed ? 0.72 : 1 }
               ]}
             >
               Log in
@@ -58,13 +58,13 @@ export default function Landing() {
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (c: Palette) => StyleSheet.create({
   container: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
     gap: 12,
-    backgroundColor: '#b647ff'
+    backgroundColor: c.primary,
   },
   imageContainer: {
     position: 'relative',
@@ -76,22 +76,22 @@ const styles = StyleSheet.create({
     position: 'absolute',
     top: 240,
     alignSelf: 'center',
-    color: 'white',
+    color: c.onPrimary,
     lineHeight: 48,
   },
   buttonContainer: {
     position: 'absolute',
     bottom: 64,
     width: screenWidth - 32,
-    backgroundColor: '#b647ff',
+    backgroundColor: c.primary,
     gap: 8,
   },
   createButton: {
-    backgroundColor: 'white',
+    backgroundColor: c.onPrimary,
     borderRadius: 16,
     padding: 16,
     alignItems: 'center',
-    shadowColor: '#000',
+    shadowColor: c.shadow,
     shadowOffset: {
       width: 0,
       height: 2,
@@ -100,11 +100,16 @@ const styles = StyleSheet.create({
     shadowRadius: 6,
     elevation: 5,
   },
+  createButtonText: {
+    color: c.primary,
+    fontSize: 18,
+    fontWeight: '800',
+  },
   login: {
     fontWeight: '800',
-    color: 'white',
+    color: c.onPrimary,
     fontSize: 18,
-    shadowColor: '#000',
+    shadowColor: c.shadow,
     shadowOffset: {
       width: 0,
       height: 2,

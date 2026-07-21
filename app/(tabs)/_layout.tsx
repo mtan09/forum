@@ -3,12 +3,11 @@ import React from "react";
 
 import { HapticTab } from '@/components/haptic-tab';
 import { IconSymbol } from "@/components/ui/icon-symbol";
-import { Colors } from "@/constants/theme";
-import { useColorScheme } from "@/hooks/use-color-scheme";
+import { usePalette } from "@/hooks/use-palette";
 import { emitTabRefresh } from "@/lib/tabRefresh";
 
 export default function TabLayout() {
-  const colorScheme = useColorScheme();
+  const { c } = usePalette();
 
   // Pressing the tab you're already on tells that screen to scroll to top
   // and refresh (screens subscribe via onTabRefresh).
@@ -21,10 +20,14 @@ export default function TabLayout() {
   return (
     <Tabs
       screenOptions={{
-        tabBarActiveTintColor: Colors[colorScheme ?? "light"].tint,
+        tabBarActiveTintColor: c.primary,
+        tabBarInactiveTintColor: c.tabIconDefault,
         headerShown: false,
         tabBarShowLabel: false,
         tabBarStyle: {
+          backgroundColor: c.background,
+          borderTopColor: c.border,
+          borderTopWidth: 1,
           paddingTop: 10,
           paddingBottom: 5,
         },

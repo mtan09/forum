@@ -47,7 +47,7 @@ export default function SpectrumTrail({ points, width }: { points: TrailPoint[];
         <Svg width={width} height={H}>
           {/* center (0.5) reference */}
           <Line x1={0} y1={y(0.5)} x2={width} y2={y(0.5)} stroke={c.cardBorder} strokeWidth={1} strokeDasharray="4 4" />
-          <Polyline points={coords} fill="none" stroke={c.accent} strokeWidth={2.5} strokeLinejoin="round" />
+          <Polyline points={coords} fill="none" stroke={c.primary} strokeWidth={2.5} strokeLinejoin="round" />
           {points.map((pt, i) => (
             <Circle
               key={i}

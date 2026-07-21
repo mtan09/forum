@@ -71,6 +71,7 @@ const makeStyles = (c: Palette) => StyleSheet.create({
   container: {
     position: 'relative',
     zIndex: 1,
+    backgroundColor: 'transparent',
   },
   trigger: {
     flexDirection: 'row',
@@ -94,7 +95,7 @@ const makeStyles = (c: Palette) => StyleSheet.create({
     backgroundColor: c.overlayCard,
     borderRadius: 16,
     marginTop: 4,
-    shadowColor: '#000',
+    shadowColor: c.shadow,
     shadowOffset: { width: 0, height: -2 },
     shadowOpacity: 0.25,
     shadowRadius: 3.84,
@@ -112,7 +113,7 @@ const makeStyles = (c: Palette) => StyleSheet.create({
     fontSize: 14,
   },
   selectedOptionText: {
-    color: c.accent,
+    color: c.primary,
     fontWeight: '600',
   },
   optionsContainer: {

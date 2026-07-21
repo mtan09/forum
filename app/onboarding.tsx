@@ -166,7 +166,7 @@ export default function Onboarding() {
           <ThemedText style={styles.nextText}>
             {step === 1 ? 'Next' : followed.size > 0 ? "Let's go" : 'Skip for now'}
           </ThemedText>
-          <IconSymbol name="chevron.right" size={18} color="#FFFFFF" />
+          <IconSymbol name="chevron.right" size={18} color={c.onPrimary} />
         </Pressable>
       </ThemedView>
     </ThemedView>
@@ -177,7 +177,7 @@ const makeStyles = (c: Palette) => StyleSheet.create({
   screen: { flex: 1 },
   container: { padding: 24, paddingTop: 80, paddingBottom: 120, gap: 8 },
   step: { color: c.muted, fontWeight: '700', fontSize: 13, textTransform: 'uppercase', letterSpacing: 0.5 },
-  title: { color: c.accent, marginBottom: 4 },
+  title: { color: c.primary, marginBottom: 4 },
   subtitle: { color: c.subtle, lineHeight: 21, marginBottom: 16 },
   chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
   chip: {
@@ -187,7 +187,7 @@ const makeStyles = (c: Palette) => StyleSheet.create({
     paddingHorizontal: 14,
     paddingVertical: 8,
   },
-  chipOn: { backgroundColor: c.accentFaint, borderColor: c.accent },
+  chipOn: { backgroundColor: c.accentFaint, borderColor: c.primary },
   chipText: { fontWeight: '600', fontSize: 15, color: c.subtle },
   chipTextOn: { color: c.onAccentFaint, fontWeight: '800' },
   userRow: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 10 },
@@ -195,14 +195,14 @@ const makeStyles = (c: Palette) => StyleSheet.create({
   userName: { fontWeight: '700', fontSize: 16 },
   userMeta: { color: c.muted, fontSize: 13 },
   followBtn: {
-    backgroundColor: c.accent,
+    backgroundColor: c.primary,
     borderRadius: 12,
     paddingHorizontal: 14,
     paddingVertical: 6,
   },
-  followingBtn: { backgroundColor: 'transparent', borderWidth: 1.5, borderColor: c.accent },
-  followText: { color: '#FFFFFF', fontWeight: '800', fontSize: 13 },
-  followingText: { color: c.accent },
+  followingBtn: { backgroundColor: 'transparent', borderWidth: 1.5, borderColor: c.primary },
+  followText: { color: c.onPrimary, fontWeight: '800', fontSize: 13 },
+  followingText: { color: c.primary },
   footer: {
     position: 'absolute',
     bottom: 0,
@@ -217,9 +217,9 @@ const makeStyles = (c: Palette) => StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     gap: 6,
-    backgroundColor: c.accent,
+    backgroundColor: c.primary,
     borderRadius: 16,
     paddingVertical: 15,
   },
-  nextText: { color: '#FFFFFF', fontWeight: '800', fontSize: 16 },
+  nextText: { color: c.onPrimary, fontWeight: '800', fontSize: 16 },
 });

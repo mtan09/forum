@@ -271,7 +271,7 @@ const makeStyles = (c: Palette) => StyleSheet.create({
   mixBarFill: {
     height: 10,
     borderRadius: 5,
-    backgroundColor: c.accent,
+    backgroundColor: c.primary,
   },
   mixPct: {
     width: 40,

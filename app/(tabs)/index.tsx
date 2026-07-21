@@ -6,7 +6,7 @@ import { ThemedView } from '@/components/themed-view';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { type Palette } from '@/constants/theme';
 import { useAuth } from '@/context/authContext';
-import { mapPost, usePosts } from '@/context/postContext';
+import { usePosts } from '@/context/postContext';
 import { usePalette } from '@/hooks/use-palette';
 import { api } from '@/lib/api';
 import { selectTick, tapLight } from '@/lib/haptics';
@@ -48,35 +48,14 @@ export default function Feed() {
 
   const router = useRouter();
 
-  const { c, scheme } = usePalette();
+  const { c } = usePalette();
   const styles = useMemo(() => makeStyles(c), [c]);
 
-  const { posts, setPosts, refresh, loadMorePosts, hasMorePosts, postsEpoch } = usePosts();
+  const { posts, refresh, loadMorePosts, hasMorePosts, postsEpoch } = usePosts();
 
   const scrollY = useRef(new Animated.Value(0)).current;
 
-  const [activeTab, setActiveTab] = useState<'Following' | 'For You' | 'Random' | 'Against You'>('Random');
-
-  // Following tab: posts from people you follow, merged into the shared
-  // post context (so votes stay in sync) and tracked here by id.
-  const [followingIds, setFollowingIds] = useState<string[] | null>(null);
-  const fetchFollowing = useCallback(async () => {
-    try {
-      const rows = await api<any[]>('/posts?feed=following&limit=50');
-      const mapped = rows.map(mapPost);
-      setPosts((prev) => {
-        const seen = new Set(prev.map((p) => p.id));
-        return [...prev, ...mapped.filter((p) => !seen.has(p.id))];
-      });
-      setFollowingIds(mapped.map((p) => p.id));
-    } catch (err: any) {
-      console.log('Error fetching following feed:', err?.message);
-      setFollowingIds((prev) => prev ?? []);
-    }
-  }, [setPosts]);
-  useEffect(() => {
-    if (activeTab === 'Following' && followingIds === null) fetchFollowing();
-  }, [activeTab, followingIds, fetchFollowing]);
+  const [activeTab, setActiveTab] = useState<'For You' | 'Random' | 'Against You'>('Random');
 
   // Each feed tab remembers its own scroll position; the listener keeps
   // the active tab's offset current on every scroll event.
@@ -197,13 +176,12 @@ export default function Feed() {
         refresh(),
         fetchArticles(true),
         fetchHotTopics(),
-        followingIds !== null ? fetchFollowing() : Promise.resolve(),
       ]);
     } finally {
       setRefreshing(false);
       refreshInflight.current = false;
     }
-  }, [refresh, fetchArticles, fetchHotTopics, followingIds, fetchFollowing]);
+  }, [refresh, fetchArticles, fetchHotTopics]);
 
   // Infinite scroll: page in more articles AND posts when the bottom nears
   const onEndReached = useCallback(async () => {
@@ -254,12 +232,6 @@ export default function Feed() {
     [filteredPosts]
   );
   const feedItems = useMemo<FeedItem[]>(() => {
-    if (activeTab === 'Following') {
-      return (followingIds ?? [])
-        .map((id) => postsById.get(id))
-        .filter((p): p is NonNullable<typeof p> => !!p)
-        .map((data) => ({ kind: 'post' as const, id: `p-${data.id}`, data }));
-    }
     const items: FeedItem[] = [];
     for (const o of masterOrder) {
       if (o.kind === 'post') {
@@ -271,7 +243,7 @@ export default function Feed() {
       }
     }
     return items;
-  }, [masterOrder, postsById, articlesById, visiblePostIds, tabAllows, activeTab, followingIds]);
+  }, [masterOrder, postsById, articlesById, visiblePostIds, tabAllows]);
 
   const listRef = useRef<FlatList<FeedItem>>(null);
 
@@ -341,13 +313,6 @@ export default function Feed() {
           }
           onEndReached={onEndReached}
           onEndReachedThreshold={0.6}
-          ListEmptyComponent={
-            activeTab === 'Following' && followingIds !== null ? (
-              <ThemedText style={styles.feedEnd}>
-                You&apos;re not following anyone yet — tap Follow on any profile and their posts land here.
-              </ThemedText>
-            ) : null
-          }
           ListFooterComponent={
             loadingMore ? (
               <ActivityIndicator style={{ paddingVertical: 24 }} />
@@ -387,7 +352,7 @@ export default function Feed() {
                           key={i}
                           style={[
                             styles.hotDot,
-                            { backgroundColor: i === hotIndex ? c.accentDeep : scheme === 'dark' ? '#6E5C85' : '#FFFFFF' },
+                            { backgroundColor: i === hotIndex ? c.accentDeep : c.carouselDotInactive },
                           ]}
                         />
                       ))}
@@ -403,19 +368,15 @@ export default function Feed() {
             smoothly instead of being cut off mid-fade */}
         {hotTopics.length > 0 && (
           <LinearGradient
-            // fades from the screen background color, so it must track the theme
-            colors={
-              scheme === 'dark'
-                ? ['rgba(21,23,24,1)', 'rgba(21,23,24,0.6)', 'rgba(21,23,24,0.25)', 'rgba(21,23,24,0)']
-                : ['rgba(255,255,255,1)', 'rgba(255,255,255,0.6)', 'rgba(255,255,255,0.25)', 'rgba(255,255,255,0)']
-            }
+            // Theme-owned fade tokens keep this overlay neutral in both modes.
+            colors={[c.background, c.backgroundFade60, c.backgroundFade25, c.backgroundTransparent]}
             locations={[0, 0.45, 0.75, 1]}
             style={styles.fadeOverlay}
             pointerEvents="none"
           />
         )}
         <ThemedView style={styles.header}>
-          {(['Following', 'For You', 'Random', 'Against You'] as const).map((tab) => (
+          {(['For You', 'Random', 'Against You'] as const).map((tab) => (
             <Pressable
               key={tab}
               onPress={() => { selectTick(); setActiveTab(tab); }}
@@ -424,11 +385,11 @@ export default function Feed() {
                 borderBottomLeftRadius: activeTab === tab ? 4 : 0,
                 borderBottomRightRadius: activeTab === tab ? 4 : 0,
                 borderBottomWidth: 4,
-                borderBottomColor: activeTab === tab ? c.accent : c.background,
+                borderBottomColor: activeTab === tab ? c.primary : c.background,
                 alignItems: 'center',
                 justifyContent: 'center',
                 marginTop: 54,
-                width: screenWidth / 4,
+                width: screenWidth / 3,
               }}
             >
               <ThemedText
@@ -447,7 +408,7 @@ export default function Feed() {
           accessibilityRole="button"
           accessibilityLabel="Create post"
         >
-          <IconSymbol name="plus" size={28} color="#FFFFFF" />
+          <IconSymbol name="plus" size={28} color={c.onPrimary} />
         </Pressable>
       </ThemedView>
 
@@ -525,10 +486,10 @@ const makeStyles = (c: Palette) => StyleSheet.create({
     width: 58,
     height: 58,
     borderRadius: 29,
-    backgroundColor: '#B647FF',
+    backgroundColor: c.primary,
     alignItems: 'center',
     justifyContent: 'center',
-    shadowColor: '#000',
+    shadowColor: c.shadow,
     shadowOffset: { width: 0, height: 3 },
     shadowOpacity: 0.3,
     shadowRadius: 5,

@@ -14,7 +14,7 @@ import { Keyboard, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleS
 
 export default function ArticleScreen() {
   const router = useRouter();
-  const { c, scheme } = usePalette();
+  const { c } = usePalette();
   const styles = useMemo(() => makeStyles(c), [c]);
   const { id } = useLocalSearchParams();
   const articleId = useMemo(() => (Array.isArray(id) ? id[0] : id) as string | undefined, [id]);
@@ -115,7 +115,7 @@ export default function ArticleScreen() {
             }
             style={({ pressed }) => [styles.aiButton, { opacity: pressed ? 0.7 : 1 }]}
           >
-            <IconSymbol name="sparkles" size={18} color="#FFFFFF" />
+            <IconSymbol name="sparkles" size={18} color={c.onPrimary} />
             <ThemedText style={styles.aiButtonText}>Ask forumAI about this article</ThemedText>
           </Pressable>
 
@@ -126,7 +126,7 @@ export default function ArticleScreen() {
             style={({ pressed }) => [styles.readButton, { opacity: pressed ? 0.7 : 1 }]}
           >
             <ThemedText style={styles.readButtonText}>Read full article at {article.source}</ThemedText>
-            <IconSymbol name="square.and.arrow.up" size={18} color={c.accent} />
+            <IconSymbol name="square.and.arrow.up" size={18} color={c.primary} />
           </Pressable>
 
           {/* Comments */}
@@ -151,7 +151,7 @@ export default function ArticleScreen() {
                 <IconSymbol
                   name="arrow.up.circle.fill"
                   size={28}
-                  color={commentText.trim() && !submitting ? c.accent : scheme === 'dark' ? '#5C3E7D' : '#dfaeffff'}
+                  color={commentText.trim() && !submitting ? c.primary : c.primaryDisabled}
                 />
               </Pressable>
             </ThemedView>
@@ -179,11 +179,11 @@ const makeStyles = (c: Palette) => StyleSheet.create({
     gap: 8,
     paddingVertical: 12,
     borderRadius: 16,
-    backgroundColor: c.accent,
+    backgroundColor: c.primary,
   },
   aiButtonText: {
     fontWeight: '700',
-    color: '#FFFFFF',
+    color: c.onPrimary,
   },
   readButton: {
     flexDirection: 'row',
@@ -198,7 +198,7 @@ const makeStyles = (c: Palette) => StyleSheet.create({
   },
   readButtonText: {
     fontWeight: '700',
-    color: c.accent,
+    color: c.primary,
   },
   composer: {
     flexDirection: 'row',

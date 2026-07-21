@@ -24,8 +24,8 @@ type CarouselProps<T> = {
   onIndexChange?: (index: number) => void;
   renderPagination?: (activeIndex: number, count: number) => React.ReactNode;
   showPagination?: boolean; // default: true
-  dotActiveColor?: string; // default: '#592EDC'
-  dotInactiveColor?: string; // default: '#BAA8F0'
+  dotActiveColor?: string; // defaults to the strong primary-purple token
+  dotInactiveColor?: string; // defaults to the muted primary-purple token
   dotSize?: number; // default: 8
   dotSpacing?: number; // default: 8
   paginationContainerStyle?: ViewStyle;

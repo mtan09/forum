@@ -86,7 +86,7 @@ export default function Messages() {
   if (conversations === null) {
     return (
       <ThemedView style={styles.center}>
-        <ActivityIndicator color={c.accent} />
+        <ActivityIndicator color={c.primary} />
       </ThemedView>
     );
   }
@@ -95,7 +95,7 @@ export default function Messages() {
     <ScrollView
       contentContainerStyle={styles.container}
       refreshControl={
-        <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={c.accent} colors={[c.accent]} />
+        <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={c.primary} colors={[c.primary]} />
       }
     >
       {conversations.length === 0 ? (
@@ -140,10 +140,10 @@ const makeStyles = (c: Palette) => StyleSheet.create({
     minWidth: 20,
     height: 20,
     borderRadius: 10,
-    backgroundColor: c.accent,
+    backgroundColor: c.primary,
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: 5,
   },
-  unreadCount: { color: '#FFFFFF', fontSize: 11, fontWeight: '800', lineHeight: 14 },
+  unreadCount: { color: c.onPrimary, fontSize: 11, fontWeight: '800', lineHeight: 14 },
 });

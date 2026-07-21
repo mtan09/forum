@@ -123,7 +123,7 @@ export default function AdminReports() {
   if (reports === null) {
     return (
       <ThemedView style={styles.center}>
-        <ActivityIndicator color={c.accent} />
+        <ActivityIndicator color={c.primary} />
       </ThemedView>
     );
   }
@@ -132,7 +132,7 @@ export default function AdminReports() {
     <ScrollView
       contentContainerStyle={styles.container}
       refreshControl={
-        <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={c.accent} colors={[c.accent]} />
+        <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={c.primary} colors={[c.primary]} />
       }
     >
       {reports.length === 0 ? (

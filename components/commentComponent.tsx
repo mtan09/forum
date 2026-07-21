@@ -133,7 +133,7 @@ export default function CommentList({
 type VoteDirection = 'up' | 'down' | null;
 
 function CommentItem({ comment }: { comment: Comment }) {
-	const { c, scheme } = usePalette();
+	const { c } = usePalette();
 	const styles = useMemo(() => makeStyles(c), [c]);
 	const [showReplies, setShowReplies] = useState(false);
 	const [replyOpen, setReplyOpen] = useState(false);
@@ -234,12 +234,12 @@ function CommentItem({ comment }: { comment: Comment }) {
 			{/* Actions: votes, reply, replies toggle */}
 			<View style={styles.commentActions}>
 				<Pressable onPress={() => vote(isUpvoted ? null : 'up')} style={styles.voteButton}>
-					<IconSymbol name={isUpvoted ? 'arrowshape.up.fill' : 'arrowshape.up'} size={16} color={isUpvoted ? c.green : c.muted} />
-					<ThemedText style={[styles.voteCount, isUpvoted && { color: '#14DD78' }]}>{votes.up}</ThemedText>
+					<IconSymbol name={isUpvoted ? 'arrowshape.up.fill' : 'arrowshape.up'} size={16} color={isUpvoted ? c.voteUp : c.textMuted} />
+					<ThemedText style={[styles.voteCount, isUpvoted && { color: c.voteUp }]}>{votes.up}</ThemedText>
 				</Pressable>
 				<Pressable onPress={() => vote(isDownvoted ? null : 'down')} style={styles.voteButton}>
-					<IconSymbol name={isDownvoted ? 'arrowshape.down.fill' : 'arrowshape.down'} size={16} color={isDownvoted ? '#FF0080' : c.muted} />
-					<ThemedText style={[styles.voteCount, isDownvoted && { color: '#FF0080' }]}>{votes.down}</ThemedText>
+					<IconSymbol name={isDownvoted ? 'arrowshape.down.fill' : 'arrowshape.down'} size={16} color={isDownvoted ? c.voteDown : c.textMuted} />
+					<ThemedText style={[styles.voteCount, isDownvoted && { color: c.voteDown }]}>{votes.down}</ThemedText>
 				</Pressable>
 				<Pressable onPress={() => setReplyOpen((o) => !o)} style={styles.voteButton}>
 					<IconSymbol name="bubble" size={15} color={c.muted} />
@@ -271,7 +271,7 @@ function CommentItem({ comment }: { comment: Comment }) {
 						<IconSymbol
 							name="arrow.up.circle.fill"
 							size={24}
-							color={replyText.trim() && !replySubmitting ? c.accent : scheme === 'dark' ? '#5C3E7D' : '#dfaeffff'}
+							color={replyText.trim() && !replySubmitting ? c.primary : c.primaryDisabled}
 						/>
 					</Pressable>
 				</View>
@@ -311,7 +311,7 @@ const makeStyles = (c: Palette) => StyleSheet.create({
 	},
 	buttonText: {
 		fontWeight: '600',
-    color: c.accent,
+    color: c.primary,
 	},
 	comment: {
 		borderLeftWidth: 2,
@@ -364,7 +364,7 @@ const makeStyles = (c: Palette) => StyleSheet.create({
 	},
 	repliesToggle: {
 		fontSize: 13,
-		color: c.accent,
+		color: c.primary,
 		fontWeight: '600',
 	},
 	replyComposer: {

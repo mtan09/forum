@@ -107,7 +107,7 @@ export default function ForgotPassword() {
               editable={!loading}
             />
             <TouchableOpacity onPress={requestCode} disabled={loading} style={[styles.button, loading && styles.buttonDisabled]}>
-              {loading ? <ActivityIndicator color="#fff" /> : <Text style={styles.buttonText}>Send code</Text>}
+              {loading ? <ActivityIndicator color={c.onPrimary} /> : <Text style={styles.buttonText}>Send code</Text>}
             </TouchableOpacity>
           </>
         ) : (
@@ -141,7 +141,7 @@ export default function ForgotPassword() {
               editable={!loading}
             />
             <TouchableOpacity onPress={submitReset} disabled={loading} style={[styles.button, loading && styles.buttonDisabled]}>
-              {loading ? <ActivityIndicator color="#fff" /> : <Text style={styles.buttonText}>Reset password</Text>}
+              {loading ? <ActivityIndicator color={c.onPrimary} /> : <Text style={styles.buttonText}>Reset password</Text>}
             </TouchableOpacity>
             <TouchableOpacity onPress={requestCode} disabled={loading}>
               <Text style={styles.link}>Resend code</Text>
@@ -159,7 +159,7 @@ const makeStyles = (c: Palette) => StyleSheet.create({
     fontSize: 28,
     fontWeight: '800',
     textAlign: 'center',
-    color: '#b647ff',
+    color: c.primary,
   },
   subtitle: {
     textAlign: 'center',
@@ -174,6 +174,7 @@ const makeStyles = (c: Palette) => StyleSheet.create({
     paddingVertical: 10,
     borderRadius: 16,
     color: c.text,
+    backgroundColor: c.surfaceMuted,
   },
   codeInput: {
     textAlign: 'center',
@@ -182,14 +183,14 @@ const makeStyles = (c: Palette) => StyleSheet.create({
     letterSpacing: 8,
   },
   button: {
-    backgroundColor: '#b647ff',
+    backgroundColor: c.primary,
     paddingVertical: 14,
     borderRadius: 16,
     alignItems: 'center',
     marginTop: 8,
   },
   buttonDisabled: { opacity: 0.6 },
-  buttonText: { color: '#fff', fontWeight: '600' },
+  buttonText: { color: c.onPrimary, fontWeight: '600' },
   error: { color: c.danger, textAlign: 'center' },
-  link: { color: '#b647ff', fontWeight: '600', textAlign: 'center', marginTop: 8 },
+  link: { color: c.primary, fontWeight: '600', textAlign: 'center', marginTop: 8 },
 });

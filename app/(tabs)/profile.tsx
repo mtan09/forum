@@ -252,9 +252,9 @@ export default function Profile() {
         accessibilityLabel="Change banner photo"
       >
         {bannerUploading ? (
-          <ActivityIndicator size="small" color="#FFFFFF" />
+          <ActivityIndicator size="small" color={c.onImage} />
         ) : (
-          <IconSymbol name="camera.fill" size={18} color="#FFFFFF" />
+          <IconSymbol name="camera.fill" size={18} color={c.onImage} />
         )}
       </Pressable>
       {/* Settings moved off the tab bar — the gear lives here now */}
@@ -265,7 +265,7 @@ export default function Profile() {
         accessibilityRole="button"
         accessibilityLabel="Settings"
       >
-        <IconSymbol name="gearshape.fill" size={20} color="#FFFFFF" />
+        <IconSymbol name="gearshape.fill" size={20} color={c.onImage} />
       </Pressable>
       {/* DM inbox */}
       <Pressable
@@ -275,7 +275,7 @@ export default function Profile() {
         accessibilityRole="button"
         accessibilityLabel="Messages"
       >
-        <IconSymbol name="envelope.fill" size={18} color="#FFFFFF" />
+        <IconSymbol name="envelope.fill" size={18} color={c.onImage} />
         {unreadDms > 0 && (
           <ThemedView style={styles.inboxBadge}>
             <ThemedText style={styles.inboxBadgeText}>{unreadDms > 9 ? '9+' : unreadDms}</ThemedText>
@@ -301,6 +301,24 @@ export default function Profile() {
             {followCounts.followers} follower{followCounts.followers === 1 ? '' : 's'} · {followCounts.following} following
           </ThemedText>
         )}
+
+        <Pressable
+          onPress={() => { tapLight(); router.push('/following'); }}
+          style={({ pressed }) => [styles.followingFeedButton, { opacity: pressed ? 0.65 : 1 }]}
+          accessibilityRole="button"
+          accessibilityLabel="Open posts from people you follow"
+        >
+          <ThemedView style={styles.followingFeedLeft}>
+            <ThemedView style={styles.followingFeedIcon}>
+              <IconSymbol name="person.2.fill" size={17} color={c.primary} />
+            </ThemedView>
+            <ThemedView style={styles.followingFeedCopy}>
+              <ThemedText style={styles.followingFeedTitle}>Following feed</ThemedText>
+              <ThemedText style={styles.followingFeedSubtitle}>Posts from people you chose</ThemedText>
+            </ThemedView>
+          </ThemedView>
+          <IconSymbol name="chevron.right" size={17} color={c.faint} />
+        </Pressable>
 
         {profile?.bio ? <ThemedText>{profile.bio}</ThemedText> : null}
         {joined && (
@@ -350,7 +368,7 @@ export default function Profile() {
               onPress={() => { tapLight(); setShareOpen(true); }}
               style={({ pressed }) => [styles.shareLean, { opacity: pressed ? 0.7 : 1 }]}
             >
-              <IconSymbol name="square.and.arrow.up" size={16} color={c.accent} />
+              <IconSymbol name="square.and.arrow.up" size={16} color={c.primary} />
               <ThemedText style={styles.shareLeanText}>Share my lean</ThemedText>
             </Pressable>
           )}
@@ -389,7 +407,7 @@ export default function Profile() {
       </ThemedView>
 
       {tabLoading && (
-        <ActivityIndicator style={{ marginVertical: 24 }} color={c.accent} />
+        <ActivityIndicator style={{ marginVertical: 24 }} color={c.primary} />
       )}
 
       {!tabLoading && activeTab === 'Posts' && (
@@ -437,7 +455,7 @@ const makeStyles = (c: Palette) => StyleSheet.create({
     width: 38,
     height: 38,
     borderRadius: 19,
-    backgroundColor: 'rgba(0,0,0,0.35)',
+    backgroundColor: c.imageControlBg,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -449,7 +467,7 @@ const makeStyles = (c: Palette) => StyleSheet.create({
     width: 38,
     height: 38,
     borderRadius: 19,
-    backgroundColor: 'rgba(0,0,0,0.35)',
+    backgroundColor: c.imageControlBg,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -460,13 +478,13 @@ const makeStyles = (c: Palette) => StyleSheet.create({
     minWidth: 18,
     height: 18,
     borderRadius: 9,
-    backgroundColor: c.accent,
+    backgroundColor: c.primary,
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: 4,
   },
   inboxBadgeText: {
-    color: '#FFFFFF',
+    color: c.onPrimary,
     fontSize: 10,
     fontWeight: '800',
     lineHeight: 12,
@@ -480,7 +498,7 @@ const makeStyles = (c: Palette) => StyleSheet.create({
     width: 38,
     height: 38,
     borderRadius: 19,
-    backgroundColor: 'rgba(0,0,0,0.35)',
+    backgroundColor: c.imageControlBg,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -511,6 +529,45 @@ const makeStyles = (c: Palette) => StyleSheet.create({
     color: c.muted,
     fontSize: 13,
   },
+  followingFeedButton: {
+    minHeight: 56,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: c.cardBorder,
+    backgroundColor: c.card,
+    paddingHorizontal: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginTop: 2,
+  },
+  followingFeedLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    backgroundColor: 'transparent',
+  },
+  followingFeedIcon: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: c.accentSoftBg,
+  },
+  followingFeedCopy: {
+    backgroundColor: 'transparent',
+  },
+  followingFeedTitle: {
+    fontSize: 14,
+    lineHeight: 18,
+    fontWeight: '800',
+  },
+  followingFeedSubtitle: {
+    color: c.muted,
+    fontSize: 12,
+    lineHeight: 16,
+  },
   spectrumCard: {
     marginTop: 8,
     borderRadius: 16,
@@ -527,13 +584,13 @@ const makeStyles = (c: Palette) => StyleSheet.create({
     backgroundColor: 'transparent',
   },
   leanBadge: {
-    backgroundColor: c.accent,
+    backgroundColor: c.primary,
     borderRadius: 10,
     paddingHorizontal: 10,
     paddingVertical: 3,
   },
   leanBadgeText: {
-    color: '#FFFFFF',
+    color: c.onPrimary,
     fontWeight: '800',
     fontSize: 12,
     lineHeight: 16,
@@ -560,7 +617,7 @@ const makeStyles = (c: Palette) => StyleSheet.create({
     borderColor: c.cardBorder,
   },
   shareLeanText: {
-    color: c.accent,
+    color: c.primary,
     fontWeight: '800',
     fontSize: 14,
   },
@@ -580,7 +637,7 @@ const makeStyles = (c: Palette) => StyleSheet.create({
     color: c.muted,
   },
   tabLabelActive: {
-    color: c.accent,
+    color: c.primary,
     fontWeight: '800',
   },
   tabIndicator: {
@@ -590,7 +647,7 @@ const makeStyles = (c: Palette) => StyleSheet.create({
     width: '60%',
     borderTopLeftRadius: 3,
     borderTopRightRadius: 3,
-    backgroundColor: c.accent,
+    backgroundColor: c.primary,
   },
   emptyText: {
     textAlign: 'center',
@@ -606,7 +663,7 @@ const makeStyles = (c: Palette) => StyleSheet.create({
     gap: 4,
   },
   commentContext: {
-    color: c.accent,
+    color: c.primary,
     fontSize: 13,
     fontWeight: '600',
   },

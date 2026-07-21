@@ -155,7 +155,7 @@ export default function ContentActions({
 const makeStyles = (c: Palette) => StyleSheet.create({
   backdrop: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.4)',
+    backgroundColor: c.scrim,
     justifyContent: 'flex-end',
   },
   sheet: {

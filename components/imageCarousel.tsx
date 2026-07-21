@@ -1,5 +1,7 @@
 import { useMemo, useRef, useState } from 'react';
 import { Dimensions, FlatList, Image, NativeScrollEvent, NativeSyntheticEvent, StyleSheet } from 'react-native';
+import { type Palette } from '@/constants/theme';
+import { usePalette } from '@/hooks/use-palette';
 import { ThemedText } from './themed-text';
 import { ThemedView } from './themed-view';
 
@@ -9,6 +11,8 @@ type ImageCarouselProps = {
 };
 
 export default function ImageCarousel({ images: allImages, height = 300 }: ImageCarouselProps) {
+  const { c } = usePalette();
+  const styles = useMemo(() => makeStyles(c), [c]);
   const [activeIndex, setActiveIndex] = useState(0);
   const flatListRef = useRef<FlatList>(null);
   const screenWidth = Dimensions.get('window').width;
@@ -93,7 +97,7 @@ export default function ImageCarousel({ images: allImages, height = 300 }: Image
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (c: Palette) => StyleSheet.create({
   container: {
     width: '100%',
     marginBottom: 8,
@@ -109,13 +113,13 @@ const styles = StyleSheet.create({
     position: 'absolute',
     top: 12,
     right: 12,
-    backgroundColor: 'rgba(0,0,0,0.55)',
+    backgroundColor: c.imageControlBg,
     borderRadius: 12,
     paddingHorizontal: 10,
     paddingVertical: 3,
   },
   counterText: {
-    color: '#FFFFFF',
+    color: c.onImage,
     fontSize: 12,
     fontWeight: '700',
     lineHeight: 16,

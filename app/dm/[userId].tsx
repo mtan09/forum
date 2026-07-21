@@ -24,7 +24,7 @@ const POLL_MS = 5000;
 // socket infra needed at this stage; push notifications cover the
 // backgrounded case.
 export default function DmThread() {
-  const { c, scheme } = usePalette();
+  const { c } = usePalette();
   const styles = useMemo(() => makeStyles(c), [c]);
   const { userId } = useLocalSearchParams();
   const otherId = Array.isArray(userId) ? userId[0] : userId;
@@ -137,7 +137,7 @@ export default function DmThread() {
             <IconSymbol
               name="arrow.up.circle.fill"
               size={30}
-              color={text.trim() && !sending ? c.accent : scheme === 'dark' ? '#5C3E7D' : '#dfaeffff'}
+              color={text.trim() && !sending ? c.primary : c.primaryDisabled}
             />
           </Pressable>
         </ThemedView>
@@ -157,7 +157,7 @@ const makeStyles = (c: Palette) => StyleSheet.create({
   },
   mine: {
     alignSelf: 'flex-end',
-    backgroundColor: c.accent,
+    backgroundColor: c.primary,
     borderBottomRightRadius: 4,
   },
   theirs: {
@@ -167,7 +167,7 @@ const makeStyles = (c: Palette) => StyleSheet.create({
     borderColor: c.cardBorder,
     borderBottomLeftRadius: 4,
   },
-  mineText: { color: '#FFFFFF', fontSize: 15, lineHeight: 20 },
+  mineText: { color: c.onPrimary, fontSize: 15, lineHeight: 20 },
   theirsText: { fontSize: 15, lineHeight: 20 },
   error: { color: c.danger, textAlign: 'center', paddingBottom: 4, fontSize: 13 },
   composer: {

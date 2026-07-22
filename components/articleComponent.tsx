@@ -7,9 +7,10 @@ import { usePalette } from '@/hooks/use-palette';
 import { useRelativeTime } from '@/hooks/useRelativeTime';
 import { getDisplayableArticleMedia } from '@/lib/article-media';
 import { getPerspectiveToneForPosition } from '@/lib/perspective-colors';
+import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
-import { useEffect, useMemo, useState } from 'react';
-import { Dimensions, Image, Pressable, StyleSheet } from 'react-native';
+import { memo, useEffect, useMemo, useState } from 'react';
+import { Dimensions, Pressable, StyleSheet } from 'react-native';
 import ArticleActions from './article-actions';
 import ScorerReceipts from './scorerReceipts';
 
@@ -59,7 +60,7 @@ type Props = {
   article: ArticleType;
 }
 
-export default function Article({ article }: Props) {
+function Article({ article }: Props) {
 
   const { c } = usePalette();
   const styles = useMemo(() => makeStyles(c), [c]);
@@ -98,6 +99,8 @@ export default function Article({ article }: Props) {
                   source={{ uri: logo }}
                   style={styles.logo}
                   onError={() => setLogoFailed(true)}
+                  cachePolicy="memory-disk"
+                  recyclingKey={logo}
                 />
               ) : (
                 <ThemedView style={styles.logoFallback}>
@@ -151,9 +154,9 @@ export default function Article({ article }: Props) {
 
           </ThemedView>
         </ThemedView>
-        {receiptPosition != null && (
+        {receiptPosition != null && receiptsOpen && (
           <ScorerReceipts
-            visible={receiptsOpen}
+            visible
             onClose={() => setReceiptsOpen(false)}
             position={receiptPosition}
             signals={article.lean_signals ?? []}
@@ -171,6 +174,8 @@ export default function Article({ article }: Props) {
     
   )
 }
+
+export default memo(Article);
 
 const makeStyles = (c: Palette) => StyleSheet.create({
   container: {

@@ -1,3 +1,4 @@
+import AppRefreshControl from '@/components/appRefreshControl';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { type Palette } from '@/constants/theme';
@@ -7,7 +8,7 @@ import { api } from '@/lib/api';
 import { notifyWarning, tapLight } from '@/lib/haptics';
 import { useCallback, useMemo, useState } from 'react';
 import { useFocusEffect } from 'expo-router';
-import { ActivityIndicator, Alert, Pressable, RefreshControl, ScrollView, StyleSheet } from 'react-native';
+import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet } from 'react-native';
 
 type Report = {
   id: string;
@@ -132,7 +133,7 @@ export default function AdminReports() {
     <ScrollView
       contentContainerStyle={styles.container}
       refreshControl={
-        <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={c.primary} colors={[c.primary]} />
+        <AppRefreshControl refreshing={refreshing} onRefresh={onRefresh} />
       }
     >
       {reports.length === 0 ? (

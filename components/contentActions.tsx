@@ -94,60 +94,64 @@ export default function ContentActions({
       </Pressable>
 
       {/* Overflow sheet */}
-      <Modal visible={menuOpen} transparent animationType="fade" onRequestClose={() => setMenuOpen(false)}>
-        <Pressable style={styles.backdrop} onPress={() => setMenuOpen(false)}>
-          <Pressable style={styles.sheet} onPress={(e) => e.stopPropagation()}>
-            <ThemedView style={styles.handle} />
-            <Pressable
-              style={({ pressed }) => [styles.action, pressed && styles.actionPressed]}
-              onPress={() => { setMenuOpen(false); setReasonOpen(true); }}
-            >
-              <IconSymbol name="flag" size={20} color={c.red} />
-              <ThemedText style={styles.actionText}>Report</ThemedText>
-            </Pressable>
-            {canBlock && (
+      {menuOpen && (
+        <Modal visible transparent animationType="fade" onRequestClose={() => setMenuOpen(false)}>
+          <Pressable style={styles.backdrop} onPress={() => setMenuOpen(false)}>
+            <Pressable style={styles.sheet} onPress={(e) => e.stopPropagation()}>
+              <ThemedView style={styles.handle} />
               <Pressable
                 style={({ pressed }) => [styles.action, pressed && styles.actionPressed]}
-                onPress={confirmBlock}
+                onPress={() => { setMenuOpen(false); setReasonOpen(true); }}
               >
-                <IconSymbol name="hand.raised" size={20} color={c.red} />
-                <ThemedText style={styles.actionText}>Block {authorName ?? 'user'}</ThemedText>
+                <IconSymbol name="flag" size={20} color={c.red} />
+                <ThemedText style={styles.actionText}>Report</ThemedText>
               </Pressable>
-            )}
-            <Pressable
-              style={({ pressed }) => [styles.action, styles.cancel, pressed && styles.actionPressed]}
-              onPress={() => setMenuOpen(false)}
-            >
-              <ThemedText style={styles.cancelText}>Cancel</ThemedText>
+              {canBlock && (
+                <Pressable
+                  style={({ pressed }) => [styles.action, pressed && styles.actionPressed]}
+                  onPress={confirmBlock}
+                >
+                  <IconSymbol name="hand.raised" size={20} color={c.red} />
+                  <ThemedText style={styles.actionText}>Block {authorName ?? 'user'}</ThemedText>
+                </Pressable>
+              )}
+              <Pressable
+                style={({ pressed }) => [styles.action, styles.cancel, pressed && styles.actionPressed]}
+                onPress={() => setMenuOpen(false)}
+              >
+                <ThemedText style={styles.cancelText}>Cancel</ThemedText>
+              </Pressable>
             </Pressable>
           </Pressable>
-        </Pressable>
-      </Modal>
+        </Modal>
+      )}
 
       {/* Reason picker */}
-      <Modal visible={reasonOpen} transparent animationType="slide" onRequestClose={() => setReasonOpen(false)}>
-        <Pressable style={styles.backdrop} onPress={() => setReasonOpen(false)}>
-          <Pressable style={styles.sheet} onPress={(e) => e.stopPropagation()}>
-            <ThemedView style={styles.handle} />
-            <ThemedText type="defaultSemiBold" style={styles.reasonTitle}>Why are you reporting this?</ThemedText>
-            {REASONS.map((r) => (
+      {reasonOpen && (
+        <Modal visible transparent animationType="fade" onRequestClose={() => setReasonOpen(false)}>
+          <Pressable style={styles.backdrop} onPress={() => setReasonOpen(false)}>
+            <Pressable style={styles.sheet} onPress={(e) => e.stopPropagation()}>
+              <ThemedView style={styles.handle} />
+              <ThemedText type="defaultSemiBold" style={styles.reasonTitle}>Why are you reporting this?</ThemedText>
+              {REASONS.map((r) => (
+                <Pressable
+                  key={r.key}
+                  style={({ pressed }) => [styles.action, pressed && styles.actionPressed]}
+                  onPress={() => submitReport(r.key)}
+                >
+                  <ThemedText style={styles.actionText}>{r.label}</ThemedText>
+                </Pressable>
+              ))}
               <Pressable
-                key={r.key}
-                style={({ pressed }) => [styles.action, pressed && styles.actionPressed]}
-                onPress={() => submitReport(r.key)}
+                style={({ pressed }) => [styles.action, styles.cancel, pressed && styles.actionPressed]}
+                onPress={() => setReasonOpen(false)}
               >
-                <ThemedText style={styles.actionText}>{r.label}</ThemedText>
+                <ThemedText style={styles.cancelText}>Cancel</ThemedText>
               </Pressable>
-            ))}
-            <Pressable
-              style={({ pressed }) => [styles.action, styles.cancel, pressed && styles.actionPressed]}
-              onPress={() => setReasonOpen(false)}
-            >
-              <ThemedText style={styles.cancelText}>Cancel</ThemedText>
             </Pressable>
           </Pressable>
-        </Pressable>
-      </Modal>
+        </Modal>
+      )}
     </>
   );
 }

@@ -4,7 +4,6 @@ import { StyleProp, StyleSheet, TextStyle, View } from 'react-native';
 import { type Palette } from '@/constants/theme';
 import { usePalette } from '@/hooks/use-palette';
 import { ThemedText } from './themed-text';
-import { ThemedView } from './themed-view';
 
 type SpectrumProps = {
   width: number;
@@ -19,7 +18,7 @@ export default function Spectrum({width, height = 20, position, topic, textStyle
   const styles = useMemo(() => makeStyles(c), [c]);
   return (
 
-    <ThemedView style={styles.container}>
+    <View style={styles.container}>
       {topic && (
         <ThemedText type="defaultSemiBold" style={[
           styles.topicText,
@@ -42,7 +41,7 @@ export default function Spectrum({width, height = 20, position, topic, textStyle
 
       </View>
 
-    </ThemedView>
+    </View>
 
   );
 }

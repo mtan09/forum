@@ -1,3 +1,4 @@
+import AppRefreshControl from '@/components/appRefreshControl';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { type Palette } from '@/constants/theme';
@@ -6,7 +7,7 @@ import { useRelativeTime } from '@/hooks/useRelativeTime';
 import { api } from '@/lib/api';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useCallback, useMemo, useState } from 'react';
-import { ActivityIndicator, Image, Pressable, RefreshControl, ScrollView, StyleSheet } from 'react-native';
+import { ActivityIndicator, Image, Pressable, ScrollView, StyleSheet } from 'react-native';
 
 type Conversation = {
   conversation_id: string;
@@ -95,7 +96,7 @@ export default function Messages() {
     <ScrollView
       contentContainerStyle={styles.container}
       refreshControl={
-        <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={c.primary} colors={[c.primary]} />
+        <AppRefreshControl refreshing={refreshing} onRefresh={onRefresh} />
       }
     >
       {conversations.length === 0 ? (

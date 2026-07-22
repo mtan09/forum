@@ -1,6 +1,7 @@
 import Article, { ArticleType } from '@/components/articleComponent';
+import AppRefreshControl from '@/components/appRefreshControl';
 import Carousel from '@/components/carousel';
-import Post from '@/components/postComponent';
+import Post, { type PostType } from '@/components/postComponent';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { IconSymbol } from '@/components/ui/icon-symbol';
@@ -9,19 +10,22 @@ import { useAuth } from '@/context/authContext';
 import { usePosts } from '@/context/postContext';
 import { usePalette } from '@/hooks/use-palette';
 import { api } from '@/lib/api';
+import { getDisplayableArticleMedia } from '@/lib/article-media';
 import { selectTick, tapLight } from '@/lib/haptics';
 import { onTabRefresh } from '@/lib/tabRefresh';
+import { Image as ExpoImage } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Animated,
   Dimensions,
   FlatList,
+  type ListRenderItemInfo,
   Pressable,
-  RefreshControl,
   StyleSheet,
+  type ViewToken,
 } from 'react-native';
 
 const screenWidth = Dimensions.get('window').width;
@@ -30,6 +34,37 @@ const screenWidth = Dimensions.get('window').width;
 // outlet's lean (always present for ingested articles)
 const articleLean = (a: ArticleType): number | null =>
   a.political_lean ?? a.source_lean ?? null;
+
+const sameSignals = (left?: string[], right?: string[]): boolean => {
+  if (left === right) return true;
+  if (!left || !right || left.length !== right.length) return false;
+  return left.every((value, index) => value === right[index]);
+};
+
+const reuseArticleSnapshot = (current: ArticleType | undefined, next: ArticleType): ArticleType => {
+  if (!current) return next;
+  const unchanged =
+    current.id === next.id &&
+    current.url === next.url &&
+    current.title === next.title &&
+    current.source === next.source &&
+    current.content === next.content &&
+    current.media === next.media &&
+    current.political_lean === next.political_lean &&
+    current.content_type === next.content_type &&
+    current.lean_confidence === next.lean_confidence &&
+    current.scorer_version === next.scorer_version &&
+    current.source_lean === next.source_lean &&
+    current.general_topic_id === next.general_topic_id &&
+    current.published_at === next.published_at &&
+    current.upvotes === next.upvotes &&
+    current.downvotes === next.downvotes &&
+    current.commentcount === next.commentcount &&
+    current.my_vote === next.my_vote &&
+    current.my_bookmark === next.my_bookmark &&
+    sameSignals(current.lean_signals, next.lean_signals);
+  return unchanged ? current : next;
+};
 
 // Auto-clustered hot topics from /topics/hot
 type HotTopic = {
@@ -41,8 +76,39 @@ type HotTopic = {
   public_position: number | null;
 };
 
+type FeedItem =
+  | { kind: 'post'; id: string; data: PostType }
+  | { kind: 'article'; id: string; data: ArticleType };
+
+const feedItemKey = (item: FeedItem) => item.id;
+const FEED_VIEWABILITY_CONFIG = { itemVisiblePercentThreshold: 50 };
+
+const FeedRow = memo(function FeedRow({ item }: { item: FeedItem }) {
+  const router = useRouter();
+  if (item.kind === 'post') {
+    return (
+      <Pressable
+        onPress={() => router.push(`/post/${item.data.id}`)}
+        style={({ pressed }) => ({ opacity: pressed ? 0.6 : 1.0 })}
+      >
+        <Post post={item.data} />
+      </Pressable>
+    );
+  }
+  return (
+    <Pressable
+      onPress={() => router.push(`/article/${item.data.id}`)}
+      style={({ pressed }) => ({ opacity: pressed ? 0.6 : 1.0 })}
+    >
+      <Article article={item.data} />
+    </Pressable>
+  );
+}, (previous, next) => previous.item.id === next.item.id && previous.item.data === next.item.data);
+
+const renderFeedItem = ({ item }: ListRenderItemInfo<FeedItem>) => <FeedRow item={item} />;
+
 // Articles per page for infinite scroll
-const FEED_ARTICLE_LIMIT = 30;
+const FEED_ARTICLE_LIMIT = 15;
 
 export default function Feed() {
 
@@ -51,7 +117,7 @@ export default function Feed() {
   const { c } = usePalette();
   const styles = useMemo(() => makeStyles(c), [c]);
 
-  const { posts, refresh, loadMorePosts, hasMorePosts, postsEpoch } = usePosts();
+  const { feedPosts: posts, refresh, loadMorePosts, hasMorePosts, postsEpoch } = usePosts();
 
   const scrollY = useRef(new Animated.Value(0)).current;
 
@@ -60,7 +126,7 @@ export default function Feed() {
   // Each feed tab remembers its own scroll position; the listener keeps
   // the active tab's offset current on every scroll event.
   const scrollOffsets = useRef<Record<string, number>>({});
-  const handleScroll = Animated.event(
+  const handleScroll = useMemo(() => Animated.event(
     [{ nativeEvent: { contentOffset: { y: scrollY } } }],
     {
       useNativeDriver: false,
@@ -68,7 +134,7 @@ export default function Feed() {
         scrollOffsets.current[activeTab] = e.nativeEvent.contentOffset.y;
       },
     }
-  );
+  ), [activeTab, scrollY]);
 
   const [hotTopics, setHotTopics] = useState<HotTopic[]>([]);
   const [hotIndex, setHotIndex] = useState(0);
@@ -138,14 +204,17 @@ export default function Feed() {
     return out;
   };
 
-  const fetchArticles = useCallback(async (reset: boolean): Promise<ArticleType[]> => {
+  const fetchArticles = useCallback(async (reset: boolean, bumpEpoch = true): Promise<ArticleType[]> => {
     try {
       const offset = reset ? 0 : articlesRef.current.length;
       const rows = await api<ArticleType[]>(`/articles?limit=${FEED_ARTICLE_LIMIT}&offset=${offset}`);
       setHasMoreArticles(rows.length === FEED_ARTICLE_LIMIT);
       if (reset) {
-        setArticles(rows);
-        setOrderEpoch((e) => e + 1); // fresh page 1 = rebuild the feed order
+        setArticles((current) => {
+          const currentById = new Map(current.map((article) => [article.id, article]));
+          return rows.map((article) => reuseArticleSnapshot(currentById.get(article.id), article));
+        });
+        if (bumpEpoch) setOrderEpoch((e) => e + 1); // fresh page 1 = rebuild the feed order
       } else {
         setArticles((prev) => {
           const seen = new Set(prev.map((a) => a.id));
@@ -155,7 +224,7 @@ export default function Feed() {
       return rows;
     } catch (err: any) {
       console.log('Error fetching articles:', err?.message);
-      return [];
+      return reset ? articlesRef.current : [];
     }
   }, []);
 
@@ -167,21 +236,37 @@ export default function Feed() {
   // pull can't queue up repeat refreshes)
   const [refreshing, setRefreshing] = useState(false);
   const refreshInflight = useRef(false);
-  const onRefresh = useCallback(async () => {
+  const refreshTriggeredThisDrag = useRef(false);
+  const refreshFeed = useCallback(async () => {
     if (refreshInflight.current) return;
     refreshInflight.current = true;
     setRefreshing(true);
     try {
-      await Promise.all([
-        refresh(),
-        fetchArticles(true),
+      const [freshPosts, freshArticles] = await Promise.all([
+        // Suppress the two independent order epochs: after both datasets
+        // arrive, rebuild the shuffled feed once from the same snapshot.
+        refresh({ bumpEpoch: false }),
+        fetchArticles(true, false),
         fetchHotTopics(),
       ]);
+      setMasterOrder(shuffle([
+        ...freshPosts.map((post) => ({ kind: 'post' as const, id: post.id })),
+        ...freshArticles.map((article) => ({ kind: 'article' as const, id: article.id })),
+      ]));
     } finally {
       setRefreshing(false);
       refreshInflight.current = false;
     }
   }, [refresh, fetchArticles, fetchHotTopics]);
+
+  const onPullRefresh = useCallback(async () => {
+    // A fast request can finish while the list is still held past the
+    // refresh threshold. Keep the gesture latched until a new drag begins
+    // so native refresh controls cannot fire repeatedly for one pull.
+    if (refreshTriggeredThisDrag.current) return;
+    refreshTriggeredThisDrag.current = true;
+    await refreshFeed();
+  }, [refreshFeed]);
 
   // Infinite scroll: page in more articles AND posts when the bottom nears
   const onEndReached = useCallback(async () => {
@@ -218,10 +303,6 @@ export default function Feed() {
     setMasterOrder(shuffle([...postEntries, ...articleEntries]));
   }, [postsEpoch, orderEpoch]);
 
-  type FeedItem =
-    | { kind: 'post'; id: string; data: import('@/components/postComponent').PostType }
-    | { kind: 'article'; id: string; data: ArticleType };
-
   // Resolve the stable master order into fresh data on every render,
   // keeping only what the active tab allows — the sequence itself never
   // changes, each tab just sees its slice of it.
@@ -244,6 +325,25 @@ export default function Feed() {
     }
     return items;
   }, [masterOrder, postsById, articlesById, visiblePostIds, tabAllows]);
+  const feedItemsRef = useRef(feedItems);
+  useEffect(() => { feedItemsRef.current = feedItems; }, [feedItems]);
+
+  // Warm only the next few images after the visible window. This mirrors
+  // timeline prefetching without downloading the whole paginated feed.
+  const onViewableItemsChanged = useRef(({ viewableItems }: { viewableItems: ViewToken<FeedItem>[] }) => {
+    const lastVisibleIndex = viewableItems.reduce(
+      (highest, token) => Math.max(highest, token.index ?? -1),
+      -1
+    );
+    if (lastVisibleIndex < 0) return;
+    const urls = feedItemsRef.current
+      .slice(lastVisibleIndex + 1, lastVisibleIndex + 4)
+      .map((item) => item.kind === 'post'
+        ? item.data.media
+        : getDisplayableArticleMedia(item.data.media, item.data.url))
+      .filter((url): url is string => typeof url === 'string' && /^https?:\/\//i.test(url));
+    if (urls.length > 0) ExpoImage.prefetch(urls, 'memory-disk').catch(() => {});
+  }).current;
 
   const listRef = useRef<FlatList<FeedItem>>(null);
 
@@ -252,9 +352,9 @@ export default function Feed() {
     return onTabRefresh('index', () => {
       listRef.current?.scrollToOffset({ offset: 0, animated: true });
       scrollOffsets.current[activeTab] = 0;
-      onRefresh();
+      refreshFeed();
     });
-  }, [onRefresh, activeTab]);
+  }, [refreshFeed, activeTab]);
 
   // Coming back to a tab drops you where you left it
   useEffect(() => {
@@ -272,32 +372,19 @@ export default function Feed() {
         <FlatList<FeedItem>
           ref={listRef}
           data={feedItems}
-          keyExtractor={(item) => item.id}
-          renderItem={({ item }) => {
-            if (item.kind === 'post') {
-              return (
-                <Pressable
-                  onPress={() => {
-                    router.push(`/post/${item.data.id}`);
-                  }}
-                  style={({ pressed }) => ({ opacity: pressed ? 0.6 : 1.0 })}
-                >
-                  <Post post={item.data} />
-                </Pressable>
-              );
-            }
-            return (
-              <Pressable
-                onPress={() => {
-                  router.push(`/article/${item.data.id}`);
-                }}
-                style={({ pressed }) => ({ opacity: pressed ? 0.6 : 1.0 })}
-              >
-                <Article article={item.data} />
-              </Pressable>
-            );
-          }}
+          showsVerticalScrollIndicator={false}
+          keyExtractor={feedItemKey}
+          renderItem={renderFeedItem}
+          initialNumToRender={5}
+          maxToRenderPerBatch={5}
+          updateCellsBatchingPeriod={50}
+          windowSize={7}
+          viewabilityConfig={FEED_VIEWABILITY_CONFIG}
+          onViewableItemsChanged={onViewableItemsChanged}
           onScroll={handleScroll}
+          onScrollBeginDrag={() => {
+            refreshTriggeredThisDrag.current = false;
+          }}
           scrollEventThrottle={16}
           // The list's own top edge sits just below the solid part of the
           // hot bar, so pull-to-refresh triggers at the normal distance
@@ -305,14 +392,13 @@ export default function Feed() {
           // scrolls up under the gradient (which overlays the list top).
           style={{ marginTop: hotTopics.length > 0 ? 210 : 104 }}
           refreshControl={
-            <RefreshControl
+            <AppRefreshControl
               refreshing={refreshing}
-              onRefresh={onRefresh}
-              // intentionally the iOS system-default gray spinner
+              onRefresh={onPullRefresh}
             />
           }
           onEndReached={onEndReached}
-          onEndReachedThreshold={0.6}
+          onEndReachedThreshold={0.4}
           ListFooterComponent={
             loadingMore ? (
               <ActivityIndicator style={{ paddingVertical: 24 }} />

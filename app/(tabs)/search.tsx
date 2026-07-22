@@ -10,7 +10,7 @@ import { api } from '@/lib/api';
 import { getPerspectiveToneForPosition } from '@/lib/perspective-colors';
 import { onTabRefresh } from '@/lib/tabRefresh';
 import { useRouter } from 'expo-router';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Image, Keyboard, Pressable, ScrollView, StyleSheet, TextInput } from 'react-native';
 
 type SearchResults = {
@@ -22,8 +22,12 @@ type SearchResults = {
 
 type ResultFilter = 'All' | 'Stories' | 'People' | 'Sources';
 
+type HotTopic = {
+  title?: unknown;
+};
+
 const EMPTY: SearchResults = { users: [], sources: [], posts: [], articles: [] };
-const QUICK_TOPICS = ['Election 2026', 'Housing costs', 'Immigration', 'Climate policy', 'The economy'];
+const FALLBACK_QUICK_TOPICS = ['The economy', 'Immigration', 'Climate policy', 'Housing costs', 'Elections'];
 
 export default function SearchTab() {
   const router = useRouter();
@@ -34,11 +38,42 @@ export default function SearchTab() {
   const [loading, setLoading] = useState(false);
   const [searchError, setSearchError] = useState<string | null>(null);
   const [activeFilter, setActiveFilter] = useState<ResultFilter>('All');
+  const [quickTopics, setQuickTopics] = useState(FALLBACK_QUICK_TOPICS);
+  const [hasLiveTopics, setHasLiveTopics] = useState(false);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const scrollRef = useRef<ScrollView>(null);
   const searchRef = useRef<TextInput>(null);
 
-  useEffect(() => onTabRefresh('search', () => scrollRef.current?.scrollTo({ y: 0, animated: true })), []);
+  const fetchQuickTopics = useCallback(async () => {
+    try {
+      const payload = await api<HotTopic[]>('/topics/hot?limit=5');
+      const titles = Array.isArray(payload)
+        ? [...new Set(payload.flatMap((topic) => typeof topic?.title === 'string' ? [topic.title.trim()] : []).filter(Boolean))].slice(0, 5)
+        : [];
+
+      if (titles.length > 0) {
+        setQuickTopics(titles);
+        setHasLiveTopics(true);
+      } else {
+        setQuickTopics(FALLBACK_QUICK_TOPICS);
+        setHasLiveTopics(false);
+      }
+    } catch (err: any) {
+      // Keep stable suggestions available when live topic retrieval fails.
+      console.warn('[search] hot topics unavailable:', err?.message);
+      setQuickTopics(FALLBACK_QUICK_TOPICS);
+      setHasLiveTopics(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchQuickTopics();
+  }, [fetchQuickTopics]);
+
+  useEffect(() => onTabRefresh('search', () => {
+    scrollRef.current?.scrollTo({ y: 0, animated: true });
+    fetchQuickTopics();
+  }), [fetchQuickTopics]);
 
   useEffect(() => {
     if (debounceRef.current) clearTimeout(debounceRef.current);
@@ -146,16 +181,16 @@ export default function SearchTab() {
             <ThemedView style={styles.topicSection}>
               <ThemedView style={styles.sectionTitleRow}>
                 <ThemedText style={styles.sectionTitle}>Start with a topic</ThemedText>
-                <ThemedText style={styles.sectionMeta}>Live search</ThemedText>
+                <ThemedText style={styles.sectionMeta}>{hasLiveTopics ? 'Trending now' : 'Suggested'}</ThemedText>
               </ThemedView>
               <ThemedView style={styles.topicGrid}>
-                {QUICK_TOPICS.map((topic, index) => (
+                {quickTopics.map((topic, index) => (
                   <Pressable
                     key={topic}
                     onPress={() => chooseTopic(topic)}
                     style={({ pressed }) => [styles.topicChip, index === 0 && styles.topicChipFeatured, { opacity: pressed ? 0.65 : 1 }]}
                   >
-                    <ThemedText style={[styles.topicText, index === 0 && styles.topicTextFeatured]}>{topic}</ThemedText>
+                    <ThemedText numberOfLines={2} style={[styles.topicText, index === 0 && styles.topicTextFeatured]}>{topic}</ThemedText>
                     <IconSymbol name="arrow.up.right" size={14} color={index === 0 ? c.onPrimary : c.primary} />
                   </Pressable>
                 ))}
@@ -312,10 +347,10 @@ const makeStyles = (c: Palette) => StyleSheet.create({
   sectionTitleRow: { flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between', marginBottom: 10, backgroundColor: 'transparent' },
   sectionTitle: { fontSize: 16, lineHeight: 20, fontWeight: '900' },
   sectionMeta: { color: c.muted, fontSize: 11, lineHeight: 14, fontWeight: '700' },
-  topicGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, backgroundColor: 'transparent' },
-  topicChip: { minHeight: 40, flexDirection: 'row', alignItems: 'center', gap: 7, borderWidth: 1, borderColor: c.cardBorder, borderRadius: 12, backgroundColor: c.card, paddingHorizontal: 12, paddingVertical: 9 },
+  topicGrid: { width: '100%', gap: 8, backgroundColor: 'transparent' },
+  topicChip: { width: '100%', minHeight: 46, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 10, borderWidth: 1, borderColor: c.cardBorder, borderRadius: 12, backgroundColor: c.card, paddingHorizontal: 12, paddingVertical: 10 },
   topicChipFeatured: { backgroundColor: c.primary, borderColor: c.primary },
-  topicText: { color: c.onAccentFaint, fontSize: 12, lineHeight: 16, fontWeight: '800' },
+  topicText: { flex: 1, minWidth: 0, color: c.onAccentFaint, fontSize: 12, lineHeight: 16, fontWeight: '800' },
   topicTextFeatured: { color: c.onPrimary },
   filterRow: { gap: 8, paddingHorizontal: 16, paddingTop: 17, paddingBottom: 7 },
   filterChip: { minHeight: 38, flexDirection: 'row', alignItems: 'center', gap: 7, borderRadius: 12, borderWidth: 1, borderColor: c.border, backgroundColor: c.background, paddingHorizontal: 12, paddingVertical: 7 },

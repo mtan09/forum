@@ -1,11 +1,10 @@
 import { ThemedText } from '@/components/themed-text';
-import { ThemedView } from '@/components/themed-view';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import Spectrum from '@/components/spectrum';
 import { type Palette } from '@/constants/theme';
 import { usePalette } from '@/hooks/use-palette';
 import { useMemo } from 'react';
-import { Dimensions, Modal, Pressable, ScrollView, StyleSheet } from 'react-native';
+import { Dimensions, Modal, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 
 const screenWidth = Dimensions.get('window').width;
 
@@ -16,7 +15,9 @@ const screenWidth = Dimensions.get('window').width;
 //   scorer:<version>       loaded:"phrase"×N      quotes:NN%
 //   confidence:0.NN        left:"phrase"×N        subjectivity:0.NN
 //   prior:0.NN             right:"phrase"×N       type:content_type(...)
+//   stance-left/right:"issue · policy position"×N
 type Framing = { side: 'left' | 'right' | 'loaded'; phrase: string; count: number };
+type Stance = { side: 'left' | 'right'; issue: string; position: string };
 
 type Parsed = {
   version?: string;
@@ -26,13 +27,24 @@ type Parsed = {
   subjectivity?: number;
   quotes?: string;
   framing: Framing[];
+  stances: Stance[];
 };
 
 const PHRASE_RE = /^(left|right|loaded):"(.+)"×(\d+)$/;
+const STANCE_RE = /^stance-(left|right):"([^"·]+) · (.+)"×\d+$/;
 
 function parse(signals: string[]): Parsed {
-  const out: Parsed = { framing: [] };
+  const out: Parsed = { framing: [], stances: [] };
   for (const raw of signals) {
+    const stance = STANCE_RE.exec(raw);
+    if (stance) {
+      out.stances.push({
+        side: stance[1] as Stance['side'],
+        issue: stance[2].trim(),
+        position: stance[3],
+      });
+      continue;
+    }
     const m = PHRASE_RE.exec(raw);
     if (m) {
       out.framing.push({ side: m[1] as Framing['side'], phrase: m[2], count: Number(m[3]) });
@@ -73,97 +85,118 @@ export default function ScorerReceipts({ visible, onClose, position, signals, ki
   const { c } = usePalette();
   const styles = useMemo(() => makeStyles(c), [c]);
   const parsed = parse(signals);
+  const stanceHits = parsed.stances;
   const leanHits = parsed.framing.filter((f) => f.side === 'left' || f.side === 'right');
   const loadedHits = parsed.framing.filter((f) => f.side === 'loaded');
 
   return (
-    <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
+    <Modal visible={visible} animationType="fade" transparent onRequestClose={onClose}>
       <Pressable style={styles.backdrop} onPress={onClose}>
         <Pressable style={styles.sheet} onPress={(e) => e.stopPropagation()}>
-          <ThemedView style={styles.handle} />
+          <View style={styles.handle} />
           <ScrollView showsVerticalScrollIndicator={false}>
-            <ThemedView style={styles.header}>
+            <View style={styles.header}>
               <IconSymbol name="checkmark.seal.fill" size={20} color={c.primary} />
               <ThemedText type="defaultSemiBold" style={styles.title}>Why this placement?</ThemedText>
-            </ThemedView>
+            </View>
 
             <Spectrum width={screenWidth - 64} height={20} position={position} />
             <ThemedText style={styles.band}>{bandLabel(position)}</ThemedText>
 
             {/* Source prior — articles start from their outlet's rating */}
             {kind === 'article' && parsed.prior != null && (
-              <ThemedView style={styles.block}>
+              <View style={styles.block}>
                 <ThemedText style={styles.blockLabel}>Started from the outlet</ThemedText>
                 <ThemedText style={styles.blockBody}>
                   This source&apos;s baseline rating is {bandLabel(parsed.prior).toLowerCase()} ({parsed.prior.toFixed(2)}).
                   The text below moved it from there.
                 </ThemedText>
-              </ThemedView>
+              </View>
+            )}
+
+            {stanceHits.length > 0 && (
+              <View style={styles.block}>
+                <ThemedText style={styles.blockLabel}>Policy stance</ThemedText>
+                <View style={styles.stanceList}>
+                  {stanceHits.map((stance, i) => (
+                    <View key={`${stance.issue}-${stance.position}-${i}`} style={styles.stanceRow}>
+                      <View style={[
+                        styles.stanceMarker,
+                        { backgroundColor: stance.side === 'left' ? c.blue : c.red },
+                      ]} />
+                      <View style={styles.stanceCopy}>
+                        <ThemedText style={styles.stanceIssue}>{prettyType(stance.issue)}</ThemedText>
+                        <ThemedText style={styles.stancePosition}>{prettyType(stance.position)}</ThemedText>
+                      </View>
+                    </View>
+                  ))}
+                </View>
+              </View>
             )}
 
             {/* Framing phrases that actually shifted the score */}
             {leanHits.length > 0 ? (
-              <ThemedView style={styles.block}>
+              <View style={styles.block}>
                 <ThemedText style={styles.blockLabel}>The words that moved it</ThemedText>
-                <ThemedView style={styles.chips}>
+                <View style={styles.chips}>
                   {leanHits.map((f, i) => (
-                    <ThemedView
+                    <View
                       key={i}
                       style={[styles.chip, f.side === 'left' ? styles.chipLeft : styles.chipRight]}
                     >
                       <ThemedText style={[styles.chipText, f.side === 'left' ? styles.chipTextLeft : styles.chipTextRight]}>
                         {f.phrase}{f.count > 1 ? ` ×${f.count}` : ''}
                       </ThemedText>
-                    </ThemedView>
+                    </View>
                   ))}
-                </ThemedView>
-              </ThemedView>
-            ) : (
-              <ThemedView style={styles.block}>
-                <ThemedText style={styles.blockLabel}>No partisan language detected</ThemedText>
+                </View>
+              </View>
+            ) : stanceHits.length === 0 ? (
+              <View style={styles.block}>
+                <ThemedText style={styles.blockLabel}>No directional language detected</ThemedText>
                 <ThemedText style={styles.blockBody}>
-                  Nothing in the text leaned the score either way, so it sits at center by default.
+                  The text did not move the score away from its starting point.
                 </ThemedText>
-              </ThemedView>
-            )}
+              </View>
+            ) : null}
 
             {/* Loaded / editorializing language (informs content type) */}
             {loadedHits.length > 0 && (
-              <ThemedView style={styles.block}>
+              <View style={styles.block}>
                 <ThemedText style={styles.blockLabel}>Loaded language</ThemedText>
-                <ThemedView style={styles.chips}>
+                <View style={styles.chips}>
                   {loadedHits.map((f, i) => (
-                    <ThemedView key={i} style={[styles.chip, styles.chipLoaded]}>
+                    <View key={i} style={[styles.chip, styles.chipLoaded]}>
                       <ThemedText style={[styles.chipText, styles.chipTextLoaded]}>
                         {f.phrase}{f.count > 1 ? ` ×${f.count}` : ''}
                       </ThemedText>
-                    </ThemedView>
+                    </View>
                   ))}
-                </ThemedView>
-              </ThemedView>
+                </View>
+              </View>
             )}
 
             {/* Fact row */}
-            <ThemedView style={styles.facts}>
+            <View style={styles.facts}>
               {parsed.contentType && (
-                <ThemedView style={styles.factRow}>
+                <View style={styles.factRow}>
                   <ThemedText style={styles.factKey}>Read as</ThemedText>
                   <ThemedText style={styles.factVal}>{prettyType(parsed.contentType)}</ThemedText>
-                </ThemedView>
+                </View>
               )}
               {parsed.confidence != null && (
-                <ThemedView style={styles.factRow}>
+                <View style={styles.factRow}>
                   <ThemedText style={styles.factKey}>Confidence</ThemedText>
                   <ThemedText style={styles.factVal}>{Math.round(parsed.confidence * 100)}%</ThemedText>
-                </ThemedView>
+                </View>
               )}
               {parsed.quotes && (
-                <ThemedView style={styles.factRow}>
+                <View style={styles.factRow}>
                   <ThemedText style={styles.factKey}>Quoted material</ThemedText>
                   <ThemedText style={styles.factVal}>{parsed.quotes}</ThemedText>
-                </ThemedView>
+                </View>
               )}
-            </ThemedView>
+            </View>
 
             <ThemedText style={styles.footer}>
               Scored deterministically by {parsed.version ?? 'the forum scorer'} — no AI, no black box.
@@ -240,6 +273,39 @@ const makeStyles = (c: Palette) => StyleSheet.create({
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: 8,
+  },
+  stanceList: {
+    gap: 10,
+  },
+  stanceRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    backgroundColor: c.surfaceMuted,
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+  },
+  stanceMarker: {
+    width: 4,
+    alignSelf: 'stretch',
+    borderRadius: 2,
+  },
+  stanceCopy: {
+    flex: 1,
+    gap: 2,
+  },
+  stanceIssue: {
+    color: c.muted,
+    fontSize: 12,
+    fontWeight: '800',
+    textTransform: 'uppercase',
+    letterSpacing: 0.4,
+  },
+  stancePosition: {
+    color: c.text,
+    fontSize: 15,
+    fontWeight: '700',
   },
   chip: {
     borderRadius: 10,

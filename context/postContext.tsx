@@ -1,27 +1,31 @@
 import { PostType } from '@/components/postComponent';
 import { api } from '@/lib/api';
-import { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { useAuth } from './authContext';
 
 export type VoteDirection = 'up' | 'down' | null;
 
 type PostContextType = {
+  /** Normalized entity cache used by detail, profile, Following, and Home. */
   posts: PostType[];
+  /** Only the ordered, paginated IDs belonging to the main Home feed. */
+  feedPosts: PostType[];
   setPosts: React.Dispatch<React.SetStateAction<PostType[]>>;
   isLoading: boolean;
   error: string | null;
-  refresh: () => Promise<void>;
+  refresh: (options?: { bumpEpoch?: boolean }) => Promise<PostType[]>;
   vote: (postId: string, direction: VoteDirection) => Promise<void>;
   /** Load the next page; resolves with the newly appended posts. */
   loadMorePosts: () => Promise<PostType[]>;
   hasMorePosts: boolean;
-  /** Bumps whenever the post list is reset (refresh), NOT on appends. */
+  /** Bumps for standalone post resets; Home suppresses it during its coordinated refresh. */
   postsEpoch: number;
   /** Fetch a single post into the context if it isn't already loaded. */
   ensurePost: (id: string) => Promise<void>;
 };
 
 const PostContext = createContext<PostContextType | null>(null);
+const PostVoteContext = createContext<PostContextType['vote'] | null>(null);
 
 export const mapPost = (row: any): PostType => ({
   id: String(row.id),
@@ -34,7 +38,7 @@ export const mapPost = (row: any): PostType => ({
   commentCount: row.commentcount ?? 0,
   topic: row.general_topic_id ?? 'general',
   hashtags: row.hashtags ?? [],
-  // null = scorer's confidence gate not met; the post shows no placement
+  // null = no directional evidence; the post shows no placement
   position: typeof row.position === 'number' ? row.position : null,
   // scorer receipts: the exact signals that produced the placement
   positionSignals: row.position_signals ?? [],
@@ -45,6 +49,38 @@ export const mapPost = (row: any): PostType => ({
   myVote: row.my_vote ?? null,
   myBookmark: row.my_bookmark ?? false,
 });
+
+const sameArray = <T,>(left?: T[], right?: T[]): boolean => {
+  if (left === right) return true;
+  if (!left || !right || left.length !== right.length) return false;
+  return left.every((value, index) => value === right[index]);
+};
+
+// Preserve object identity for unchanged normalized entities. Memoized feed
+// rows can then skip work when a refresh returns the same server snapshot.
+export const reusePostSnapshot = (current: PostType | undefined, next: PostType): PostType => {
+  if (!current) return next;
+  const unchanged =
+    current.id === next.id &&
+    current.user === next.user &&
+    current.text === next.text &&
+    current.timestamp === next.timestamp &&
+    current.media === next.media &&
+    current.upvotes === next.upvotes &&
+    current.downvotes === next.downvotes &&
+    current.commentCount === next.commentCount &&
+    current.topic === next.topic &&
+    current.position === next.position &&
+    current.positionConfidence === next.positionConfidence &&
+    current.scorerVersion === next.scorerVersion &&
+    current.username === next.username &&
+    current.avatarUrl === next.avatarUrl &&
+    current.myVote === next.myVote &&
+    current.myBookmark === next.myBookmark &&
+    sameArray(current.hashtags, next.hashtags) &&
+    sameArray(current.positionSignals, next.positionSignals);
+  return unchanged ? current : next;
+};
 
 // Applies a vote change to local counts before the server confirms
 const applyVote = (post: PostType, direction: VoteDirection): PostType => {
@@ -58,10 +94,11 @@ const applyVote = (post: PostType, direction: VoteDirection): PostType => {
 
 // Posts page in from the API instead of loading the whole table — the feed
 // appends pages on scroll, exactly like articles already do.
-const POSTS_PAGE = 30;
+const POSTS_PAGE = 15;
 
 export function PostProvider({ children }: { children: React.ReactNode }) {
   const [posts, setPosts] = useState<PostType[]>([]);
+  const [feedPostIds, setFeedPostIds] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [hasMorePosts, setHasMorePosts] = useState(true);
@@ -70,17 +107,35 @@ export function PostProvider({ children }: { children: React.ReactNode }) {
 
   const postsRef = useRef<PostType[]>([]);
   useEffect(() => { postsRef.current = posts; }, [posts]);
+  const feedPostIdsRef = useRef<string[]>([]);
   const loadingMoreRef = useRef(false);
 
-  const refresh = useCallback(async () => {
+  const feedPosts = useMemo(() => {
+    const postsById = new Map(posts.map((post) => [post.id, post]));
+    return feedPostIds.map((id) => postsById.get(id)).filter((post): post is PostType => !!post);
+  }, [feedPostIds, posts]);
+
+  const refresh = useCallback(async (options: { bumpEpoch?: boolean } = {}): Promise<PostType[]> => {
     try {
       const rows = await api<any[]>(`/posts?limit=${POSTS_PAGE}&offset=0`);
-      setPosts(rows.map(mapPost));
+      const fresh = rows.map(mapPost);
+      setPosts((current) => {
+        const currentById = new Map(current.map((post) => [post.id, post]));
+        const nextById = new Map(currentById);
+        fresh.forEach((post) => nextById.set(post.id, reusePostSnapshot(currentById.get(post.id), post)));
+        return Array.from(nextById.values());
+      });
+      const freshIds = fresh.map((post) => post.id);
+      feedPostIdsRef.current = freshIds;
+      setFeedPostIds(freshIds);
       setHasMorePosts(rows.length === POSTS_PAGE);
-      setPostsEpoch((e) => e + 1);
+      if (options.bumpEpoch !== false) setPostsEpoch((e) => e + 1);
       setError(null);
+      return fresh;
     } catch (err: any) {
       setError(err?.message ?? 'Failed to load posts');
+      const postsById = new Map(postsRef.current.map((post) => [post.id, post]));
+      return feedPostIdsRef.current.map((id) => postsById.get(id)).filter((post): post is PostType => !!post);
     } finally {
       setIsLoading(false);
     }
@@ -90,13 +145,17 @@ export function PostProvider({ children }: { children: React.ReactNode }) {
     if (loadingMoreRef.current) return [];
     loadingMoreRef.current = true;
     try {
-      const rows = await api<any[]>(`/posts?limit=${POSTS_PAGE}&offset=${postsRef.current.length}`);
+      const rows = await api<any[]>(`/posts?limit=${POSTS_PAGE}&offset=${feedPostIdsRef.current.length}`);
       setHasMorePosts(rows.length === POSTS_PAGE);
       const fresh = rows.map(mapPost);
       setPosts((prev) => {
-        const seen = new Set(prev.map((p) => p.id));
-        return [...prev, ...fresh.filter((p) => !seen.has(p.id))];
+        const nextById = new Map(prev.map((post) => [post.id, post]));
+        fresh.forEach((post) => nextById.set(post.id, reusePostSnapshot(nextById.get(post.id), post)));
+        return Array.from(nextById.values());
       });
+      const nextIds = [...new Set([...feedPostIdsRef.current, ...fresh.map((post) => post.id)])];
+      feedPostIdsRef.current = nextIds;
+      setFeedPostIds(nextIds);
       return fresh;
     } catch (err: any) {
       console.log('Error loading more posts:', err?.message);
@@ -145,10 +204,26 @@ export function PostProvider({ children }: { children: React.ReactNode }) {
     [refresh]
   );
 
+  const contextValue = useMemo<PostContextType>(() => ({
+    posts,
+    feedPosts,
+    setPosts,
+    isLoading,
+    error,
+    refresh,
+    vote,
+    loadMorePosts,
+    hasMorePosts,
+    postsEpoch,
+    ensurePost,
+  }), [error, ensurePost, feedPosts, hasMorePosts, isLoading, loadMorePosts, posts, postsEpoch, refresh, vote]);
+
   return (
-    <PostContext.Provider value={{ posts, setPosts, isLoading, error, refresh, vote, loadMorePosts, hasMorePosts, postsEpoch, ensurePost }}>
-      {children}
-    </PostContext.Provider>
+    <PostVoteContext.Provider value={vote}>
+      <PostContext.Provider value={contextValue}>
+        {children}
+      </PostContext.Provider>
+    </PostVoteContext.Provider>
   );
 }
 
@@ -156,4 +231,13 @@ export function usePosts() {
   const context = useContext(PostContext);
   if (!context) throw new Error('usePosts must be used within PostProvider');
   return context;
+}
+
+// Feed action rows only need the stable vote callback. Keeping them off the
+// full posts context prevents every visible row from re-rendering whenever
+// one post changes or a page is appended.
+export function usePostVote() {
+  const vote = useContext(PostVoteContext);
+  if (!vote) throw new Error('usePostVote must be used within PostProvider');
+  return vote;
 }

@@ -1,3 +1,4 @@
+import AppRefreshControl from '@/components/appRefreshControl';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { IconSymbol } from '@/components/ui/icon-symbol';
@@ -7,8 +8,7 @@ import { api } from '@/lib/api';
 import { onTabRefresh } from '@/lib/tabRefresh';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Pressable, RefreshControl, ScrollView, StyleSheet } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Pressable, ScrollView, StyleSheet } from 'react-native';
 
 // The Floor: the app's live rooms. One debate per daily pick — the
 // biggest story and the most divided one — each with a shared thread.
@@ -33,13 +33,14 @@ const kindMeta = (c: Palette): Record<Debate['kind'], { label: string; color: st
 
 export default function DebateTab() {
   const router = useRouter();
-  const insets = useSafeAreaInsets();
   const { c } = usePalette();
   const styles = useMemo(() => makeStyles(c), [c]);
   const KIND_META = useMemo(() => kindMeta(c), [c]);
   const [debates, setDebates] = useState<Debate[] | null>(null);
   const [recap, setRecap] = useState<RecapDebate[]>([]);
   const [refreshing, setRefreshing] = useState(false);
+  const refreshInflight = useRef(false);
+  const refreshTriggeredThisDrag = useRef(false);
 
   const load = useCallback(async () => {
     try {
@@ -60,20 +61,32 @@ export default function DebateTab() {
     }, [load])
   );
 
-  const onRefresh = useCallback(async () => {
+  const refreshFloor = useCallback(async () => {
+    if (refreshInflight.current) return;
+    refreshInflight.current = true;
     setRefreshing(true);
-    await load();
-    setRefreshing(false);
+    try {
+      await load();
+    } finally {
+      setRefreshing(false);
+      refreshInflight.current = false;
+    }
   }, [load]);
+
+  const onPullRefresh = useCallback(async () => {
+    if (refreshTriggeredThisDrag.current) return;
+    refreshTriggeredThisDrag.current = true;
+    await refreshFloor();
+  }, [refreshFloor]);
 
   // Re-tapping The Floor's tab button jumps to the top and reloads
   const scrollRef = useRef<ScrollView>(null);
   useEffect(() => {
     return onTabRefresh('debate', () => {
       scrollRef.current?.scrollTo({ y: 0, animated: true });
-      onRefresh();
+      refreshFloor();
     });
-  }, [onRefresh]);
+  }, [refreshFloor]);
 
   const today = new Date().toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' });
 
@@ -81,16 +94,15 @@ export default function DebateTab() {
     <ScrollView
       ref={scrollRef}
       contentContainerStyle={styles.container}
+      alwaysBounceVertical
+      onScrollBeginDrag={() => {
+        refreshTriggeredThisDrag.current = false;
+      }}
       refreshControl={
-        <RefreshControl
+        <AppRefreshControl
           refreshing={refreshing}
-          onRefresh={onRefresh}
-          tintColor={c.primary}
-          colors={[c.primary]}
-          // The scroll view starts at the very top of the screen, so without
-          // this the spinner draws up behind the status bar / notch and is
-          // invisible. Push it into the visible area below the safe inset.
-          progressViewOffset={insets.top + 16}
+          onRefresh={onPullRefresh}
+          indicatorVisible={false}
         />
       }
     >

@@ -5,9 +5,10 @@ import { type Palette } from '@/constants/theme';
 import { usePalette } from '@/hooks/use-palette';
 import { useRelativeTime } from '@/hooks/useRelativeTime';
 import { api } from '@/lib/api';
+import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
-import { useEffect, useMemo, useState } from 'react';
-import { Dimensions, Image, Pressable, StyleSheet } from 'react-native';
+import { memo, useEffect, useMemo, useState } from 'react';
+import { Dimensions, Pressable, StyleSheet } from 'react-native';
 import ContentActions from './contentActions';
 import PostActions from './post-actions';
 import ScorerReceipts from './scorerReceipts';
@@ -48,7 +49,7 @@ type Props = {
   post: PostType;
 }
 
-export default function Post({ post }: Props) {
+function Post({ post }: Props) {
 
   const router = useRouter();
   const { c } = usePalette();
@@ -58,21 +59,19 @@ export default function Post({ post }: Props) {
   const [receiptsOpen, setReceiptsOpen] = useState(false);
   const [hidden, setHidden] = useState(false);
 
-  const [ user, setUser ] = useState<UserType>({
-    id: post.user,
-    username: post.username ?? '',
-    avatar_url: post.avatarUrl,
-  });
+  const [fetchedUser, setFetchedUser] = useState<UserType | null>(null);
+  const user = useMemo<UserType>(() => (
+    post.username
+      ? { id: post.user, username: post.username, avatar_url: post.avatarUrl }
+      : fetchedUser ?? { id: post.user, username: '', avatar_url: post.avatarUrl }
+  ), [fetchedUser, post.avatarUrl, post.user, post.username]);
 
   useEffect(() => {
     // Author usually arrives joined onto the post; fetch only if missing
-    if (post.username) {
-      setUser({ id: post.user, username: post.username, avatar_url: post.avatarUrl });
-      return;
-    }
+    if (post.username) return;
     let cancelled = false;
     api<UserType>(`/users/${post.user}`)
-      .then((data) => { if (!cancelled) setUser(data); })
+      .then((data) => { if (!cancelled) setFetchedUser(data); })
       .catch((error) => console.log('Error fetching profile:', error?.message));
     return () => { cancelled = true; };
   }, [post.user, post.username, post.avatarUrl]);
@@ -93,6 +92,8 @@ export default function Post({ post }: Props) {
                 <Image
                   source={user.avatar_url ? { uri: user.avatar_url } : require('@/assets/images/Default_pfp.jpg')}
                   style={styles.avatar}
+                  cachePolicy="memory-disk"
+                  recyclingKey={user.avatar_url ?? `avatar:${post.user}`}
                 />
                 <ThemedView>
                   <ThemedText type="defaultSemiBold" style={{fontWeight: 800, fontSize: 18}}>{user.username}</ThemedText>
@@ -145,9 +146,9 @@ export default function Post({ post }: Props) {
           </Pressable>
         )}
 
-        {typeof post.position === 'number' && (
+        {typeof post.position === 'number' && receiptsOpen && (
           <ScorerReceipts
-            visible={receiptsOpen}
+            visible
             onClose={() => setReceiptsOpen(false)}
             position={post.position}
             signals={post.positionSignals ?? []}
@@ -162,6 +163,8 @@ export default function Post({ post }: Props) {
 
   )
 }
+
+export default memo(Post);
 
 const makeStyles = (c: Palette) => StyleSheet.create({
   container: {

@@ -3,7 +3,7 @@ import { ThemedView } from '@/components/themed-view';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { usePalette } from '@/hooks/use-palette';
 import { notifySuccess, tapLight } from '@/lib/haptics';
-import { usePosts } from '@/context/postContext';
+import { usePostVote } from '@/context/postContext';
 import { api, API_URL } from '@/lib/api';
 import { Pressable, Share, StyleSheet } from 'react-native';
 import { useEffect, useState } from 'react';
@@ -35,7 +35,7 @@ export default function PostActions({ post, user }: PostActionsProps) {
     }
   };
 
-  const { vote } = usePosts();
+  const vote = usePostVote();
 
   const isUpvoted = post.myVote === 'up';
   const isDownvoted = post.myVote === 'down';

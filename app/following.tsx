@@ -1,36 +1,75 @@
+import AppRefreshControl from '@/components/appRefreshControl';
 import Post, { type PostType } from '@/components/postComponent';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { IconSymbol } from '@/components/ui/icon-symbol';
-import { mapPost, usePosts } from '@/context/postContext';
+import { mapPost, reusePostSnapshot, usePosts } from '@/context/postContext';
 import { usePalette } from '@/hooks/use-palette';
 import { api } from '@/lib/api';
 import { useFocusEffect, useRouter } from 'expo-router';
-import { useCallback, useMemo, useState } from 'react';
-import { ActivityIndicator, FlatList, Pressable, RefreshControl, StyleSheet } from 'react-native';
+import { memo, useCallback, useMemo, useRef, useState } from 'react';
+import { ActivityIndicator, FlatList, type ListRenderItemInfo, Pressable, StyleSheet } from 'react-native';
+
+const postKey = (post: PostType) => post.id;
+const FOLLOWING_PAGE_SIZE = 20;
+
+const FollowingRow = memo(function FollowingRow({ post }: { post: PostType }) {
+  const router = useRouter();
+  return (
+    <Pressable
+      onPress={() => router.push(`/post/${post.id}`)}
+      style={({ pressed }) => ({ opacity: pressed ? 0.65 : 1 })}
+    >
+      <Post post={post} />
+    </Pressable>
+  );
+});
+
+const renderPost = ({ item }: ListRenderItemInfo<PostType>) => <FollowingRow post={item} />;
 
 export default function FollowingFeed() {
-  const router = useRouter();
   const { c } = usePalette();
   const styles = useMemo(() => makeStyles(c), [c]);
   const { posts, setPosts } = usePosts();
   const [ids, setIds] = useState<string[] | null>(null);
   const [refreshing, setRefreshing] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [hasMore, setHasMore] = useState(true);
+  const idsRef = useRef<string[]>([]);
+  const loadingMoreRef = useRef(false);
 
-  const load = useCallback(async () => {
-    const rows = await api<any[]>('/posts?feed=following&limit=100');
-    const mapped = rows.map(mapPost);
-    setPosts((current) => {
-      const nextById = new Map(current.map((post) => [post.id, post]));
-      mapped.forEach((post) => nextById.set(post.id, post));
-      return Array.from(nextById.values());
-    });
-    setIds(mapped.map((post) => post.id));
+  const load = useCallback(async (reset: boolean) => {
+    if (!reset && loadingMoreRef.current) return;
+    if (!reset) {
+      loadingMoreRef.current = true;
+      setLoadingMore(true);
+    }
+    try {
+      const offset = reset ? 0 : idsRef.current.length;
+      const rows = await api<any[]>(`/posts?feed=following&limit=${FOLLOWING_PAGE_SIZE}&offset=${offset}`);
+      const mapped = rows.map(mapPost);
+      setPosts((current) => {
+        const nextById = new Map(current.map((post) => [post.id, post]));
+        mapped.forEach((post) => nextById.set(post.id, reusePostSnapshot(nextById.get(post.id), post)));
+        return Array.from(nextById.values());
+      });
+      const nextIds = reset
+        ? mapped.map((post) => post.id)
+        : [...new Set([...idsRef.current, ...mapped.map((post) => post.id)])];
+      idsRef.current = nextIds;
+      setIds(nextIds);
+      setHasMore(rows.length === FOLLOWING_PAGE_SIZE);
+    } finally {
+      if (!reset) {
+        loadingMoreRef.current = false;
+        setLoadingMore(false);
+      }
+    }
   }, [setPosts]);
 
   useFocusEffect(
     useCallback(() => {
-      load().catch((error: any) => {
+      load(true).catch((error: any) => {
         console.log('Error loading following feed:', error?.message);
         setIds((current) => current ?? []);
       });
@@ -40,7 +79,7 @@ export default function FollowingFeed() {
   const refresh = useCallback(async () => {
     setRefreshing(true);
     try {
-      await load();
+      await load(true);
     } finally {
       setRefreshing(false);
     }
@@ -51,21 +90,25 @@ export default function FollowingFeed() {
     () => (ids ?? []).map((id) => postsById.get(id)).filter((post): post is PostType => !!post),
     [ids, postsById]
   );
+  const loadMore = useCallback(() => {
+    if (hasMore && !refreshing) {
+      load(false).catch((error: any) => console.log('Error loading more following posts:', error?.message));
+    }
+  }, [hasMore, load, refreshing]);
 
   return (
     <ThemedView style={styles.screen}>
       <FlatList
         data={followingPosts}
-        keyExtractor={(post) => post.id}
-        renderItem={({ item }) => (
-          <Pressable
-            onPress={() => router.push(`/post/${item.id}`)}
-            style={({ pressed }) => ({ opacity: pressed ? 0.65 : 1 })}
-          >
-            <Post post={item} />
-          </Pressable>
-        )}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={refresh} tintColor={c.primary} colors={[c.primary]} />}
+        keyExtractor={postKey}
+        renderItem={renderPost}
+        initialNumToRender={5}
+        maxToRenderPerBatch={5}
+        updateCellsBatchingPeriod={50}
+        windowSize={7}
+        onEndReached={loadMore}
+        onEndReachedThreshold={0.4}
+        refreshControl={<AppRefreshControl refreshing={refreshing} onRefresh={refresh} />}
         contentContainerStyle={followingPosts.length === 0 ? styles.emptyContainer : styles.listContent}
         ListEmptyComponent={
           ids === null ? (
@@ -82,6 +125,7 @@ export default function FollowingFeed() {
             </ThemedView>
           )
         }
+        ListFooterComponent={loadingMore ? <ActivityIndicator color={c.icon} style={styles.footerLoader} /> : null}
       />
     </ThemedView>
   );
@@ -95,4 +139,5 @@ const makeStyles = (c: ReturnType<typeof usePalette>['c']) => StyleSheet.create(
   emptyIcon: { width: 48, height: 48, borderRadius: 24, backgroundColor: c.accentSoftBg, alignItems: 'center', justifyContent: 'center', marginBottom: 12 },
   emptyTitle: { fontWeight: '800', fontSize: 17, lineHeight: 22, textAlign: 'center' },
   emptyText: { color: c.muted, fontSize: 14, lineHeight: 20, textAlign: 'center', marginTop: 6 },
+  footerLoader: { paddingVertical: 24 },
 });

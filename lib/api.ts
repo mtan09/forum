@@ -42,20 +42,45 @@ export class ApiError extends Error {
 type ApiOptions = {
   method?: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
   body?: unknown;
+  /** Retry once when the browser/device cannot establish a network request. */
+  retryNetwork?: boolean;
 };
+
+const NETWORK_ERROR_MESSAGE = 'Couldn’t reach Forum. Check your connection and try again.';
+const NETWORK_RETRY_DELAY_MS = 700;
+
+const delay = (milliseconds: number) =>
+  new Promise<void>((resolve) => setTimeout(resolve, milliseconds));
 
 export async function api<T = any>(path: string, options: ApiOptions = {}): Promise<T> {
   const token = await getToken();
   const hasBody = options.body !== undefined;
+  const method = options.method ?? (hasBody ? 'POST' : 'GET');
+  const makeRequest = () =>
+    fetch(`${API_URL}${path}`, {
+      method,
+      headers: {
+        ...(hasBody ? { 'content-type': 'application/json' } : {}),
+        ...(token ? { authorization: `Bearer ${token}` } : {}),
+      },
+      body: hasBody ? JSON.stringify(options.body) : undefined,
+    });
 
-  const res = await fetch(`${API_URL}${path}`, {
-    method: options.method ?? (hasBody ? 'POST' : 'GET'),
-    headers: {
-      ...(hasBody ? { 'content-type': 'application/json' } : {}),
-      ...(token ? { authorization: `Bearer ${token}` } : {}),
-    },
-    body: hasBody ? JSON.stringify(options.body) : undefined,
-  });
+  let res: Response;
+  try {
+    res = await makeRequest();
+  } catch {
+    // Reads are safe to repeat. Login opts in separately because issuing a
+    // second token has no server-side side effect, unlike signup/posting.
+    const shouldRetry = options.retryNetwork ?? method === 'GET';
+    if (!shouldRetry) throw new Error(NETWORK_ERROR_MESSAGE);
+    await delay(NETWORK_RETRY_DELAY_MS);
+    try {
+      res = await makeRequest();
+    } catch {
+      throw new Error(NETWORK_ERROR_MESSAGE);
+    }
+  }
 
   const data = await res.json().catch(() => null);
   if (!res.ok) {

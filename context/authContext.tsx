@@ -86,6 +86,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const signIn = async (email: string, password: string) => {
     const { token, user: me } = await api<{ token: string; user: AuthUser }>('/auth/login', {
       body: { email, password },
+      // Login is safe to repeat if Safari fails before receiving a response.
+      retryNetwork: true,
     })
     await setToken(token)
     setUser(me)

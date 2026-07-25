@@ -30,9 +30,17 @@ from your local `forum-api/.env`, they already point at Neon):
 
 Verify: `curl https://<your-app>.up.railway.app/health` → `{"status":"ok","db":"ok"}`.
 
-Point the app at it: put `EXPO_PUBLIC_API_URL=https://<your-app>.up.railway.app`
-in `forum/.env` **and** replace `https://YOUR-DEPLOYED-API.example.com` in
-`forum/eas.json` (preview + production profiles).
+Point local development at it with
+`EXPO_PUBLIC_API_URL=https://<your-app>.up.railway.app` in `forum/.env.local`.
+For cloud builds and hosting, keep the URL out of `eas.json` and set it in
+the linked EAS project environments:
+
+```bash
+eas env:set preview --name EXPO_PUBLIC_API_URL \
+  --value https://<your-app>.up.railway.app --visibility plaintext
+eas env:set production --name EXPO_PUBLIC_API_URL \
+  --value https://<your-app>.up.railway.app --visibility plaintext
+```
 
 ## 2. R2 image storage (~10 min)
 
@@ -64,7 +72,7 @@ Requires the $99/yr Apple Developer Program.
 ```bash
 cd forum
 npm i -g eas-cli && eas login       # free Expo account
-eas init                            # writes the projectId into app.json
+eas init                            # one-time: writes the projectId into app.json
 eas build --profile device --platform ios   # dev build for a real device
 ```
 

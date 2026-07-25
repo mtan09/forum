@@ -4,17 +4,15 @@ import { StanceShareCard } from '@/components/shareCards';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { IconSymbol } from '@/components/ui/icon-symbol';
+import WebPageFrame from '@/components/web-page-frame';
 import { type Palette } from '@/constants/theme';
 import { usePalette } from '@/hooks/use-palette';
 import { api } from '@/lib/api';
 import { selectTick, tapLight, tapMedium } from '@/lib/haptics';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useEffect, useMemo, useState } from 'react';
-import { Dimensions, GestureResponderEvent, Keyboard, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, TextInput } from 'react-native';
-
-const screenWidth = Dimensions.get('window').width;
-const TRACK_WIDTH = screenWidth - 64; // card padding 16 + screen padding 16, both sides
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { GestureResponderEvent, Keyboard, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
 
 type Distribution = { bins: number[]; median: number | null };
 
@@ -39,14 +37,40 @@ const kindMeta = (c: Palette) => ({
 function SpectrumTrack({ pin, onPlace }: { pin: number | null; onPlace: (p: number) => void }) {
   const { c } = usePalette();
   const styles = useMemo(() => makeStyles(c), [c]);
+  const [trackWidth, setTrackWidth] = useState(0);
+  const trackRef = useRef<View>(null);
   const handlePress = (e: GestureResponderEvent) => {
+    if (trackWidth <= 0) return;
+    const pageX = e.nativeEvent.pageX;
     selectTick();
-    const x = e.nativeEvent.locationX;
-    onPlace(Math.min(Math.max(x / TRACK_WIDTH, 0), 1));
+    trackRef.current?.measureInWindow((trackLeft) => {
+      const x = pageX - trackLeft;
+      onPlace(Math.min(Math.max(x / trackWidth, 0), 1));
+    });
+  };
+  const adjust = (delta: number) => {
+    selectTick();
+    onPlace(Math.min(Math.max((pin ?? 0.5) + delta, 0), 1));
   };
   return (
-    <Pressable onPress={handlePress}>
-      <ThemedView style={styles.trackWrap}>
+    <ThemedView style={styles.trackPressable}>
+      <Pressable
+        ref={trackRef}
+        onPress={handlePress}
+        accessibilityRole="adjustable"
+        accessibilityLabel="Choose where you stand"
+        accessibilityValue={{ min: 0, max: 100, now: Math.round((pin ?? 0.5) * 100) }}
+        accessibilityActions={[
+          { name: 'increment', label: 'Move right' },
+          { name: 'decrement', label: 'Move left' },
+        ]}
+        onAccessibilityAction={(event) => {
+          if (event.nativeEvent.actionName === 'increment') adjust(0.05);
+          if (event.nativeEvent.actionName === 'decrement') adjust(-0.05);
+        }}
+        style={styles.trackWrap}
+        onLayout={(event) => setTrackWidth(Math.round(event.nativeEvent.layout.width))}
+      >
         <LinearGradient
           colors={[c.blue, c.primary, c.red]}
           locations={[0, 0.5, 1]}
@@ -54,15 +78,15 @@ function SpectrumTrack({ pin, onPlace }: { pin: number | null; onPlace: (p: numb
           end={{ x: 1, y: 0 }}
           style={styles.track}
         />
-        {pin != null && (
-          <ThemedView style={[styles.pin, { left: pin * TRACK_WIDTH - 7 }]} />
+        {pin != null && trackWidth > 0 && (
+          <ThemedView style={[styles.pin, { left: pin * (trackWidth - 14) }]} />
         )}
-      </ThemedView>
+      </Pressable>
       <ThemedView style={styles.trackLabels}>
         <ThemedText style={styles.trackLabel}>Left</ThemedText>
         <ThemedText style={styles.trackLabel}>Right</ThemedText>
       </ThemedView>
-    </Pressable>
+    </ThemedView>
   );
 }
 
@@ -186,8 +210,14 @@ export default function DebateScreen() {
       style={{ flex: 1 }}
       keyboardVerticalOffset={100}
     >
-      <ScrollView keyboardShouldPersistTaps="handled">
-        <ThemedView style={styles.container}>
+      <ScrollView
+        keyboardShouldPersistTaps="handled"
+        showsVerticalScrollIndicator={false}
+        style={styles.scroll}
+        contentContainerStyle={styles.scrollContent}
+      >
+        <WebPageFrame maxWidth={720}>
+          <ThemedView style={styles.container}>
           <ThemedView style={[styles.kindChip, { backgroundColor: meta.bg }]}>
             <ThemedText style={[styles.kindChipText, { color: meta.color }]}>{meta.label}</ThemedText>
           </ThemedView>
@@ -272,6 +302,7 @@ export default function DebateScreen() {
                 value={commentText}
                 onChangeText={setCommentText}
                 multiline
+                numberOfLines={1}
                 style={styles.composerInput}
                 editable={hasVoted && !postingComment}
               />
@@ -289,7 +320,8 @@ export default function DebateScreen() {
 
             <CommentList debateId={debate.id} refreshKey={refreshKey} />
           </ThemedView>
-        </ThemedView>
+          </ThemedView>
+        </WebPageFrame>
       </ScrollView>
 
       {hasVoted && (
@@ -311,8 +343,14 @@ export default function DebateScreen() {
 }
 
 const makeStyles = (c: Palette) => StyleSheet.create({
+  scroll: {
+    backgroundColor: Platform.OS === 'web' ? c.surface : c.background,
+  },
+  scrollContent: {
+    paddingBottom: Platform.OS === 'web' ? 32 : 0,
+  },
   container: {
-    padding: 16,
+    padding: Platform.OS === 'web' ? 22 : 16,
     gap: 12,
   },
   kindChip: {
@@ -356,14 +394,19 @@ const makeStyles = (c: Palette) => StyleSheet.create({
     fontSize: 13,
     lineHeight: 18,
   },
+  trackPressable: {
+    width: '100%',
+    backgroundColor: 'transparent',
+    cursor: Platform.OS === 'web' ? 'pointer' : undefined,
+  },
   trackWrap: {
-    width: TRACK_WIDTH,
+    width: '100%',
     height: 28,
     justifyContent: 'center',
     backgroundColor: 'transparent',
   },
   track: {
-    width: TRACK_WIDTH,
+    width: '100%',
     height: 16,
     borderRadius: 8,
   },
@@ -441,9 +484,12 @@ const makeStyles = (c: Palette) => StyleSheet.create({
   composerInput: {
     flex: 1,
     fontSize: 15,
+    lineHeight: 20,
+    minHeight: 28,
     maxHeight: 96,
-    paddingTop: 0,
-    paddingBottom: 0,
+    paddingTop: 4,
+    paddingBottom: 4,
+    textAlignVertical: 'center',
     color: c.text,
   },
 });

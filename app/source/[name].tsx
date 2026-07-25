@@ -2,14 +2,13 @@ import Article, { ArticleType } from '@/components/articleComponent';
 import Spectrum from '@/components/spectrum';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
+import WebPageFrame from '@/components/web-page-frame';
 import { type Palette } from '@/constants/theme';
 import { usePalette } from '@/hooks/use-palette';
 import { api } from '@/lib/api';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useMemo, useState } from 'react';
-import { Dimensions, Image, Pressable, ScrollView, StyleSheet } from 'react-native';
-
-const screenWidth = Dimensions.get('window').width;
+import { Image, Platform, Pressable, ScrollView, StyleSheet, useWindowDimensions } from 'react-native';
 
 type SourceInfo = {
   name: string;
@@ -55,6 +54,8 @@ const TYPE_LABELS: [string, string][] = [
 export default function SourceScreen() {
   const { c } = usePalette();
   const styles = useMemo(() => makeStyles(c), [c]);
+  const { width: windowWidth } = useWindowDimensions();
+  const frameWidth = Platform.OS === 'web' ? Math.min(windowWidth, 760) : windowWidth;
   const { name } = useLocalSearchParams();
   const sourceName = useMemo(
     () => decodeURIComponent((Array.isArray(name) ? name[0] : name) ?? ''),
@@ -97,8 +98,13 @@ export default function SourceScreen() {
     : null;
 
   return (
-    <ScrollView>
-      <ThemedView style={styles.container}>
+    <ScrollView
+      style={styles.scroll}
+      contentContainerStyle={styles.scrollContent}
+      showsVerticalScrollIndicator={false}
+    >
+      <WebPageFrame maxWidth={760}>
+        <ThemedView style={styles.container}>
         {/* Outlet identity */}
         <ThemedView style={styles.headerRow}>
           {logo && !logoFailed ? (
@@ -122,7 +128,7 @@ export default function SourceScreen() {
             articles actually land under our scorer */}
         <ThemedView style={styles.card}>
           <ThemedText type="defaultSemiBold" style={styles.cardTitle}>Outlet rating</ThemedText>
-          <Spectrum width={screenWidth - 64} height={20} position={info.lean ?? 0.5} />
+          <Spectrum width={Math.max(1, frameWidth - 64)} height={20} position={info.lean ?? 0.5} />
           <ThemedText style={styles.cardNote}>
             Hand-mapped from published media-bias ratings (AllSides / Ad Fontes).
           </ThemedText>
@@ -132,7 +138,7 @@ export default function SourceScreen() {
               <ThemedText type="defaultSemiBold" style={[styles.cardTitle, { marginTop: 10 }]}>
                 How its articles score here
               </ThemedText>
-              <Spectrum width={screenWidth - 64} height={20} position={info.stats.avg_lean} />
+              <Spectrum width={Math.max(1, frameWidth - 64)} height={20} position={info.stats.avg_lean} />
               <ThemedText style={styles.cardNote}>
                 Average article score: {info.stats.avg_lean.toFixed(2)}
                 {info.stats.p25 != null && info.stats.p75 != null
@@ -194,11 +200,18 @@ export default function SourceScreen() {
         </Pressable>
       ))}
       <ThemedView style={{ height: 32 }} />
+      </WebPageFrame>
     </ScrollView>
   );
 }
 
 const makeStyles = (c: Palette) => StyleSheet.create({
+  scroll: {
+    backgroundColor: Platform.OS === 'web' ? c.surface : c.background,
+  },
+  scrollContent: {
+    paddingBottom: Platform.OS === 'web' ? 32 : 0,
+  },
   container: {
     padding: 16,
     gap: 12,

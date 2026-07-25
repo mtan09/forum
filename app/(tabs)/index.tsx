@@ -7,6 +7,7 @@ import { ThemedView } from '@/components/themed-view';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { type Palette } from '@/constants/theme';
 import { useAuth } from '@/context/authContext';
+import { useFeedPreference } from '@/context/feedPreferenceContext';
 import { usePosts } from '@/context/postContext';
 import { usePalette } from '@/hooks/use-palette';
 import { api } from '@/lib/api';
@@ -20,15 +21,14 @@ import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Animated,
-  Dimensions,
   FlatList,
+  Platform,
   type ListRenderItemInfo,
   Pressable,
   StyleSheet,
   type ViewToken,
+  useWindowDimensions,
 } from 'react-native';
-
-const screenWidth = Dimensions.get('window').width;
 
 // An article's side comes from its scored lean, falling back to its
 // outlet's lean (always present for ingested articles)
@@ -116,8 +116,23 @@ export default function Feed() {
 
   const { c } = usePalette();
   const styles = useMemo(() => makeStyles(c), [c]);
+  const isWeb = Platform.OS === 'web';
+  const { width: windowWidth } = useWindowDimensions();
+  const webHasSidebar = isWeb && windowWidth >= 1180;
+  const webHasHeaderComposer = isWeb && windowWidth < 700;
+  const [feedWidth, setFeedWidth] = useState(0);
 
-  const { feedPosts: posts, refresh, loadMorePosts, hasMorePosts, postsEpoch } = usePosts();
+  const { preference: feedContentPreference } = useFeedPreference();
+  const showsPosts = feedContentPreference !== 'articles';
+  const showsArticles = feedContentPreference !== 'posts';
+  const {
+    feedPosts: posts,
+    refresh,
+    loadMorePosts,
+    hasMorePosts,
+    postsEpoch,
+    isLoading: postsLoading,
+  } = usePosts();
 
   const scrollY = useRef(new Animated.Value(0)).current;
 
@@ -175,17 +190,19 @@ export default function Feed() {
   }, [activeTab, userPosition]);
 
   const filteredPosts = useMemo(() => {
+    if (!showsPosts) return [];
     // Your own posts never appear in the feed — they live on your profile
     const others = posts.filter((p) => p.user !== me?.id);
     if (activeTab === 'Random') return others;
     return others.filter((p) => tabAllows(p.position));
-  }, [posts, activeTab, me?.id, tabAllows]);
+  }, [posts, activeTab, me?.id, showsPosts, tabAllows]);
 
   // Articles accumulate page by page for infinite scroll
   const [ articles, setArticles ] = useState<ArticleType[]>([]);
   const articlesRef = useRef<ArticleType[]>([]);
   useEffect(() => { articlesRef.current = articles; }, [articles]);
   const [hasMoreArticles, setHasMoreArticles] = useState(true);
+  const [articlesLoaded, setArticlesLoaded] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
 
   // ONE master order for all three tabs: shuffled only when the data is
@@ -225,6 +242,8 @@ export default function Feed() {
     } catch (err: any) {
       console.log('Error fetching articles:', err?.message);
       return reset ? articlesRef.current : [];
+    } finally {
+      setArticlesLoaded(true);
     }
   }, []);
 
@@ -270,12 +289,14 @@ export default function Feed() {
 
   // Infinite scroll: page in more articles AND posts when the bottom nears
   const onEndReached = useCallback(async () => {
-    if (loadingMore || refreshing || (!hasMoreArticles && !hasMorePosts)) return;
+    const canLoadArticles = showsArticles && hasMoreArticles;
+    const canLoadPosts = showsPosts && hasMorePosts;
+    if (loadingMore || refreshing || (!canLoadArticles && !canLoadPosts)) return;
     setLoadingMore(true);
     try {
       const [addedArticles, addedPosts] = await Promise.all([
-        hasMoreArticles ? fetchArticles(false) : Promise.resolve([] as ArticleType[]),
-        hasMorePosts ? loadMorePosts() : Promise.resolve([]),
+        canLoadArticles ? fetchArticles(false) : Promise.resolve([] as ArticleType[]),
+        canLoadPosts ? loadMorePosts() : Promise.resolve([]),
       ]);
       // Appended pages join the END of the master order (shuffled among
       // themselves); every tab sees them below what it already showed.
@@ -290,7 +311,16 @@ export default function Feed() {
     } finally {
       setLoadingMore(false);
     }
-  }, [loadingMore, refreshing, hasMoreArticles, hasMorePosts, fetchArticles, loadMorePosts]);
+  }, [
+    loadingMore,
+    refreshing,
+    showsArticles,
+    showsPosts,
+    hasMoreArticles,
+    hasMorePosts,
+    fetchArticles,
+    loadMorePosts,
+  ]);
 
   // Rebuild the master shuffle only on data RESETS (pull-to-refresh, new
   // post created) — never on appended pages or tab switches, so the
@@ -303,6 +333,26 @@ export default function Feed() {
     setMasterOrder(shuffle([...postEntries, ...articleEntries]));
   }, [postsEpoch, orderEpoch]);
 
+  // Async post/article resets can finish in separate renders. Keep the
+  // stable order synchronized with the data that actually exists so an
+  // early empty reset can never strand the feed with no rows. Existing
+  // entries keep their order; newly paged content joins at the end.
+  useEffect(() => {
+    setMasterOrder((current) => {
+      const available = [
+        ...posts.map((post) => ({ kind: 'post' as const, id: post.id })),
+        ...articles.map((article) => ({ kind: 'article' as const, id: article.id })),
+      ];
+      const availableKeys = new Set(available.map((item) => `${item.kind}:${item.id}`));
+      const kept = current.filter((item) => availableKeys.has(`${item.kind}:${item.id}`));
+      const keptKeys = new Set(kept.map((item) => `${item.kind}:${item.id}`));
+      const missing = available.filter((item) => !keptKeys.has(`${item.kind}:${item.id}`));
+
+      if (missing.length === 0 && kept.length === current.length) return current;
+      return [...kept, ...shuffle(missing)];
+    });
+  }, [articles, posts]);
+
   // Resolve the stable master order into fresh data on every render,
   // keeping only what the active tab allows — the sequence itself never
   // changes, each tab just sees its slice of it.
@@ -314,17 +364,35 @@ export default function Feed() {
   );
   const feedItems = useMemo<FeedItem[]>(() => {
     const items: FeedItem[] = [];
-    for (const o of masterOrder) {
+    const renderOrder = masterOrder.length > 0
+      ? masterOrder
+      : [
+          ...posts.map((post) => ({ kind: 'post' as const, id: post.id })),
+          ...articles.map((article) => ({ kind: 'article' as const, id: article.id })),
+        ];
+    for (const o of renderOrder) {
       if (o.kind === 'post') {
+        if (!showsPosts) continue;
         const data = postsById.get(o.id);
         if (data && visiblePostIds.has(o.id)) items.push({ kind: 'post', id: `p-${o.id}`, data });
       } else {
+        if (!showsArticles) continue;
         const data = articlesById.get(o.id);
         if (data && tabAllows(articleLean(data))) items.push({ kind: 'article', id: `a-${o.id}`, data });
       }
     }
     return items;
-  }, [masterOrder, postsById, articlesById, visiblePostIds, tabAllows]);
+  }, [
+    masterOrder,
+    posts,
+    articles,
+    postsById,
+    articlesById,
+    visiblePostIds,
+    tabAllows,
+    showsPosts,
+    showsArticles,
+  ]);
   const feedItemsRef = useRef(feedItems);
   useEffect(() => { feedItemsRef.current = feedItems; }, [feedItems]);
 
@@ -347,6 +415,13 @@ export default function Feed() {
 
   const listRef = useRef<FlatList<FeedItem>>(null);
 
+  // A content-type change creates a different timeline. Reset every tab's
+  // saved offset so returning from Settings cannot land beyond the new list.
+  useEffect(() => {
+    scrollOffsets.current = {};
+    listRef.current?.scrollToOffset({ offset: 0, animated: false });
+  }, [feedContentPreference]);
+
   // Re-tapping the home tab button jumps to the top and reloads the feed
   useEffect(() => {
     return onTabRefresh('index', () => {
@@ -368,7 +443,13 @@ export default function Feed() {
   }, [activeTab]);
 
   return(
-      <ThemedView style={styles.container}>
+      <ThemedView
+        style={styles.container}
+        onLayout={(event) => {
+          const next = Math.round(event.nativeEvent.layout.width);
+          if (next > 0 && next !== feedWidth) setFeedWidth(next);
+        }}
+      >
         <FlatList<FeedItem>
           ref={listRef}
           data={feedItems}
@@ -390,39 +471,76 @@ export default function Feed() {
           // hot bar, so pull-to-refresh triggers at the normal distance
           // and the spinner shows up in the fade zone. Content still
           // scrolls up under the gradient (which overlays the list top).
-          style={{ marginTop: hotTopics.length > 0 ? 210 : 104 }}
+          style={{
+            flex: 1,
+            marginTop: hotTopics.length > 0 ? (isWeb ? 184 : 210) : (isWeb ? 58 : 104),
+          }}
           refreshControl={
-            <AppRefreshControl
-              refreshing={refreshing}
-              onRefresh={onPullRefresh}
-            />
+            isWeb ? undefined : (
+              <AppRefreshControl
+                refreshing={refreshing}
+                onRefresh={onPullRefresh}
+              />
+            )
           }
           onEndReached={onEndReached}
           onEndReachedThreshold={0.4}
           ListFooterComponent={
             loadingMore ? (
               <ActivityIndicator style={{ paddingVertical: 24 }} />
-            ) : !hasMoreArticles && !hasMorePosts && feedItems.length > 0 ? (
+            ) : (!showsArticles || !hasMoreArticles) &&
+              (!showsPosts || !hasMorePosts) &&
+              feedItems.length > 0 ? (
               <ThemedText style={styles.feedEnd}>You&apos;re all caught up</ThemedText>
             ) : null
+          }
+          ListEmptyComponent={
+            <ThemedView style={styles.emptyFeed}>
+              {(showsPosts && postsLoading && posts.length === 0) ||
+              (showsArticles && !articlesLoaded && articles.length === 0) ? (
+                <>
+                  <ActivityIndicator color={c.muted} />
+                  <ThemedText style={styles.emptyFeedText}>Loading the conversation…</ThemedText>
+                </>
+              ) : (
+                <>
+                  <ThemedText style={styles.emptyFeedTitle}>Nothing matches this view yet</ThemedText>
+                  <ThemedText style={styles.emptyFeedText}>
+                    {feedContentPreference === 'posts'
+                      ? 'No posts match this perspective yet.'
+                      : feedContentPreference === 'articles'
+                        ? 'No articles match this perspective yet.'
+                        : 'The Random feed keeps every perspective in the mix.'}
+                  </ThemedText>
+                  {activeTab !== 'Random' && (
+                    <Pressable onPress={() => setActiveTab('Random')} style={styles.emptyFeedButton}>
+                      <ThemedText style={styles.emptyFeedButtonText}>Open Random</ThemedText>
+                    </Pressable>
+                  )}
+                </>
+              )}
+            </ThemedView>
           }
           contentContainerStyle={{ paddingTop: 0, paddingBottom: 24 }}
         />
         {/* Hot topics: slim swipeable carousel pinned below the tabs;
             tap a title for its summary */}
         {hotTopics.length > 0 && (
-          <ThemedView style={styles.hotBar} pointerEvents="box-none">
+          <ThemedView style={[styles.hotBar, isWeb && styles.hotBarWeb, { pointerEvents: 'box-none' }]}>
             <Carousel
               data={hotTopics}
               keyExtractor={(t) => t.id}
+              pageWidth={feedWidth || undefined}
               horizontalPadding={0}
               showPagination={false}
+              showControls={isWeb && windowWidth >= 700}
               onIndexChange={setHotIndex}
               renderItem={({ item }) => (
                 <Pressable
                   onPress={() => router.push(`/summary/${item.id}`)}
                   style={({ pressed }) => [
                     styles.hotCard,
+                    isWeb && styles.hotCardWeb,
                     { backgroundColor: pressed ? c.accentFaint + 'BF' : c.accentFaint },
                   ]}
                 >
@@ -457,11 +575,10 @@ export default function Feed() {
             // Theme-owned fade tokens keep this overlay neutral in both modes.
             colors={[c.background, c.backgroundFade60, c.backgroundFade25, c.backgroundTransparent]}
             locations={[0, 0.45, 0.75, 1]}
-            style={styles.fadeOverlay}
-            pointerEvents="none"
+            style={[styles.fadeOverlay, isWeb && styles.fadeOverlayWeb, { pointerEvents: 'none' }]}
           />
         )}
-        <ThemedView style={styles.header}>
+        <ThemedView style={[styles.header, isWeb && styles.headerWeb]}>
           {(['For You', 'Random', 'Against You'] as const).map((tab) => (
             <Pressable
               key={tab}
@@ -474,8 +591,8 @@ export default function Feed() {
                 borderBottomColor: activeTab === tab ? c.primary : c.background,
                 alignItems: 'center',
                 justifyContent: 'center',
-                marginTop: 54,
-                width: screenWidth / 3,
+                marginTop: isWeb ? 0 : 54,
+                flex: 1,
               }}
             >
               <ThemedText
@@ -490,7 +607,7 @@ export default function Feed() {
         {/* Floating create-post button */}
         <Pressable
           onPress={() => { tapLight(); router.push('/createpost'); }}
-          style={({ pressed }) => [styles.fab, { opacity: pressed ? 0.85 : 1 }]}
+          style={({ pressed }) => [styles.fab, (webHasSidebar || webHasHeaderComposer) && styles.fabWeb, { opacity: pressed ? 0.85 : 1 }]}
           accessibilityRole="button"
           accessibilityLabel="Create post"
         >
@@ -511,25 +628,40 @@ const makeStyles = (c: Palette) => StyleSheet.create({
     justifyContent: 'space-around',
     backgroundColor: c.background,
     position: 'absolute',
-    width: screenWidth,
+    width: '100%',
     height: 104,
     borderColor: c.border,
     borderBottomWidth: 1,
   },
+  headerWeb: {
+    height: 58,
+    zIndex: 4,
+  },
   hotBar: {
     position: 'absolute',
     top: 104,
-    width: screenWidth,
+    width: '100%',
     paddingTop: 14,
     paddingBottom: 8,
     backgroundColor: c.background,
+  },
+  hotBarWeb: {
+    top: 58,
+    paddingTop: 12,
+    paddingBottom: 12,
+    zIndex: 3,
   },
   // sits directly below the solid bar (104 + 14 + 84 card + 8 = 210)
   fadeOverlay: {
     position: 'absolute',
     top: 210,
-    width: screenWidth,
+    width: '100%',
     height: 20,
+  },
+  fadeOverlayWeb: {
+    top: 166,
+    height: 18,
+    zIndex: 2,
   },
   hotCard: {
     marginHorizontal: 16,
@@ -539,6 +671,10 @@ const makeStyles = (c: Palette) => StyleSheet.create({
     paddingBottom: 12,
     minHeight: 84,
     justifyContent: 'center',
+  },
+  hotCardWeb: {
+    minHeight: 84,
+    marginHorizontal: 12,
   },
   hotCardText: {
     fontSize: 15,
@@ -565,6 +701,41 @@ const makeStyles = (c: Palette) => StyleSheet.create({
     color: c.muted,
     paddingVertical: 24,
   },
+  emptyFeed: {
+    minHeight: 240,
+    paddingHorizontal: 32,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    backgroundColor: 'transparent',
+  },
+  emptyFeedTitle: {
+    fontSize: 16,
+    lineHeight: 21,
+    fontWeight: '900',
+    textAlign: 'center',
+  },
+  emptyFeedText: {
+    color: c.muted,
+    fontSize: 13,
+    lineHeight: 18,
+    textAlign: 'center',
+  },
+  emptyFeedButton: {
+    marginTop: 6,
+    minHeight: 38,
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: c.primary,
+  },
+  emptyFeedButtonText: {
+    color: c.onPrimary,
+    fontSize: 12,
+    lineHeight: 16,
+    fontWeight: '900',
+  },
   fab: {
     position: 'absolute',
     right: 20,
@@ -575,10 +746,17 @@ const makeStyles = (c: Palette) => StyleSheet.create({
     backgroundColor: c.primary,
     alignItems: 'center',
     justifyContent: 'center',
-    shadowColor: c.shadow,
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.3,
-    shadowRadius: 5,
+    ...(Platform.OS === 'web'
+      ? { boxShadow: `0 3px 10px ${c.shadow}4D` }
+      : {
+          shadowColor: c.shadow,
+          shadowOffset: { width: 0, height: 3 },
+          shadowOpacity: 0.3,
+          shadowRadius: 5,
+        }),
     elevation: 6,
+  },
+  fabWeb: {
+    display: 'none',
   },
 });

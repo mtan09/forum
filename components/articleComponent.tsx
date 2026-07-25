@@ -10,11 +10,9 @@ import { getPerspectiveToneForPosition } from '@/lib/perspective-colors';
 import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
 import { memo, useEffect, useMemo, useState } from 'react';
-import { Dimensions, Pressable, StyleSheet } from 'react-native';
+import { Platform, Pressable, StyleSheet, useWindowDimensions } from 'react-native';
 import ArticleActions from './article-actions';
 import ScorerReceipts from './scorerReceipts';
-
-const screenWidth = Dimensions.get('window').width;
 
 export type ArticleType = {
   id: string;
@@ -58,13 +56,16 @@ export type UserType = {
 
 type Props = {
   article: ArticleType;
+  variant?: 'feed' | 'detail';
 }
 
-function Article({ article }: Props) {
+function Article({ article, variant = 'feed' }: Props) {
 
   const { c } = usePalette();
   const styles = useMemo(() => makeStyles(c), [c]);
-  const contentWidth = screenWidth - 32;
+  const { width: windowWidth } = useWindowDimensions();
+  const [measuredWidth, setMeasuredWidth] = useState(0);
+  const contentWidth = measuredWidth || Math.max(1, Math.min(windowWidth - 32, 700));
   const timeAgo = useRelativeTime(article.published_at);
 
   // Articles are identified by their OUTLET's published lean (a small
@@ -79,15 +80,22 @@ function Article({ article }: Props) {
   const logo = logoUrl(article.url);
   const media = getDisplayableArticleMedia(article.media, article.url);
   const receiptPosition = article.political_lean ?? article.source_lean ?? null;
+  const detail = variant === 'detail';
 
   useEffect(() => {
     setMediaFailed(false);
   }, [media]);
 
   return (
-    <ThemedView style={styles.post}>
-      <ThemedView style={styles.postContent}>
-        <ThemedView style={styles.container}>
+    <ThemedView style={[styles.post, detail && styles.postDetailWeb]}>
+      <ThemedView style={[styles.postContent, detail && styles.postContentDetailWeb]}>
+          <ThemedView
+            style={styles.container}
+            onLayout={(event) => {
+              const next = Math.round(event.nativeEvent.layout.width);
+              if (next > 0 && next !== measuredWidth) setMeasuredWidth(next);
+            }}
+          >
           <ThemedView style={styles.header}>
             {/* Outlet logo opens the source's detail page */}
             <Pressable
@@ -134,17 +142,23 @@ function Article({ article }: Props) {
             <ThemedText style={styles.text}>{article.title}</ThemedText>
 
             {/* Post media (if any) */}
-            {media && !mediaFailed && (
-              // <ThemedView style={styles.mediaContainer}>
-                <ScalableImage
-                  source={{uri: media}}
-                  type='width'
-                  dimension={contentWidth}
-                  style={styles.media}
-                  onError={() => setMediaFailed(true)}
-                />
-              // </ThemedView>
-            )}
+            {media && !mediaFailed && Platform.OS === 'web' ? (
+              <Image
+                source={{ uri: media }}
+                style={[styles.webMedia, { height: detail ? Math.min(contentWidth * 0.62, 420) : contentWidth * 9 / 16 }]}
+                contentFit={detail ? 'contain' : 'cover'}
+                cachePolicy="memory-disk"
+                onError={() => setMediaFailed(true)}
+              />
+            ) : media && !mediaFailed ? (
+              <ScalableImage
+                source={{uri: media}}
+                type='width'
+                dimension={contentWidth}
+                style={styles.media}
+                onError={() => setMediaFailed(true)}
+              />
+            ) : null}
             {media && mediaFailed && (
               <ThemedView style={styles.mediaFallback}>
                 <IconSymbol name="photo" size={24} color={c.muted} />
@@ -183,13 +197,33 @@ const makeStyles = (c: Palette) => StyleSheet.create({
     flexDirection: 'column',
   },
   post: {
-    paddingHorizontal: 16,
-    
+    paddingHorizontal: Platform.OS === 'web' ? 12 : 16,
   },
   postContent: {
     paddingVertical: 16,
     borderColor: c.border,
-    borderBottomWidth: 1,
+    borderBottomWidth: Platform.OS === 'web' ? 0 : 1,
+    ...(Platform.OS === 'web' ? {
+      borderWidth: 1,
+      borderRadius: 18,
+      backgroundColor: c.background,
+      paddingHorizontal: 16,
+      marginBottom: 12,
+    } : {}),
+  },
+  postDetailWeb: {
+    paddingHorizontal: Platform.OS === 'web' ? 0 : 16,
+  },
+  postContentDetailWeb: {
+    ...(Platform.OS === 'web'
+      ? {
+          borderWidth: 0,
+          borderBottomWidth: 1,
+          borderRadius: 0,
+          paddingHorizontal: 20,
+          marginBottom: 0,
+        }
+      : {}),
   },
   logo: {
     width: 50,
@@ -214,7 +248,7 @@ const makeStyles = (c: Palette) => StyleSheet.create({
     color: c.onAccentFaint,
   },
   content: {
-    width: screenWidth - 32,
+    width: '100%',
   },
   text: {
     flexShrink: 1,
@@ -245,12 +279,19 @@ const makeStyles = (c: Palette) => StyleSheet.create({
     borderRadius: 16,
     marginBottom: 8,
   },
+  webMedia: {
+    width: '100%',
+    borderRadius: 14,
+    marginBottom: 8,
+    backgroundColor: c.surfaceMuted,
+  },
   mediaFallback: {
-    width: screenWidth - 32,
+    width: '100%',
     aspectRatio: 16 / 9,
     borderRadius: 16,
     marginBottom: 8,
     backgroundColor: c.inputBg,
+    display: Platform.OS === 'web' ? 'none' : 'flex',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 6,

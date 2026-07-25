@@ -263,6 +263,7 @@ function CommentItem({ comment }: { comment: Comment }) {
 						value={replyText}
 						onChangeText={setReplyText}
 						multiline
+						numberOfLines={1}
 						style={styles.replyInput}
 						editable={!replySubmitting}
 						autoFocus
@@ -380,9 +381,12 @@ const makeStyles = (c: Palette) => StyleSheet.create({
 	replyInput: {
 		flex: 1,
 		fontSize: 14,
+		lineHeight: 19,
+		minHeight: 27,
 		maxHeight: 80,
-		paddingTop: 0,
-		paddingBottom: 0,
+		paddingTop: 4,
+		paddingBottom: 4,
+		textAlignVertical: 'center',
 		color: c.text,
 	},
 });

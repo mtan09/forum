@@ -8,7 +8,7 @@ import { api } from '@/lib/api';
 import { onTabRefresh } from '@/lib/tabRefresh';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet } from 'react-native';
+import { Platform, Pressable, ScrollView, StyleSheet, useWindowDimensions } from 'react-native';
 
 // The Floor: the app's live rooms. One debate per daily pick — the
 // biggest story and the most divided one — each with a shared thread.
@@ -35,6 +35,8 @@ export default function DebateTab() {
   const router = useRouter();
   const { c } = usePalette();
   const styles = useMemo(() => makeStyles(c), [c]);
+  const { width } = useWindowDimensions();
+  const compactWeb = Platform.OS === 'web' && width < 760;
   const KIND_META = useMemo(() => kindMeta(c), [c]);
   const [debates, setDebates] = useState<Debate[] | null>(null);
   const [recap, setRecap] = useState<RecapDebate[]>([]);
@@ -93,17 +95,20 @@ export default function DebateTab() {
   return (
     <ScrollView
       ref={scrollRef}
+      showsVerticalScrollIndicator={false}
       contentContainerStyle={styles.container}
       alwaysBounceVertical
       onScrollBeginDrag={() => {
         refreshTriggeredThisDrag.current = false;
       }}
       refreshControl={
-        <AppRefreshControl
-          refreshing={refreshing}
-          onRefresh={onPullRefresh}
-          indicatorVisible={false}
-        />
+        Platform.OS === 'web' ? undefined : (
+          <AppRefreshControl
+            refreshing={refreshing}
+            onRefresh={onPullRefresh}
+            indicatorVisible={false}
+          />
+        )
       }
     >
       <ThemedText type="title" style={styles.title}>The Floor</ThemedText>
@@ -117,41 +122,43 @@ export default function DebateTab() {
         </ThemedView>
       )}
 
-      {debates?.map((debate) => {
-        const meta = KIND_META[debate.kind];
-        const joined = debate.my_position != null;
-        return (
-          <Pressable
-            key={debate.id}
-            onPress={() => router.push(`/debate/${debate.id}`)}
-            style={({ pressed }) => [{ opacity: pressed ? 0.7 : 1 }]}
-          >
-            <ThemedView style={styles.card}>
-              <ThemedView style={[styles.kindChip, { backgroundColor: meta.bg }]}>
-                <ThemedText style={[styles.kindChipText, { color: meta.color }]}>{meta.label}</ThemedText>
-              </ThemedView>
-              <ThemedText type="defaultSemiBold" style={styles.cardTitle} numberOfLines={3}>
-                {debate.title}
-              </ThemedText>
-              <ThemedView style={styles.cardFooter}>
-                <ThemedText style={styles.cardStats}>
-                  {debate.total_votes} voice{debate.total_votes === 1 ? '' : 's'} · {debate.comment_count} comment{debate.comment_count === 1 ? '' : 's'}
+      <ThemedView style={[styles.todayGrid, compactWeb && styles.todayGridCompact]}>
+        {debates?.map((debate) => {
+          const meta = KIND_META[debate.kind];
+          const joined = debate.my_position != null;
+          return (
+            <Pressable
+              key={debate.id}
+              onPress={() => router.push(`/debate/${debate.id}`)}
+              style={({ pressed }) => [styles.roomPressable, compactWeb && styles.roomPressableCompact, { opacity: pressed ? 0.7 : 1 }]}
+            >
+              <ThemedView style={styles.card}>
+                <ThemedView style={[styles.kindChip, { backgroundColor: meta.bg }]}>
+                  <ThemedText style={[styles.kindChipText, { color: meta.color }]}>{meta.label}</ThemedText>
+                </ThemedView>
+                <ThemedText type="defaultSemiBold" style={styles.cardTitle} numberOfLines={3}>
+                  {debate.title}
                 </ThemedText>
-                <ThemedView style={styles.cardCta}>
-                  <ThemedText style={[styles.cardCtaText, joined && { color: c.success }]}>
-                    {joined ? 'You’re in' : 'Take a stance'}
+                <ThemedView style={styles.cardFooter}>
+                  <ThemedText style={styles.cardStats}>
+                    {debate.total_votes} voice{debate.total_votes === 1 ? '' : 's'} · {debate.comment_count} comment{debate.comment_count === 1 ? '' : 's'}
                   </ThemedText>
-                  <IconSymbol
-                    name={joined ? 'checkmark.circle.fill' : 'chevron.right'}
-                    size={16}
-                    color={joined ? c.success : c.primary}
-                  />
+                  <ThemedView style={styles.cardCta}>
+                    <ThemedText style={[styles.cardCtaText, joined && { color: c.success }]}>
+                      {joined ? 'You’re in' : 'Take a stance'}
+                    </ThemedText>
+                    <IconSymbol
+                      name={joined ? 'checkmark.circle.fill' : 'chevron.right'}
+                      size={16}
+                      color={joined ? c.success : c.primary}
+                    />
+                  </ThemedView>
                 </ThemedView>
               </ThemedView>
-            </ThemedView>
-          </Pressable>
-        );
-      })}
+            </Pressable>
+          );
+        })}
+      </ThemedView>
 
       {/* Yesterday's rooms, with where they landed — the closing beat */}
       {recap.length > 0 && (
@@ -213,24 +220,45 @@ function RecapCard({ room }: { room: RecapDebate }) {
 
 const makeStyles = (c: Palette) => StyleSheet.create({
   container: {
-    paddingTop: 88,
-    paddingHorizontal: 16,
+    paddingTop: Platform.OS === 'web' ? 32 : 88,
+    paddingHorizontal: Platform.OS === 'web' ? 28 : 16,
     paddingBottom: 32,
     gap: 12,
   },
   title: {
     color: c.primary,
+    fontSize: Platform.OS === 'web' ? 34 : undefined,
+    lineHeight: Platform.OS === 'web' ? 40 : undefined,
   },
   subtitle: {
     color: c.muted,
     marginBottom: 8,
   },
+  todayGrid: {
+    flexDirection: Platform.OS === 'web' ? 'row' : 'column',
+    flexWrap: Platform.OS === 'web' ? 'wrap' : 'nowrap',
+    gap: 12,
+    backgroundColor: 'transparent',
+  },
+  todayGridCompact: {
+    flexDirection: 'column',
+    flexWrap: 'nowrap',
+  },
+  roomPressable: {
+    width: Platform.OS === 'web' ? '49%' : '100%',
+    flexGrow: Platform.OS === 'web' ? 1 : 0,
+  },
+  roomPressableCompact: {
+    width: '100%',
+    flexGrow: 0,
+  },
   card: {
-    borderRadius: 16,
+    flex: 1,
+    borderRadius: Platform.OS === 'web' ? 20 : 16,
     borderWidth: 1,
     borderColor: c.cardBorder,
     backgroundColor: c.card,
-    padding: 16,
+    padding: Platform.OS === 'web' ? 20 : 16,
     gap: 10,
   },
   kindChip: {

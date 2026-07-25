@@ -9,7 +9,7 @@ import { notifySuccess, tapLight, tapMedium } from '@/lib/haptics';
 import * as ImagePicker from 'expo-image-picker';
 import { useRouter } from 'expo-router';
 import { useMemo, useState } from 'react';
-import { Image, Keyboard, Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
+import { Image, Keyboard, Platform, Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
 
 export default function CreatePost() {
   const router = useRouter();
@@ -121,7 +121,7 @@ export default function CreatePost() {
   };
 
   return(
-    <Pressable style={{ flex: 1 }} onPress={Keyboard.dismiss} accessible={false}>
+    <Pressable style={styles.backdrop} onPress={Keyboard.dismiss} accessible={false}>
       <ThemedView style={styles.container}>
         <ScrollView 
           style={styles.scrollView}
@@ -231,16 +231,30 @@ export default function CreatePost() {
 }
 
 const makeStyles = (c: Palette) => StyleSheet.create({
-  container: {
+  backdrop: {
     flex: 1,
+    alignItems: Platform.OS === 'web' ? 'center' : 'stretch',
+    justifyContent: Platform.OS === 'web' ? 'center' : 'flex-start',
+    padding: Platform.OS === 'web' ? 24 : 0,
+    backgroundColor: Platform.OS === 'web' ? c.scrim : c.surfaceRaised,
+  },
+  container: {
+    flex: Platform.OS === 'web' ? undefined : 1,
+    width: '100%',
+    maxWidth: Platform.OS === 'web' ? 680 : undefined,
+    height: Platform.OS === 'web' ? 'min(560px, calc(100vh - 48px))' as any : undefined,
+    borderRadius: Platform.OS === 'web' ? 24 : 0,
+    borderWidth: Platform.OS === 'web' ? 1 : 0,
+    borderColor: c.cardBorder,
+    overflow: 'hidden',
     backgroundColor: c.surfaceRaised,
   },
   scrollView: {
     flex: 1,
   },
   scrollContent: {
-    paddingHorizontal: 16,
-    paddingTop: 16,
+    paddingHorizontal: Platform.OS === 'web' ? 24 : 16,
+    paddingTop: Platform.OS === 'web' ? 20 : 16,
     paddingBottom: 120,
   },
   header: {
@@ -248,7 +262,7 @@ const makeStyles = (c: Palette) => StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     marginBottom: 24,
-    marginTop: 26,
+    marginTop: Platform.OS === 'web' ? 0 : 26,
     backgroundColor: 'transparent',
   },
   headerTitle: {
@@ -264,7 +278,7 @@ const makeStyles = (c: Palette) => StyleSheet.create({
     backgroundColor: c.surfaceMuted,
     borderWidth: 1,
     borderColor: c.border,
-    transform: [{ translateY: -3 }],
+    transform: [{ translateY: Platform.OS === 'web' ? 0 : -3 }],
   },
   input: {
     width: '100%',
@@ -272,7 +286,7 @@ const makeStyles = (c: Palette) => StyleSheet.create({
     borderWidth: 2,
     borderColor: c.accentFaint,
     borderRadius: 16,
-    paddingHorizontal: 16,
+    paddingHorizontal: Platform.OS === 'web' ? 24 : 16,
     paddingVertical: 12,
     marginBottom: 16,
     fontSize: 16,

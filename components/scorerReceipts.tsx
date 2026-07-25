@@ -4,9 +4,7 @@ import Spectrum from '@/components/spectrum';
 import { type Palette } from '@/constants/theme';
 import { usePalette } from '@/hooks/use-palette';
 import { useMemo } from 'react';
-import { Dimensions, Modal, Pressable, ScrollView, StyleSheet, View } from 'react-native';
-
-const screenWidth = Dimensions.get('window').width;
+import { Modal, Platform, Pressable, ScrollView, StyleSheet, useWindowDimensions, View } from 'react-native';
 
 // The deterministic scorer records every signal that produced a
 // placement (posts.position_signals / articles.lean_signals). This modal
@@ -84,6 +82,8 @@ type Props = {
 export default function ScorerReceipts({ visible, onClose, position, signals, kind = 'post' }: Props) {
   const { c } = usePalette();
   const styles = useMemo(() => makeStyles(c), [c]);
+  const { width: windowWidth } = useWindowDimensions();
+  const spectrumWidth = Math.max(1, Math.min(windowWidth - 64, 640));
   const parsed = parse(signals);
   const stanceHits = parsed.stances;
   const leanHits = parsed.framing.filter((f) => f.side === 'left' || f.side === 'right');
@@ -100,7 +100,7 @@ export default function ScorerReceipts({ visible, onClose, position, signals, ki
               <ThemedText type="defaultSemiBold" style={styles.title}>Why this placement?</ThemedText>
             </View>
 
-            <Spectrum width={screenWidth - 64} height={20} position={position} />
+            <Spectrum width={spectrumWidth} height={20} position={position} />
             <ThemedText style={styles.band}>{bandLabel(position)}</ThemedText>
 
             {/* Source prior — articles start from their outlet's rating */}
@@ -217,12 +217,19 @@ const makeStyles = (c: Palette) => StyleSheet.create({
   backdrop: {
     flex: 1,
     backgroundColor: c.scrim,
-    justifyContent: 'flex-end',
+    justifyContent: Platform.OS === 'web' ? 'center' : 'flex-end',
+    alignItems: Platform.OS === 'web' ? 'center' : 'stretch',
+    padding: Platform.OS === 'web' ? 24 : 0,
   },
   sheet: {
+    width: '100%',
+    maxWidth: Platform.OS === 'web' ? 704 : undefined,
     backgroundColor: c.overlayCard,
+    borderRadius: Platform.OS === 'web' ? 24 : 0,
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
+    borderWidth: Platform.OS === 'web' ? 1 : 0,
+    borderColor: c.cardBorder,
     paddingHorizontal: 24,
     paddingBottom: 32,
     paddingTop: 12,

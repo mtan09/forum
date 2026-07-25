@@ -4,7 +4,7 @@ import { usePalette } from '@/hooks/use-palette';
 import { tapMedium } from '@/lib/haptics';
 import { useRouter } from 'expo-router';
 import React, { useMemo, useState } from 'react';
-import { ActivityIndicator, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Platform, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 
 export default function Login() {
   const { c } = usePalette();
@@ -83,7 +83,7 @@ export default function Login() {
 }
 
 const makeStyles = (c: Palette) => StyleSheet.create({
-  container: { flex: 1, padding: 24, gap: 12, backgroundColor: c.background, justifyContent: 'center' },
+  container: { flex: 1, width: '100%', maxWidth: Platform.OS === 'web' ? 480 : undefined, alignSelf: 'center', padding: Platform.OS === 'web' ? 40 : 24, gap: 12, backgroundColor: c.background, justifyContent: 'center' },
   title: {
     fontSize: 28, 
     fontWeight: '800', 

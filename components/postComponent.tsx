@@ -8,13 +8,11 @@ import { api } from '@/lib/api';
 import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
 import { memo, useEffect, useMemo, useState } from 'react';
-import { Dimensions, Pressable, StyleSheet } from 'react-native';
+import { Platform, Pressable, StyleSheet, useWindowDimensions } from 'react-native';
 import ContentActions from './contentActions';
 import PostActions from './post-actions';
 import ScorerReceipts from './scorerReceipts';
 import Spectrum from './spectrum';
-
-const screenWidth = Dimensions.get('window').width;
 
 export type PostType = {
   id: string;
@@ -47,17 +45,21 @@ export type UserType = {
 
 type Props = {
   post: PostType;
+  variant?: 'feed' | 'detail';
 }
 
-function Post({ post }: Props) {
+function Post({ post, variant = 'feed' }: Props) {
 
   const router = useRouter();
   const { c } = usePalette();
   const styles = useMemo(() => makeStyles(c), [c]);
-  const contentWidth = screenWidth - 32;
+  const { width: windowWidth } = useWindowDimensions();
+  const [measuredWidth, setMeasuredWidth] = useState(0);
+  const contentWidth = measuredWidth || Math.max(1, Math.min(windowWidth - 32, 700));
   const timeAgo = useRelativeTime(post.timestamp);
   const [receiptsOpen, setReceiptsOpen] = useState(false);
   const [hidden, setHidden] = useState(false);
+  const detail = variant === 'detail';
 
   const [fetchedUser, setFetchedUser] = useState<UserType | null>(null);
   const user = useMemo<UserType>(() => (
@@ -79,8 +81,8 @@ function Post({ post }: Props) {
   if (hidden) return null;
 
   return (
-    <ThemedView style={styles.post}>
-      <ThemedView style={styles.postContent}>
+    <ThemedView style={[styles.post, detail && styles.postDetailWeb]}>
+      <ThemedView style={[styles.postContent, detail && styles.postContentDetailWeb]}>
         <ThemedView style={styles.container}>
           {/* Avatar + name open the author's public profile; overflow menu at right */}
           <ThemedView style={styles.headerRow}>
@@ -110,7 +112,13 @@ function Post({ post }: Props) {
             />
           </ThemedView>
 
-          <ThemedView style={styles.content}>
+            <ThemedView
+              style={styles.content}
+              onLayout={(event) => {
+                const next = Math.round(event.nativeEvent.layout.width);
+                if (next > 0 && next !== measuredWidth) setMeasuredWidth(next);
+              }}
+            >
 
             {/* Post text */}
             <ThemedText style={styles.text}>{post.text}</ThemedText>
@@ -123,14 +131,21 @@ function Post({ post }: Props) {
             )}
 
             {/* Post media (if any) */}
-            {post.media && (
+            {post.media && Platform.OS === 'web' ? (
+              <Image
+                source={{ uri: post.media }}
+                style={[styles.webMedia, { height: detail ? Math.min(contentWidth * 0.62, 420) : contentWidth * 9 / 16 }]}
+                contentFit={detail ? 'contain' : 'cover'}
+                cachePolicy="memory-disk"
+              />
+            ) : post.media ? (
               <ScalableImage
                 source={{uri: post.media}}
                 type='width'
                 dimension={contentWidth}
                 style={styles.media}
               />
-            )}
+            ) : null}
 
           </ThemedView>
         </ThemedView>
@@ -172,13 +187,33 @@ const makeStyles = (c: Palette) => StyleSheet.create({
     flexDirection: 'column',
   },
   post: {
-    paddingHorizontal: 16,
-
+    paddingHorizontal: Platform.OS === 'web' ? 12 : 16,
   },
   postContent: {
     paddingVertical: 16,
     borderColor: c.border,
-    borderBottomWidth: 1,
+    borderBottomWidth: Platform.OS === 'web' ? 0 : 1,
+    ...(Platform.OS === 'web' ? {
+      borderWidth: 1,
+      borderRadius: 18,
+      backgroundColor: c.background,
+      paddingHorizontal: 16,
+      marginBottom: 12,
+    } : {}),
+  },
+  postDetailWeb: {
+    paddingHorizontal: Platform.OS === 'web' ? 0 : 16,
+  },
+  postContentDetailWeb: {
+    ...(Platform.OS === 'web'
+      ? {
+          borderWidth: 0,
+          borderBottomWidth: 1,
+          borderRadius: 0,
+          paddingHorizontal: 20,
+          marginBottom: 0,
+        }
+      : {}),
   },
   avatar: {
     width: 50,
@@ -186,7 +221,7 @@ const makeStyles = (c: Palette) => StyleSheet.create({
     borderRadius: 25,
   },
   content: {
-    width: screenWidth - 32,
+    width: '100%',
   },
   text: {
     flexShrink: 1,
@@ -213,5 +248,11 @@ const makeStyles = (c: Palette) => StyleSheet.create({
   media: {
     borderRadius: 16,
     marginBottom: 8,
+  },
+  webMedia: {
+    width: '100%',
+    borderRadius: 14,
+    marginBottom: 8,
+    backgroundColor: c.surfaceMuted,
   },
 });

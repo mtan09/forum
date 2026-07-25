@@ -1,75 +1,66 @@
-// Fallback for using MaterialIcons on Android and web.
+// SF Symbols are Apple-only assets. This fallback preserves their semantic
+// names and closely matches their outline/filled silhouettes on web/Android.
 
-import MaterialIcons from '@expo/vector-icons/MaterialIcons';
-import { SymbolViewProps, SymbolWeight } from 'expo-symbols';
-import { ComponentProps } from 'react';
-import { OpaqueColorValue, type StyleProp, type TextStyle } from 'react-native';
+import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
+import type { SymbolViewProps, SymbolWeight } from 'expo-symbols';
+import type { ComponentProps } from 'react';
+import type { OpaqueColorValue, StyleProp, TextStyle } from 'react-native';
 
-type IconMapping = Record<SymbolViewProps['name'], ComponentProps<typeof MaterialIcons>['name']>;
-type IconSymbolName = keyof typeof MAPPING;
+type IconMapping = Record<SymbolViewProps['name'], ComponentProps<typeof MaterialCommunityIcons>['name']>;
 
-/**
- * Every SF Symbol the app uses, mapped to a Material Icon so Android and
- * web render real glyphs instead of blanks.
- * - Material Icons in the [Icons Directory](https://icons.expo.fyi)
- * - SF Symbols in the [SF Symbols](https://developer.apple.com/sf-symbols/) app
- */
 const MAPPING = {
-  // navigation / tab bar
+  // Navigation
   'house.fill': 'home',
-  house: 'home',
-  'bubble.left.and.bubble.right.fill': 'forum',
-  'bubble.left.and.bubble.right': 'forum',
-  'brain.fill': 'psychology',
-  brain: 'psychology',
-  magnifyingglass: 'search',
-  'newspaper.fill': 'article',
-  'arrow.up.right': 'north-east',
-  'person.fill': 'person',
-  'person.2.fill': 'people',
-  person: 'person-outline',
+  house: 'home-outline',
+  'bubble.left.and.bubble.right.fill': 'message-text',
+  'bubble.left.and.bubble.right': 'message-text-outline',
+  'brain.fill': 'brain',
+  brain: 'brain',
+  magnifyingglass: 'magnify',
+  'newspaper.fill': 'newspaper',
+  'arrow.up.right': 'arrow-top-right',
+  'person.fill': 'account',
+  'person.2.fill': 'account-group',
+  person: 'account-outline',
   'chevron.left': 'chevron-left',
   'chevron.right': 'chevron-right',
-  'chevron.up': 'keyboard-arrow-up',
-  'chevron.down': 'keyboard-arrow-down',
-  'chevron.left.forwardslash.chevron.right': 'code',
+  'chevron.up': 'chevron-up',
+  'chevron.down': 'chevron-down',
+  'chevron.left.forwardslash.chevron.right': 'code-tags',
 
-  // actions
-  'arrowshape.up.fill': 'thumb-up',
-  'arrowshape.up': 'thumb-up-off-alt',
-  'arrowshape.down.fill': 'thumb-down',
-  'arrowshape.down': 'thumb-down-off-alt',
-  bubble: 'chat-bubble-outline',
+  // Actions
+  'arrowshape.up.fill': 'arrow-up-bold-circle',
+  'arrowshape.up': 'arrow-up-bold-circle-outline',
+  'arrowshape.down.fill': 'arrow-down-bold-circle',
+  'arrowshape.down': 'arrow-down-bold-circle-outline',
+  bubble: 'comment-outline',
   'bookmark.fill': 'bookmark',
-  bookmark: 'bookmark-border',
-  'square.and.arrow.up': 'ios-share',
-  'arrow.up.circle.fill': 'arrow-circle-up',
-  'x.circle.fill': 'cancel',
+  bookmark: 'bookmark-outline',
+  'square.and.arrow.up': 'share-variant-outline',
+  'arrow.up.circle.fill': 'arrow-up-circle',
+  'x.circle.fill': 'close-circle',
   xmark: 'close',
-  plus: 'add',
-  ellipsis: 'more-horiz',
+  plus: 'plus',
+  ellipsis: 'dots-horizontal',
 
-  // content / profile
+  // Content / profile
   'checkmark.circle.fill': 'check-circle',
-  'checkmark.seal.fill': 'verified',
-  calendar: 'calendar-today',
-  'camera.fill': 'photo-camera',
-  photo: 'photo',
-  sparkles: 'auto-awesome',
-  'gearshape.fill': 'settings',
+  'checkmark.seal.fill': 'check-decagram',
+  calendar: 'calendar',
+  'camera.fill': 'camera',
+  photo: 'image',
+  sparkles: 'creation-outline',
+  'gearshape.fill': 'cog',
   'envelope.fill': 'email',
-  envelope: 'mail-outline',
-  flag: 'outlined-flag',
-  'hand.raised': 'front-hand',
-  'hand.raised.fill': 'front-hand',
+  envelope: 'email-outline',
+  flag: 'flag-outline',
+  'hand.raised': 'hand-back-left-outline',
+  'hand.raised.fill': 'hand-back-left',
   'paperplane.fill': 'send',
 } as IconMapping;
 
-/**
- * An icon component that uses native SF Symbols on iOS, and Material Icons on Android and web.
- * This ensures a consistent look across platforms, and optimal resource usage.
- * Icon `name`s are based on SF Symbols and require manual mapping to Material Icons.
- */
+type IconSymbolName = keyof typeof MAPPING;
+
 export function IconSymbol({
   name,
   size = 24,
@@ -82,5 +73,5 @@ export function IconSymbol({
   style?: StyleProp<TextStyle>;
   weight?: SymbolWeight;
 }) {
-  return <MaterialIcons color={color} size={size} name={MAPPING[name]} style={style} />;
+  return <MaterialCommunityIcons color={color} size={size} name={MAPPING[name]} style={style} />;
 }

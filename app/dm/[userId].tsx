@@ -104,7 +104,7 @@ export default function DmThread() {
   return (
     <KeyboardAvoidingView
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-      style={{ flex: 1 }}
+      style={styles.keyboard}
       keyboardVerticalOffset={100}
     >
       <Stack.Screen options={{ title: otherName }} />
@@ -112,6 +112,7 @@ export default function DmThread() {
         <FlatList
           ref={listRef}
           data={messages}
+          showsVerticalScrollIndicator={false}
           keyExtractor={(m) => m.id}
           contentContainerStyle={styles.listContent}
           renderItem={({ item }) => {
@@ -131,6 +132,7 @@ export default function DmThread() {
             placeholder={`Message ${otherName}...`}
             placeholderTextColor={c.muted}
             multiline
+            numberOfLines={1}
             style={styles.input}
           />
           <Pressable onPress={send} disabled={sending || !text.trim()}>
@@ -147,7 +149,22 @@ export default function DmThread() {
 }
 
 const makeStyles = (c: Palette) => StyleSheet.create({
-  screen: { flex: 1 },
+  keyboard: {
+    flex: 1,
+    alignItems: Platform.OS === 'web' ? 'center' : 'stretch',
+    padding: Platform.OS === 'web' ? 20 : 0,
+    backgroundColor: Platform.OS === 'web' ? c.surface : c.background,
+  },
+  screen: {
+    flex: 1,
+    width: '100%',
+    maxWidth: Platform.OS === 'web' ? 760 : undefined,
+    borderWidth: Platform.OS === 'web' ? 1 : 0,
+    borderColor: c.border,
+    borderRadius: Platform.OS === 'web' ? 20 : 0,
+    backgroundColor: c.background,
+    overflow: 'hidden',
+  },
   listContent: { padding: 16, gap: 8, flexGrow: 1, justifyContent: 'flex-end' },
   bubble: {
     maxWidth: '80%',
@@ -185,9 +202,12 @@ const makeStyles = (c: Palette) => StyleSheet.create({
   input: {
     flex: 1,
     fontSize: 15,
+    lineHeight: 20,
+    minHeight: 28,
     maxHeight: 96,
-    paddingTop: 0,
-    paddingBottom: 0,
+    paddingTop: 4,
+    paddingBottom: 4,
+    textAlignVertical: 'center',
     color: c.text,
   },
 });

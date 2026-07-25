@@ -3,6 +3,7 @@ import { ThemedView } from '@/components/themed-view';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { type Palette } from '@/constants/theme';
 import { useAuth } from '@/context/authContext';
+import { type FeedContentPreference, useFeedPreference } from '@/context/feedPreferenceContext';
 import { useThemeMode, type ThemePreference } from '@/context/themeContext';
 import { usePalette } from '@/hooks/use-palette';
 import { api, API_URL } from '@/lib/api';
@@ -13,7 +14,7 @@ import Constants from 'expo-constants';
 import * as WebBrowser from 'expo-web-browser';
 import { useRouter } from 'expo-router';
 import { useEffect, useMemo, useState } from 'react';
-import { Alert, Pressable, ScrollView, StyleSheet, Switch } from 'react-native';
+import { Alert, Platform, Pressable, ScrollView, StyleSheet } from 'react-native';
 
 // Local preference toggles — persisted on-device; no server wiring yet
 type Prefs = {
@@ -82,11 +83,24 @@ function ToggleRow({ label, value, onChange }: { label: string; value: boolean; 
   return (
     <ThemedView style={styles.row}>
       <ThemedText style={styles.rowLabel}>{label}</ThemedText>
-      <Switch
-        value={value}
-        onValueChange={(v) => { tapLight(); onChange(v); }}
-        trackColor={{ true: c.primary }}
-      />
+      <Pressable
+        onPress={() => { tapLight(); onChange(!value); }}
+        accessibilityRole="switch"
+        accessibilityState={{ checked: value }}
+        accessibilityLabel={label}
+        style={({ pressed }) => [
+          styles.toggle,
+          { backgroundColor: value ? c.primary : c.border },
+          pressed && { opacity: 0.72 },
+        ]}
+      >
+        <ThemedView
+          style={[
+            styles.toggleThumb,
+            { transform: [{ translateX: value ? 18 : 0 }] },
+          ]}
+        />
+      </Pressable>
     </ThemedView>
   );
 }
@@ -124,6 +138,47 @@ function AppearanceRow() {
             >
               <ThemedText style={[styles.segmentText, selected && styles.segmentTextSelected]}>
                 {opt.label}
+              </ThemedText>
+            </Pressable>
+          );
+        })}
+      </ThemedView>
+    </ThemedView>
+  );
+}
+
+const FEED_CONTENT_OPTIONS: { value: FeedContentPreference; label: string }[] = [
+  { value: 'all', label: 'Both' },
+  { value: 'posts', label: 'Posts' },
+  { value: 'articles', label: 'Articles' },
+];
+
+function FeedContentRow() {
+  const { styles } = useStyles();
+  const { preference, setPreference } = useFeedPreference();
+
+  return (
+    <ThemedView style={styles.preferenceBlock}>
+      <ThemedText style={styles.rowLabel}>Home feed content</ThemedText>
+      <ThemedText style={styles.preferenceHint}>Choose which kinds of stories appear in your main feed.</ThemedText>
+      <ThemedView style={styles.segmentGroup}>
+        {FEED_CONTENT_OPTIONS.map((option) => {
+          const selected = preference === option.value;
+          return (
+            <Pressable
+              key={option.value}
+              onPress={() => { selectTick(); setPreference(option.value); }}
+              accessibilityRole="radio"
+              accessibilityState={{ checked: selected }}
+              accessibilityLabel={`${option.label} feed content`}
+              style={({ pressed }) => [
+                styles.segment,
+                selected && styles.segmentSelected,
+                pressed && !selected ? { opacity: 0.6 } : null,
+              ]}
+            >
+              <ThemedText style={[styles.segmentText, selected && styles.segmentTextSelected]}>
+                {option.label}
               </ThemedText>
             </Pressable>
           );
@@ -226,7 +281,11 @@ export default function Settings() {
   const { styles } = useStyles();
 
   return (
-    <ScrollView contentContainerStyle={styles.container}>
+    <ScrollView
+      style={styles.scroll}
+      contentContainerStyle={styles.container}
+      showsVerticalScrollIndicator={false}
+    >
       <SectionHeader title="Account" />
       <Card>
         <Row label="Edit Profile" chevron onPress={() => router.push('/editprofile')} />
@@ -273,6 +332,7 @@ export default function Settings() {
 
       <SectionHeader title="Content" />
       <Card>
+        <FeedContentRow />
         <ToggleRow label="Autoplay media" value={prefs.autoplayMedia} onChange={setPref('autoplayMedia')} />
         <ToggleRow label="Data saver" value={prefs.dataSaver} onChange={setPref('dataSaver')} />
       </Card>
@@ -302,8 +362,14 @@ export default function Settings() {
 }
 
 const makeStyles = (c: Palette) => StyleSheet.create({
+  scroll: {
+    backgroundColor: Platform.OS === 'web' ? c.surface : c.background,
+  },
   container: {
-    padding: 16,
+    width: '100%',
+    maxWidth: Platform.OS === 'web' ? 760 : undefined,
+    alignSelf: 'center',
+    padding: Platform.OS === 'web' ? 20 : 16,
     paddingBottom: 48,
     gap: 8,
   },
@@ -354,6 +420,20 @@ const makeStyles = (c: Palette) => StyleSheet.create({
     color: c.danger,
     fontWeight: '700',
   },
+  toggle: {
+    width: 44,
+    height: 26,
+    borderRadius: 13,
+    padding: 2,
+    justifyContent: 'center',
+  },
+  toggleThumb: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    backgroundColor: c.onPrimary,
+    ...(Platform.OS === 'web' ? { boxShadow: `0 1px 3px ${c.shadow}33` } : {}),
+  },
   segmentGroup: {
     flex: 1,
     flexDirection: 'row',
@@ -381,5 +461,17 @@ const makeStyles = (c: Palette) => StyleSheet.create({
   segmentTextSelected: {
     color: c.onAccentFaint,
     fontWeight: '800',
+  },
+  preferenceBlock: {
+    paddingVertical: 13,
+    gap: 8,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: c.cardBorder,
+    backgroundColor: 'transparent',
+  },
+  preferenceHint: {
+    color: c.muted,
+    fontSize: 13,
+    lineHeight: 18,
   },
 });

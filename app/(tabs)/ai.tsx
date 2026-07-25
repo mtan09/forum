@@ -10,7 +10,7 @@ import Markdown from '@ronradtke/react-native-markdown-display';
 import { useLocalSearchParams } from 'expo-router';
 import { fetch as expoFetch } from 'expo/fetch';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Animated, Keyboard, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, TextInput } from 'react-native';
+import { Animated, Keyboard, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, TextInput, useWindowDimensions } from 'react-native';
 
 type Message = {
   id: string;
@@ -76,6 +76,8 @@ export default function AI() {
   const { c } = usePalette();
   const styles = useMemo(() => makeStyles(c), [c]);
   const markdownStyles = useMemo(() => makeMarkdownStyles(c), [c]);
+  const { width: windowWidth } = useWindowDimensions();
+  const showWebComparison = Platform.OS === 'web' && windowWidth >= 1080;
 
   const [inputText, setInputText] = useState('');
 
@@ -303,9 +305,10 @@ export default function AI() {
           placeholder={subject ? `Ask about this ${subject.kind}…` : 'Ask a political question…'}
           placeholderTextColor={c.muted}
           multiline
+          numberOfLines={1}
           style={styles.textInput}
           scrollEnabled
-          textAlignVertical="top"
+          textAlignVertical={inputText.length > 80 || inputText.includes('\n') ? 'top' : 'center'}
           returnKeyType="send"
           blurOnSubmit={false}
         />
@@ -413,37 +416,68 @@ export default function AI() {
                       {message.streaming && <ThemedText style={styles.streamingLabel}>LIVE</ThemedText>}
                     </ThemedView>
 
-                    <ThemedView style={styles.lensTabs}>
-                      {(['Left', 'Center', 'Right'] as const).map((lean) => {
-                        const selected = activeLean === lean;
-                        const leanColor = getPerspectiveTone(lean, c).color;
-                        return (
-                          <Pressable
-                            key={lean}
-                            onPress={() => setActiveLean(lean)}
-                            style={[styles.lensTab, selected && { backgroundColor: c.background, borderColor: c.cardBorder }]}
-                          >
-                            <ThemedView style={[styles.lensDot, { backgroundColor: leanColor }]} />
-                            <ThemedText style={[styles.lensTabText, selected && { color: c.text }]}>{lean}</ThemedText>
-                          </Pressable>
-                        );
-                      })}
-                    </ThemedView>
-
-                    <ThemedView style={styles.answerBody}>
-                      {message.error ? (
+                    {message.error ? (
+                      <ThemedView style={styles.answerBody}>
                         <ThemedText style={styles.aiErrorText}>{message.center || message.content}</ThemedText>
-                      ) : (activeLean === 'Left' ? message.left : activeLean === 'Center' ? message.center : message.right) ? (
-                        <Markdown style={markdownStyles}>
-                          {(activeLean === 'Left' ? message.left : activeLean === 'Center' ? message.center : message.right) ?? ''}
-                        </Markdown>
-                      ) : (
-                        <ThemedView style={styles.loadingState}>
-                          <AnimatedLoadingDots />
-                          <ThemedText style={styles.loadingText}>Building the {activeLean.toLowerCase()} perspective…</ThemedText>
+                      </ThemedView>
+                    ) : showWebComparison ? (
+                      <ThemedView style={styles.comparisonGrid}>
+                        {(['Left', 'Center', 'Right'] as const).map((lean) => {
+                          const tone = getPerspectiveTone(lean, c);
+                          const copy = lean === 'Left' ? message.left : lean === 'Center' ? message.center : message.right;
+                          return (
+                            <ThemedView key={lean} style={styles.comparisonColumn}>
+                              <ThemedView style={[styles.comparisonHeading, { borderTopColor: tone.color }]}>
+                                <ThemedView style={[styles.lensDot, { backgroundColor: tone.color }]} />
+                                <ThemedText style={styles.comparisonLabel}>{lean}</ThemedText>
+                              </ThemedView>
+                              <ThemedView style={styles.comparisonBody}>
+                                {copy ? (
+                                  <Markdown style={markdownStyles}>{copy}</Markdown>
+                                ) : (
+                                  <ThemedView style={styles.loadingState}>
+                                    <AnimatedLoadingDots />
+                                    <ThemedText style={styles.loadingText}>Building this perspective…</ThemedText>
+                                  </ThemedView>
+                                )}
+                              </ThemedView>
+                            </ThemedView>
+                          );
+                        })}
+                      </ThemedView>
+                    ) : (
+                      <>
+                        <ThemedView style={styles.lensTabs}>
+                          {(['Left', 'Center', 'Right'] as const).map((lean) => {
+                            const selected = activeLean === lean;
+                            const leanColor = getPerspectiveTone(lean, c).color;
+                            return (
+                              <Pressable
+                                key={lean}
+                                onPress={() => setActiveLean(lean)}
+                                style={[styles.lensTab, selected && { backgroundColor: c.background, borderColor: c.cardBorder }]}
+                              >
+                                <ThemedView style={[styles.lensDot, { backgroundColor: leanColor }]} />
+                                <ThemedText style={[styles.lensTabText, selected && { color: c.text }]}>{lean}</ThemedText>
+                              </Pressable>
+                            );
+                          })}
                         </ThemedView>
-                      )}
-                    </ThemedView>
+
+                        <ThemedView style={styles.answerBody}>
+                          {(activeLean === 'Left' ? message.left : activeLean === 'Center' ? message.center : message.right) ? (
+                            <Markdown style={markdownStyles}>
+                              {(activeLean === 'Left' ? message.left : activeLean === 'Center' ? message.center : message.right) ?? ''}
+                            </Markdown>
+                          ) : (
+                            <ThemedView style={styles.loadingState}>
+                              <AnimatedLoadingDots />
+                              <ThemedText style={styles.loadingText}>Building the {activeLean.toLowerCase()} perspective…</ThemedText>
+                            </ThemedView>
+                          )}
+                        </ThemedView>
+                      </>
+                    )}
 
                     <ThemedView style={styles.answerFooter}>
                       <IconSymbol name="newspaper.fill" size={13} color={c.muted} />
@@ -464,16 +498,43 @@ export default function AI() {
 const makeStyles = (c: Palette) => StyleSheet.create({
   keyboardView: { flex: 1 },
   container: { flex: 1 },
-  landingContent: { paddingTop: 82, paddingHorizontal: 16, paddingBottom: 44 },
+  landingContent: { paddingTop: Platform.OS === 'web' ? 36 : 82, paddingHorizontal: Platform.OS === 'web' ? 28 : 16, paddingBottom: 44 },
   landingTitleRow: { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: 'transparent' },
   landingBrain: { transform: [{ translateY: -2 }] },
   landingTitle: { color: c.primary },
   perspectivePreview: { flexDirection: 'row', gap: 8, marginTop: 20, backgroundColor: 'transparent' },
-  perspectiveCard: { flex: 1, minHeight: 50, borderRadius: 12, borderLeftWidth: 4, paddingHorizontal: 8, justifyContent: 'center' },
+  perspectiveCard: { flex: 1, minHeight: Platform.OS === 'web' ? 68 : 50, borderRadius: 12, borderLeftWidth: 4, paddingHorizontal: Platform.OS === 'web' ? 14 : 8, justifyContent: 'center' },
   perspectiveTag: { alignSelf: 'flex-start', borderRadius: 9, paddingHorizontal: 8, paddingVertical: 2 },
   perspectiveLabel: { color: c.onPrimary, fontSize: 12, lineHeight: 16, fontWeight: '800' },
-  composerArea: { marginTop: 22, borderRadius: 20, borderWidth: 1, borderColor: c.cardBorder, backgroundColor: c.card, padding: 12, gap: 9, shadowColor: c.shadow, shadowOffset: { width: 0, height: 5 }, shadowOpacity: 0.08, shadowRadius: 14, elevation: 3 },
-  composerAreaCompact: { marginTop: 0, borderRadius: 0, borderWidth: 0, borderTopWidth: 1, borderTopColor: c.border, paddingHorizontal: 12, paddingTop: 10, paddingBottom: Platform.OS === 'ios' ? 16 : 10, shadowOpacity: 0 },
+  composerArea: {
+    marginTop: 22,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: c.cardBorder,
+    backgroundColor: c.card,
+    padding: 12,
+    gap: 9,
+    ...(Platform.OS === 'web'
+      ? { boxShadow: `0 5px 14px ${c.shadow}14` }
+      : {
+          shadowColor: c.shadow,
+          shadowOffset: { width: 0, height: 5 },
+          shadowOpacity: 0.08,
+          shadowRadius: 14,
+        }),
+    elevation: 3,
+  },
+  composerAreaCompact: {
+    marginTop: 0,
+    borderRadius: 0,
+    borderWidth: 0,
+    borderTopWidth: 1,
+    borderTopColor: c.border,
+    paddingHorizontal: 12,
+    paddingTop: 10,
+    paddingBottom: Platform.OS === 'ios' ? 16 : 10,
+    ...(Platform.OS === 'web' ? { boxShadow: 'none' } : { shadowOpacity: 0 }),
+  },
   subjectChip: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: c.accentSoftBg, borderRadius: 10, paddingHorizontal: 10, paddingVertical: 6 },
   subjectChipText: { flex: 1, color: c.onAccentFaint, fontWeight: '700', fontSize: 12, lineHeight: 16 },
   framingRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: 'transparent', minHeight: 28 },
@@ -491,7 +552,7 @@ const makeStyles = (c: Palette) => StyleSheet.create({
   suggestionNumber: { width: 30, height: 30, borderRadius: 9, backgroundColor: c.accentSoftBg, alignItems: 'center', justifyContent: 'center' },
   suggestionNumberText: { color: c.accentDeep, fontSize: 10, fontWeight: '900' },
   suggestionText: { flex: 1, fontSize: 13, lineHeight: 18, fontWeight: '700' },
-  header: { minHeight: 116, paddingTop: 62, paddingHorizontal: 16, paddingBottom: 12, borderBottomWidth: 1, borderBottomColor: c.border, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  header: { minHeight: Platform.OS === 'web' ? 76 : 116, paddingTop: Platform.OS === 'web' ? 18 : 62, paddingHorizontal: Platform.OS === 'web' ? 24 : 16, paddingBottom: 12, borderBottomWidth: 1, borderBottomColor: c.border, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   headerBrand: { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: 'transparent' },
   headerCopy: { backgroundColor: 'transparent' },
   headerTitle: { fontSize: 17, lineHeight: 20, fontWeight: '900' },
@@ -499,7 +560,7 @@ const makeStyles = (c: Palette) => StyleSheet.create({
   newChatButton: { flexDirection: 'row', alignItems: 'center', gap: 3, borderWidth: 1, borderColor: c.cardBorder, backgroundColor: c.card, borderRadius: 10, paddingHorizontal: 9, paddingVertical: 7 },
   newChatText: { color: c.primary, fontSize: 12, fontWeight: '800' },
   chatContainer: { flex: 1 },
-  chatContent: { gap: 14, paddingHorizontal: 12, paddingTop: 16, paddingBottom: 20 },
+  chatContent: { gap: 14, paddingHorizontal: Platform.OS === 'web' ? 20 : 12, paddingTop: 16, paddingBottom: 20 },
   userMessage: { alignSelf: 'flex-end', maxWidth: '86%', backgroundColor: c.primary, borderRadius: 18, borderTopRightRadius: 5, paddingHorizontal: 14, paddingVertical: 10 },
   userMessageLabel: { color: c.onPrimaryMuted, fontSize: 8, lineHeight: 10, fontWeight: '900', letterSpacing: 0.8, marginBottom: 3 },
   userText: { color: c.onPrimary, fontWeight: '700', fontSize: 14, lineHeight: 20 },
@@ -514,6 +575,11 @@ const makeStyles = (c: Palette) => StyleSheet.create({
   lensDot: { width: 6, height: 6, borderRadius: 3 },
   lensTabText: { color: c.muted, fontSize: 12, fontWeight: '800' },
   answerBody: { minHeight: 116, paddingHorizontal: 15, paddingTop: 16, paddingBottom: 8, backgroundColor: 'transparent' },
+  comparisonGrid: { flexDirection: 'row', gap: 1, borderTopWidth: 1, borderTopColor: c.border, backgroundColor: c.border },
+  comparisonColumn: { flex: 1, minWidth: 0, backgroundColor: c.background },
+  comparisonHeading: { minHeight: 44, borderTopWidth: 4, paddingHorizontal: 13, flexDirection: 'row', alignItems: 'center', gap: 7, backgroundColor: c.surface },
+  comparisonLabel: { fontSize: 13, lineHeight: 17, fontWeight: '900' },
+  comparisonBody: { flex: 1, minHeight: 190, paddingHorizontal: 14, paddingTop: 15, paddingBottom: 8, backgroundColor: c.background },
   aiErrorText: { color: c.danger, fontWeight: '700' },
   loadingState: { minHeight: 90, alignItems: 'center', justifyContent: 'center', backgroundColor: 'transparent' },
   loadingText: { color: c.muted, fontSize: 12, marginTop: 8 },

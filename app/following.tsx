@@ -8,7 +8,7 @@ import { usePalette } from '@/hooks/use-palette';
 import { api } from '@/lib/api';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { memo, useCallback, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, FlatList, type ListRenderItemInfo, Pressable, StyleSheet } from 'react-native';
+import { ActivityIndicator, FlatList, type ListRenderItemInfo, Platform, Pressable, StyleSheet } from 'react-native';
 
 const postKey = (post: PostType) => post.id;
 const FOLLOWING_PAGE_SIZE = 20;
@@ -97,9 +97,11 @@ export default function FollowingFeed() {
   }, [hasMore, load, refreshing]);
 
   return (
-    <ThemedView style={styles.screen}>
-      <FlatList
+    <ThemedView style={styles.page}>
+      <ThemedView style={styles.screen}>
+        <FlatList
         data={followingPosts}
+        showsVerticalScrollIndicator={false}
         keyExtractor={postKey}
         renderItem={renderPost}
         initialNumToRender={5}
@@ -108,7 +110,7 @@ export default function FollowingFeed() {
         windowSize={7}
         onEndReached={loadMore}
         onEndReachedThreshold={0.4}
-        refreshControl={<AppRefreshControl refreshing={refreshing} onRefresh={refresh} />}
+        refreshControl={Platform.OS === 'web' ? undefined : <AppRefreshControl refreshing={refreshing} onRefresh={refresh} />}
         contentContainerStyle={followingPosts.length === 0 ? styles.emptyContainer : styles.listContent}
         ListEmptyComponent={
           ids === null ? (
@@ -126,13 +128,29 @@ export default function FollowingFeed() {
           )
         }
         ListFooterComponent={loadingMore ? <ActivityIndicator color={c.icon} style={styles.footerLoader} /> : null}
-      />
+        />
+      </ThemedView>
     </ThemedView>
   );
 }
 
 const makeStyles = (c: ReturnType<typeof usePalette>['c']) => StyleSheet.create({
-  screen: { flex: 1 },
+  page: {
+    flex: 1,
+    alignItems: 'center',
+    padding: Platform.OS === 'web' ? 20 : 0,
+    backgroundColor: Platform.OS === 'web' ? c.surface : c.background,
+  },
+  screen: {
+    flex: 1,
+    width: '100%',
+    maxWidth: Platform.OS === 'web' ? 760 : undefined,
+    borderWidth: Platform.OS === 'web' ? 1 : 0,
+    borderColor: c.border,
+    borderRadius: Platform.OS === 'web' ? 20 : 0,
+    backgroundColor: c.background,
+    overflow: 'hidden',
+  },
   listContent: { paddingTop: 6, paddingBottom: 32 },
   emptyContainer: { flexGrow: 1, alignItems: 'center', justifyContent: 'center', padding: 24 },
   emptyCard: { width: '100%', maxWidth: 420, borderRadius: 16, borderWidth: 1, borderColor: c.cardBorder, backgroundColor: c.card, padding: 22, alignItems: 'center' },

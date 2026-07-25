@@ -29,7 +29,7 @@ A political discussion social media app built with Expo / React Native. The feed
 - **Interactions** — persistent up/downvotes, nested comments with replies, real bookmarks, and consistent vote/bookmark colors and spacing in both themes
 - **forumAI**: a guided three-perspective workspace that streams Left / Center / Right readings in a focused lens view, automatically searches the app's own article corpus for specific topics, current headlines, or the hottest story, and supports audience framing, starter prompts, conversation memory, and an "Ask forumAI" entry point from article and post pages
   - "Explain like I'm: …" framing selector (student, policymaker, skeptic, …)
-- **Settings** — account (edit profile, change password, email verification + password reset by emailed code), **Appearance (Light / Dark / Match system)**, real notification toggles incl. a **daily Floor reminder**, privacy (blocked accounts), Terms + Privacy pages, and account deletion
+- **Settings** — account (edit profile, change password, email verification + password reset by emailed code), **Appearance (Light / Dark / Match system)**, a persisted home-feed content choice (**posts + articles / posts only / articles only**), real notification toggles incl. a **daily Floor reminder**, privacy (blocked accounts), Terms + Privacy pages, and account deletion
 
 ## UI color system
 
@@ -75,7 +75,8 @@ app/               screens (expo-router file-based routing)
 components/        post/article/comment cards, spectrum bar + trail,
                   scorer receipts, share cards, report/block menu, carousels
 context/          authContext (session), postContext (feed + votes),
-                  themeContext (Light / Dark / Match system preference)
+                  themeContext (Light / Dark / Match system preference),
+                  feedPreferenceContext (persisted feed content filter)
 lib/api.ts        API client: fetch wrapper, token storage, image upload
 lib/article-media.ts  defensive validation for publisher image URLs
 lib/notifications.ts  native push registration/routing + Floor reminders
@@ -123,6 +124,12 @@ npx expo start       # dev server (i = iOS simulator, a = Android, w = web)
 npm run lint         # eslint
 npx tsc --noEmit     # typecheck
 ```
+
+### Web app
+
+The browser build uses a web-specific responsive shell rather than stretching the phone UI. At laptop widths, navigation lives in a left rail, the feed stays in a constrained center column, and The Floor appears beside it as a live right rail. Tablet-sized browsers use a compact top navigation, while phone-sized browsers use a bottom navigation and a small composer action in the header. Search, forumAI, profile, summary, The Floor, and the post composer adapt to the available width while reusing the same API, auth, theme, and content logic as iOS and Android. Horizontal topic, image, and coverage rails expose mouse-friendly previous/next controls on larger browsers.
+
+The authenticated web client is exported as a single-page app because post, article, summary, user, and conversation URLs are dynamic. Configure the host to rewrite unknown paths to `index.html` (`public/_redirects` covers compatible hosts). A production web build must also set `EXPO_PUBLIC_API_URL` to the deployed HTTPS `forum-api` origin; without it, the development fallback is `http://localhost:3000`.
 
 CI (GitHub Actions) runs typecheck + lint on every push. See **[LAUNCH.md](LAUNCH.md)** for the App Store launch checklist — deployment, EAS builds, and the account setup (Apple/Resend/Sentry/Railway) each feature is env-gated behind.
 

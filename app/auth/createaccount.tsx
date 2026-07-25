@@ -5,7 +5,7 @@ import { usePalette } from '@/hooks/use-palette';
 import { tapMedium } from '@/lib/haptics';
 import { useRouter } from 'expo-router';
 import React, { useMemo, useState } from 'react';
-import { ActivityIndicator, KeyboardAvoidingView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, KeyboardAvoidingView, Platform, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 
 export default function CreateAccount() {
   const { c } = usePalette();
@@ -44,7 +44,7 @@ export default function CreateAccount() {
     <KeyboardAvoidingView behavior="padding" style={{ flex: 1 }}>
     <View style={styles.container}>
       <ScalableImage 
-        source={require('@/assets/images/forumlogoCropped.png')} 
+        source={require('@/assets/images/forumlogo.png')}
         type='width' 
         dimension={200} 
         style={styles.image}
@@ -116,7 +116,7 @@ export default function CreateAccount() {
 }
 
 const makeStyles = (c: Palette) => StyleSheet.create({
-  container: { flex: 1, padding: 24, gap: 12, backgroundColor: c.background, justifyContent: 'center' },
+  container: { flex: 1, width: '100%', maxWidth: Platform.OS === 'web' ? 500 : undefined, alignSelf: 'center', padding: Platform.OS === 'web' ? 40 : 24, gap: 12, backgroundColor: c.background, justifyContent: 'center' },
   title: { 
     fontSize: 28, 
     fontWeight: '800', 

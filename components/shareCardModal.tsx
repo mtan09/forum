@@ -4,7 +4,7 @@ import { type Palette } from '@/constants/theme';
 import { usePalette } from '@/hooks/use-palette';
 import { tapMedium } from '@/lib/haptics';
 import { useMemo, useRef } from 'react';
-import { Alert, Modal, Pressable, StyleSheet, View } from 'react-native';
+import { Alert, Modal, Platform, Pressable, StyleSheet, View } from 'react-native';
 import { captureRef } from 'react-native-view-shot';
 import * as Sharing from 'expo-sharing';
 
@@ -66,12 +66,19 @@ const makeStyles = (c: Palette) => StyleSheet.create({
   backdrop: {
     flex: 1,
     backgroundColor: c.scrim,
-    justifyContent: 'flex-end',
+    justifyContent: Platform.OS === 'web' ? 'center' : 'flex-end',
+    alignItems: Platform.OS === 'web' ? 'center' : 'stretch',
+    padding: Platform.OS === 'web' ? 24 : 0,
   },
   sheet: {
+    width: '100%',
+    maxWidth: Platform.OS === 'web' ? 620 : undefined,
     backgroundColor: c.overlayCard,
+    borderRadius: Platform.OS === 'web' ? 24 : 0,
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
+    borderWidth: Platform.OS === 'web' ? 1 : 0,
+    borderColor: c.cardBorder,
     paddingHorizontal: 20,
     paddingTop: 12,
     paddingBottom: 32,

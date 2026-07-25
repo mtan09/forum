@@ -19,9 +19,7 @@ import * as ImagePicker from 'expo-image-picker';
 import { onTabRefresh } from '@/lib/tabRefresh';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, Alert, Dimensions, Image, Pressable, ScrollView, StyleSheet } from 'react-native';
-
-const screenWidth = Dimensions.get('window').width;
+import { ActivityIndicator, Alert, Image, Platform, Pressable, ScrollView, StyleSheet, useWindowDimensions } from 'react-native';
 
 // The single computed placement — see the API's /users/me/spectrum:
 // scored posts weigh 3× their position, upvotes weigh 1× the content's
@@ -94,6 +92,10 @@ function CommentItem({ comment }: { comment: CommentRow }) {
 }
 
 export default function Profile() {
+  const { width: windowWidth } = useWindowDimensions();
+  const profileWidth = Platform.OS === 'web' && windowWidth >= 1280
+    ? Math.max(1, Math.min(windowWidth - 294, 940))
+    : windowWidth;
   const router = useRouter();
   const { c } = usePalette();
   const styles = useMemo(() => makeStyles(c), [c]);
@@ -130,6 +132,7 @@ export default function Profile() {
   const [followCounts, setFollowCounts] = useState<{ followers: number; following: number } | null>(null);
   const [unreadDms, setUnreadDms] = useState(0);
   const [shareOpen, setShareOpen] = useState(false);
+  const [spectrumWidth, setSpectrumWidth] = useState(0);
 
   const [activeTab, setActiveTab] = useState<Tab>('Posts');
   const [myPosts, setMyPosts] = useState<PostType[] | null>(null);
@@ -272,6 +275,7 @@ export default function Profile() {
   return (
     <ScrollView
       ref={scrollRef}
+      showsVerticalScrollIndicator={false}
       scrollEventThrottle={16}
       onScroll={(event) => {
         const y = event.nativeEvent.contentOffset.y;
@@ -286,7 +290,7 @@ export default function Profile() {
             : require('@/assets/images/solid-color-image.png')
         }
         type="width"
-        dimension={screenWidth}
+        dimension={profileWidth}
         height={200}
       />
       {/* Change the banner right from the profile */}
@@ -375,7 +379,13 @@ export default function Profile() {
         )}
 
         {/* One spectrum, computed — not self-declared */}
-        <ThemedView style={styles.spectrumCard}>
+        <ThemedView
+          style={styles.spectrumCard}
+          onLayout={(event) => {
+            const next = Math.round(event.nativeEvent.layout.width - 32);
+            if (next > 0 && next !== spectrumWidth) setSpectrumWidth(next);
+          }}
+        >
           <ThemedView style={styles.spectrumHeader}>
             <ThemedText type="defaultSemiBold" style={{ fontWeight: '800' }}>Your Political Lean</ThemedText>
             {spectrum && (
@@ -386,7 +396,7 @@ export default function Profile() {
           </ThemedView>
 
           <Spectrum
-            width={screenWidth - 64}
+            width={Math.max(1, spectrumWidth || profileWidth - (Platform.OS === 'web' ? 128 : 64))}
             height={20}
             position={spectrum?.position ?? 0.5}
           />
@@ -403,7 +413,12 @@ export default function Profile() {
             )
           )}
 
-          {trail.length >= 2 && <SpectrumTrail points={trail} width={screenWidth - 64} />}
+          {trail.length >= 2 && (
+            <SpectrumTrail
+              points={trail}
+              width={Math.max(1, spectrumWidth || profileWidth - (Platform.OS === 'web' ? 128 : 64))}
+            />
+          )}
 
           <ThemedText style={styles.methodText}>
             Your posts count 3× toward where they were scored; upvotes pull toward the content&apos;s lean, downvotes pull away from it.
@@ -490,8 +505,14 @@ export default function Profile() {
 const makeStyles = (c: Palette) => StyleSheet.create({
   container: {
     flex: 1,
-    padding: 16,
+    padding: Platform.OS === 'web' ? 24 : 16,
     gap: 12,
+    marginHorizontal: Platform.OS === 'web' ? 24 : 0,
+    marginTop: Platform.OS === 'web' ? -18 : 0,
+    borderRadius: Platform.OS === 'web' ? 22 : 0,
+    borderWidth: Platform.OS === 'web' ? 1 : 0,
+    borderColor: c.border,
+    backgroundColor: Platform.OS === 'web' ? c.surfaceRaised : c.background,
   },
   settingsButton: {
     position: 'absolute',
@@ -570,6 +591,7 @@ const makeStyles = (c: Palette) => StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
+    backgroundColor: 'transparent',
   },
   joinedText: {
     color: c.muted,

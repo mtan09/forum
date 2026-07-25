@@ -6,7 +6,7 @@ import { useAuth } from '@/context/authContext';
 import { usePalette } from '@/hooks/use-palette';
 import { api } from '@/lib/api';
 import { useMemo, useState } from 'react';
-import { Alert, Modal, Pressable, StyleSheet } from 'react-native';
+import { Alert, Modal, Platform, Pressable, StyleSheet } from 'react-native';
 
 // A small "•••" overflow menu for user-generated content. Report works on
 // any target; Block appears only when an author is known and it isn't the
@@ -160,12 +160,19 @@ const makeStyles = (c: Palette) => StyleSheet.create({
   backdrop: {
     flex: 1,
     backgroundColor: c.scrim,
-    justifyContent: 'flex-end',
+    justifyContent: Platform.OS === 'web' ? 'center' : 'flex-end',
+    alignItems: Platform.OS === 'web' ? 'center' : 'stretch',
+    padding: Platform.OS === 'web' ? 24 : 0,
   },
   sheet: {
+    width: '100%',
+    maxWidth: Platform.OS === 'web' ? 480 : undefined,
     backgroundColor: c.overlayCard,
+    borderRadius: Platform.OS === 'web' ? 22 : 0,
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
+    borderWidth: Platform.OS === 'web' ? 1 : 0,
+    borderColor: c.cardBorder,
     paddingHorizontal: 20,
     paddingTop: 12,
     paddingBottom: 32,

@@ -11,7 +11,7 @@ import { getPerspectiveToneForPosition } from '@/lib/perspective-colors';
 import { onTabRefresh } from '@/lib/tabRefresh';
 import { useRouter } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, Image, Keyboard, Pressable, ScrollView, StyleSheet, TextInput } from 'react-native';
+import { ActivityIndicator, Image, Keyboard, Platform, Pressable, ScrollView, StyleSheet, TextInput } from 'react-native';
 
 type SearchResults = {
   users: { id: string; username: string; avatar_url: string | null; bio: string | null }[];
@@ -23,11 +23,27 @@ type SearchResults = {
 type ResultFilter = 'All' | 'Stories' | 'People' | 'Sources';
 
 type HotTopic = {
+  id?: unknown;
   title?: unknown;
+  short_summary?: unknown;
+  volume?: unknown;
+};
+
+type QuickTopic = {
+  title: string;
+  summary?: string;
+  volume?: number;
 };
 
 const EMPTY: SearchResults = { users: [], sources: [], posts: [], articles: [] };
-const FALLBACK_QUICK_TOPICS = ['The economy', 'Immigration', 'Climate policy', 'Housing costs', 'Elections'];
+const FALLBACK_QUICK_TOPICS: QuickTopic[] = [
+  { title: 'The economy' },
+  { title: 'Immigration' },
+  { title: 'Climate policy' },
+  { title: 'Housing costs' },
+  { title: 'Elections' },
+];
+const IS_WEB = Platform.OS === 'web';
 
 export default function SearchTab() {
   const router = useRouter();
@@ -47,12 +63,19 @@ export default function SearchTab() {
   const fetchQuickTopics = useCallback(async () => {
     try {
       const payload = await api<HotTopic[]>('/topics/hot?limit=5');
-      const titles = Array.isArray(payload)
-        ? [...new Set(payload.flatMap((topic) => typeof topic?.title === 'string' ? [topic.title.trim()] : []).filter(Boolean))].slice(0, 5)
+      const topics = Array.isArray(payload)
+        ? payload.flatMap((topic): QuickTopic[] => {
+            if (typeof topic?.title !== 'string' || !topic.title.trim()) return [];
+            return [{
+              title: topic.title.trim(),
+              summary: typeof topic.short_summary === 'string' ? topic.short_summary.trim() : undefined,
+              volume: typeof topic.volume === 'number' ? topic.volume : undefined,
+            }];
+          }).filter((topic, index, all) => all.findIndex((item) => item.title === topic.title) === index).slice(0, 5)
         : [];
 
-      if (titles.length > 0) {
-        setQuickTopics(titles);
+      if (topics.length > 0) {
+        setQuickTopics(topics);
         setHasLiveTopics(true);
       } else {
         setQuickTopics(FALLBACK_QUICK_TOPICS);
@@ -128,8 +151,8 @@ export default function SearchTab() {
   ];
   const filteredCount = filters.find((filter) => filter.label === activeFilter)?.count ?? 0;
 
-  const chooseTopic = (topic: string) => {
-    setQuery(topic);
+  const chooseTopic = (topic: QuickTopic) => {
+    setQuery(topic.title);
     setActiveFilter('All');
     searchRef.current?.focus();
   };
@@ -186,12 +209,29 @@ export default function SearchTab() {
               <ThemedView style={styles.topicGrid}>
                 {quickTopics.map((topic, index) => (
                   <Pressable
-                    key={topic}
+                    key={topic.title}
                     onPress={() => chooseTopic(topic)}
-                    style={({ pressed }) => [styles.topicChip, index === 0 && styles.topicChipFeatured, { opacity: pressed ? 0.65 : 1 }]}
+                    style={({ pressed }) => [
+                      styles.topicChip,
+                      index === 0 && styles.topicChipFeatured,
+                      IS_WEB && index === 0 && styles.topicChipFeaturedWeb,
+                      { opacity: pressed ? 0.65 : 1 },
+                    ]}
                   >
-                    <ThemedText numberOfLines={2} style={[styles.topicText, index === 0 && styles.topicTextFeatured]}>{topic}</ThemedText>
-                    <IconSymbol name="arrow.up.right" size={14} color={index === 0 ? c.onPrimary : c.primary} />
+                    <ThemedView style={styles.topicCopy}>
+                      <ThemedText style={[styles.topicEyebrow, index === 0 && styles.topicEyebrowFeatured]}>
+                        {index === 0 ? 'TOP STORY' : topic.volume != null ? `${topic.volume} POSTS` : 'TRENDING'}
+                      </ThemedText>
+                      <ThemedText numberOfLines={2} style={[styles.topicText, index === 0 && styles.topicTextFeatured]}>{topic.title}</ThemedText>
+                      {topic.summary ? (
+                        <ThemedText numberOfLines={index === 0 ? 2 : 1} style={[styles.topicSummary, index === 0 && styles.topicSummaryFeatured]}>
+                          {topic.summary}
+                        </ThemedText>
+                      ) : null}
+                    </ThemedView>
+                    <ThemedView style={[styles.topicArrow, index === 0 && styles.topicArrowFeatured]}>
+                      <IconSymbol name="arrow.up.right" size={14} color={index === 0 ? c.onPrimary : c.primary} />
+                    </ThemedView>
                   </Pressable>
                 ))}
               </ThemedView>
@@ -303,14 +343,20 @@ export default function SearchTab() {
                   <ThemedText style={styles.sectionTitle}>Community posts</ThemedText>
                   <ThemedText style={styles.sectionMeta}>{results.posts.length}</ThemedText>
                 </ThemedView>
-                {results.posts.map((row) => {
-                  const post = mapPost(row);
-                  return (
-                    <Pressable key={post.id} onPress={() => router.push(`/post/${post.id}`)} style={({ pressed }) => ({ opacity: pressed ? 0.6 : 1 })}>
-                      <Post post={post} />
-                    </Pressable>
-                  );
-                })}
+                <ThemedView style={styles.storyGrid}>
+                  {results.posts.map((row) => {
+                    const post = mapPost(row);
+                    return (
+                      <Pressable
+                        key={post.id}
+                        onPress={() => router.push(`/post/${post.id}`)}
+                        style={({ pressed }) => [styles.storyResult, { opacity: pressed ? 0.6 : 1 }]}
+                      >
+                        <Post post={post} />
+                      </Pressable>
+                    );
+                  })}
+                </ThemedView>
               </ThemedView>
             )}
 
@@ -320,11 +366,17 @@ export default function SearchTab() {
                   <ThemedText style={styles.sectionTitle}>Reporting</ThemedText>
                   <ThemedText style={styles.sectionMeta}>{results.articles.length}</ThemedText>
                 </ThemedView>
-                {results.articles.map((article) => (
-                  <Pressable key={article.id} onPress={() => router.push(`/article/${article.id}`)} style={({ pressed }) => ({ opacity: pressed ? 0.6 : 1 })}>
-                    <Article article={article} />
-                  </Pressable>
-                ))}
+                <ThemedView style={styles.storyGrid}>
+                  {results.articles.map((article) => (
+                    <Pressable
+                      key={article.id}
+                      onPress={() => router.push(`/article/${article.id}`)}
+                      style={({ pressed }) => [styles.storyResult, { opacity: pressed ? 0.6 : 1 }]}
+                    >
+                      <Article article={article} />
+                    </Pressable>
+                  ))}
+                </ThemedView>
               </ThemedView>
             )}
           </>
@@ -335,24 +387,55 @@ export default function SearchTab() {
 }
 
 const makeStyles = (c: Palette) => StyleSheet.create({
-  screen: { flex: 1, paddingTop: 88 },
-  header: { paddingHorizontal: 16, backgroundColor: 'transparent' },
-  title: { color: c.primary },
-  subtitle: { color: c.muted, marginTop: 3, marginBottom: 8, fontSize: 14, lineHeight: 20 },
-  searchShell: { minHeight: 58, flexDirection: 'row', alignItems: 'center', gap: 9, marginHorizontal: 16, marginTop: 18, marginBottom: 5, borderWidth: 1.5, borderColor: c.accentFaint, borderRadius: 18, paddingHorizontal: 9, paddingVertical: 8, backgroundColor: c.card, shadowColor: c.primary, shadowOffset: { width: 0, height: 5 }, shadowOpacity: 0.09, shadowRadius: 13, elevation: 3 },
+  screen: { flex: 1, paddingTop: IS_WEB ? 32 : 88 },
+  header: { paddingHorizontal: IS_WEB ? 28 : 16, backgroundColor: 'transparent' },
+  title: { color: c.primary, fontSize: IS_WEB ? 34 : undefined, lineHeight: IS_WEB ? 40 : undefined },
+  subtitle: { color: c.muted, marginTop: 3, marginBottom: 8, fontSize: IS_WEB ? 15 : 14, lineHeight: 20 },
+  searchShell: {
+    minHeight: IS_WEB ? 64 : 58,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 9,
+    marginHorizontal: IS_WEB ? 28 : 16,
+    marginTop: 18,
+    marginBottom: 5,
+    borderWidth: 1.5,
+    borderColor: c.accentFaint,
+    borderRadius: 18,
+    paddingHorizontal: 9,
+    paddingVertical: 8,
+    backgroundColor: c.card,
+    ...(IS_WEB
+      ? { boxShadow: `0 5px 13px ${c.primary}17` }
+      : {
+          shadowColor: c.primary,
+          shadowOffset: { width: 0, height: 5 },
+          shadowOpacity: 0.09,
+          shadowRadius: 13,
+        }),
+    elevation: 3,
+  },
   searchIcon: { width: 38, height: 38, borderRadius: 12, backgroundColor: c.accentSoftBg, alignItems: 'center', justifyContent: 'center' },
-  searchInput: { flex: 1, color: c.text, fontSize: 15, fontWeight: '700', paddingVertical: 0 },
+  searchInput: { flex: 1, minHeight: 38, color: c.text, fontSize: 15, lineHeight: 20, fontWeight: '700', paddingVertical: 9, textAlignVertical: 'center' },
   scrollContent: { paddingBottom: 44 },
-  topicSection: { marginTop: 25, paddingHorizontal: 16, backgroundColor: 'transparent' },
+  topicSection: { marginTop: 25, paddingHorizontal: IS_WEB ? 28 : 16, backgroundColor: 'transparent' },
   sectionTitleRow: { flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between', marginBottom: 10, backgroundColor: 'transparent' },
   sectionTitle: { fontSize: 16, lineHeight: 20, fontWeight: '900' },
   sectionMeta: { color: c.muted, fontSize: 11, lineHeight: 14, fontWeight: '700' },
-  topicGrid: { width: '100%', gap: 8, backgroundColor: 'transparent' },
-  topicChip: { width: '100%', minHeight: 46, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 10, borderWidth: 1, borderColor: c.cardBorder, borderRadius: 12, backgroundColor: c.card, paddingHorizontal: 12, paddingVertical: 10 },
+  topicGrid: { width: '100%', gap: 8, backgroundColor: 'transparent', flexDirection: IS_WEB ? 'row' : 'column', flexWrap: IS_WEB ? 'wrap' : 'nowrap' },
+  topicChip: { width: IS_WEB ? '49%' : '100%', flexGrow: IS_WEB ? 1 : 0, minHeight: IS_WEB ? 112 : 64, flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', gap: 10, borderWidth: 1, borderColor: c.cardBorder, borderRadius: IS_WEB ? 18 : 12, backgroundColor: c.card, paddingHorizontal: IS_WEB ? 17 : 12, paddingVertical: IS_WEB ? 15 : 11 },
   topicChipFeatured: { backgroundColor: c.primary, borderColor: c.primary },
-  topicText: { flex: 1, minWidth: 0, color: c.onAccentFaint, fontSize: 12, lineHeight: 16, fontWeight: '800' },
+  topicChipFeaturedWeb: { width: '100%', minHeight: 148, flexGrow: 0 },
+  topicCopy: { flex: 1, minWidth: 0, backgroundColor: 'transparent' },
+  topicEyebrow: { color: c.primary, fontSize: 8, lineHeight: 11, fontWeight: '900', letterSpacing: 0.8, marginBottom: 7 },
+  topicEyebrowFeatured: { color: c.onPrimaryMuted },
+  topicText: { color: c.onAccentFaint, fontSize: IS_WEB ? 15 : 13, lineHeight: IS_WEB ? 20 : 18, fontWeight: '900' },
   topicTextFeatured: { color: c.onPrimary },
-  filterRow: { gap: 8, paddingHorizontal: 16, paddingTop: 17, paddingBottom: 7 },
+  topicSummary: { color: c.muted, fontSize: 11, lineHeight: 16, marginTop: 6 },
+  topicSummaryFeatured: { color: c.onPrimaryMuted },
+  topicArrow: { width: 28, height: 28, borderRadius: 9, backgroundColor: c.accentSoftBg, alignItems: 'center', justifyContent: 'center' },
+  topicArrowFeatured: { backgroundColor: c.onPrimaryOverlay },
+  filterRow: { gap: 8, paddingHorizontal: IS_WEB ? 28 : 16, paddingTop: 17, paddingBottom: 7 },
   filterChip: { minHeight: 38, flexDirection: 'row', alignItems: 'center', gap: 7, borderRadius: 12, borderWidth: 1, borderColor: c.border, backgroundColor: c.background, paddingHorizontal: 12, paddingVertical: 7 },
   filterChipSelected: { backgroundColor: c.primary, borderColor: c.primary },
   filterText: { color: c.subtle, fontSize: 12, lineHeight: 16, fontWeight: '800' },
@@ -361,14 +444,14 @@ const makeStyles = (c: Palette) => StyleSheet.create({
   filterCountSelected: { backgroundColor: c.onPrimaryOverlay },
   filterCountText: { color: c.muted, fontSize: 9, lineHeight: 12, fontWeight: '900' },
   filterCountTextSelected: { color: c.onPrimary },
-  resultSummary: { minHeight: 69, marginHorizontal: 16, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', borderBottomWidth: 1, borderBottomColor: c.border, backgroundColor: 'transparent' },
+  resultSummary: { minHeight: 69, marginHorizontal: IS_WEB ? 28 : 16, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', borderBottomWidth: 1, borderBottomColor: c.border, backgroundColor: 'transparent' },
   resultEyebrow: { color: c.muted, fontSize: 8, lineHeight: 11, fontWeight: '900', letterSpacing: 0.8 },
   resultQuery: { fontSize: 18, lineHeight: 23, fontWeight: '900', marginTop: 3 },
-  emptyCard: { marginHorizontal: 16, marginTop: 20, borderRadius: 20, borderWidth: 1, borderColor: c.cardBorder, backgroundColor: c.card, paddingHorizontal: 26, paddingVertical: 30, alignItems: 'center' },
+  emptyCard: { marginHorizontal: IS_WEB ? 28 : 16, marginTop: 20, borderRadius: 20, borderWidth: 1, borderColor: c.cardBorder, backgroundColor: c.card, paddingHorizontal: 26, paddingVertical: 30, alignItems: 'center' },
   emptyMark: { width: 52, height: 52, borderRadius: 17, backgroundColor: c.accentSoftBg, alignItems: 'center', justifyContent: 'center' },
   emptyTitle: { fontSize: 17, lineHeight: 22, fontWeight: '900', marginTop: 13 },
   emptyText: { color: c.muted, textAlign: 'center', fontSize: 13, lineHeight: 19, marginTop: 6 },
-  resultSection: { marginTop: 21, paddingHorizontal: 16, backgroundColor: 'transparent' },
+  resultSection: { marginTop: 21, paddingHorizontal: IS_WEB ? 28 : 16, backgroundColor: 'transparent' },
   resultGroup: { borderRadius: 17, borderWidth: 1, borderColor: c.cardBorder, backgroundColor: c.card, overflow: 'hidden' },
   resultRow: { minHeight: 68, flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 11, paddingVertical: 9, backgroundColor: 'transparent' },
   resultRowDivider: { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: c.cardBorder },
@@ -380,5 +463,15 @@ const makeStyles = (c: Palette) => StyleSheet.create({
   leanTagText: { fontSize: 9, lineHeight: 12, fontWeight: '900' },
   userAvatar: { width: 42, height: 42, borderRadius: 14 },
   storySection: { marginTop: 23, backgroundColor: 'transparent' },
-  storyHeading: { flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between', paddingHorizontal: 16, marginBottom: 8, backgroundColor: 'transparent' },
+  storyHeading: { flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between', paddingHorizontal: IS_WEB ? 28 : 16, marginBottom: 8, backgroundColor: 'transparent' },
+  storyGrid: {
+    flexDirection: IS_WEB ? 'row' : 'column',
+    flexWrap: IS_WEB ? 'wrap' : 'nowrap',
+    backgroundColor: 'transparent',
+  },
+  storyResult: {
+    width: IS_WEB ? '50%' : '100%',
+    minWidth: IS_WEB ? 320 : undefined,
+    flexGrow: IS_WEB ? 1 : 0,
+  },
 });

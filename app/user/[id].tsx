@@ -5,6 +5,7 @@ import Spectrum from '@/components/spectrum';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { IconSymbol } from '@/components/ui/icon-symbol';
+import WebPageFrame from '@/components/web-page-frame';
 import { type Palette } from '@/constants/theme';
 import { useAuth } from '@/context/authContext';
 import { mapPost } from '@/context/postContext';
@@ -13,9 +14,7 @@ import { api } from '@/lib/api';
 import { notifyWarning, tapLight } from '@/lib/haptics';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useMemo, useState } from 'react';
-import { Alert, Dimensions, Image, Pressable, ScrollView, StyleSheet } from 'react-native';
-
-const screenWidth = Dimensions.get('window').width;
+import { Alert, Image, Platform, Pressable, ScrollView, StyleSheet, useWindowDimensions } from 'react-native';
 
 type PublicUser = {
   id: string;
@@ -46,6 +45,8 @@ function leanLabel(position: number): string {
 export default function PublicProfile() {
   const { c } = usePalette();
   const styles = useMemo(() => makeStyles(c), [c]);
+  const { width: windowWidth } = useWindowDimensions();
+  const frameWidth = Platform.OS === 'web' ? Math.min(windowWidth, 760) : windowWidth;
   const { id } = useLocalSearchParams();
   const userId = useMemo(() => (Array.isArray(id) ? id[0] : id) as string | undefined, [id]);
   const router = useRouter();
@@ -153,15 +154,20 @@ export default function PublicProfile() {
     : null;
 
   return (
-    <ScrollView>
-      <ScalableImage
+    <ScrollView
+      style={styles.scroll}
+      contentContainerStyle={styles.scrollContent}
+      showsVerticalScrollIndicator={false}
+    >
+      <WebPageFrame maxWidth={760}>
+        <ScalableImage
         source={
           user.header_url
             ? { uri: user.header_url }
             : require('@/assets/images/solid-color-image.png')
         }
         type="width"
-        dimension={screenWidth}
+        dimension={frameWidth}
         height={140}
       />
       <ThemedView style={styles.container}>
@@ -239,7 +245,7 @@ export default function PublicProfile() {
               </ThemedView>
             )}
           </ThemedView>
-          <Spectrum width={screenWidth - 64} height={20} position={spectrum?.position ?? 0.5} />
+          <Spectrum width={Math.max(1, frameWidth - 64)} height={20} position={spectrum?.position ?? 0.5} />
           {spectrum && (
             <ThemedText style={styles.sampleText}>
               Computed from {spectrum.sample.posts} scored post{spectrum.sample.posts === 1 ? '' : 's'} and {spectrum.sample.upvotes + spectrum.sample.downvotes} vote{spectrum.sample.upvotes + spectrum.sample.downvotes === 1 ? '' : 's'}.
@@ -264,11 +270,18 @@ export default function PublicProfile() {
         </Pressable>
       ))}
       <ThemedView style={{ height: 32 }} />
+      </WebPageFrame>
     </ScrollView>
   );
 }
 
 const makeStyles = (c: Palette) => StyleSheet.create({
+  scroll: {
+    backgroundColor: Platform.OS === 'web' ? c.surface : c.background,
+  },
+  scrollContent: {
+    paddingBottom: Platform.OS === 'web' ? 32 : 0,
+  },
   container: {
     padding: 16,
     gap: 10,

@@ -3,6 +3,7 @@ import { Redirect, Stack, usePathname, useRouter } from "expo-router";
 import { StatusBar } from 'expo-status-bar';
 
 import { IconSymbol } from '@/components/ui/icon-symbol';
+import WebStackHeader from '@/components/web-stack-header';
 
 import { usePalette } from '@/hooks/use-palette';
 
@@ -10,9 +11,10 @@ import { PostProvider } from '../context/postContext';
 
 import { AuthProvider, useAuth } from '@/context/authContext';
 
+import { FeedPreferenceProvider } from '@/context/feedPreferenceContext';
 import { ThemeModeProvider } from '@/context/themeContext';
 
-import { ActivityIndicator, Pressable, Text, View } from 'react-native';
+import { ActivityIndicator, Platform, Pressable, Text, View } from 'react-native';
 
 import { useEffect } from 'react';
 
@@ -29,9 +31,11 @@ initSentry();
 export default function RootLayout() {
   return (
     <ThemeModeProvider>
-      <AuthProvider>
-        <ThemedShell />
-      </AuthProvider>
+      <FeedPreferenceProvider>
+        <AuthProvider>
+          <ThemedShell />
+        </AuthProvider>
+      </FeedPreferenceProvider>
     </ThemeModeProvider>
   );
 }
@@ -101,6 +105,14 @@ function AppNavigator() {
         <Stack
           screenOptions={{
             headerTintColor: c.primary,
+            contentStyle: {
+              backgroundColor: Platform.OS === 'web' ? c.surface : c.background,
+            },
+            ...(Platform.OS === 'web'
+              ? {
+                  header: () => <WebStackHeader />,
+                }
+              : {}),
             // header title color comes from the navigation theme, so it
             // flips with light/dark automatically
             //
@@ -160,14 +172,14 @@ function AppNavigator() {
           <Stack.Screen
             name="createpost"
             options={{
-              presentation: 'formSheet',
+              presentation: Platform.OS === 'web' ? 'transparentModal' : 'formSheet',
               headerShown: false,
-              sheetAllowedDetents: [0.9],
+              sheetAllowedDetents: Platform.OS === 'web' ? undefined : [0.9],
               sheetInitialDetentIndex: 0,
-              sheetGrabberVisible: true,
+              sheetGrabberVisible: Platform.OS !== 'web',
               sheetCornerRadius: 24,
               sheetLargestUndimmedDetentIndex: 'none',
-              contentStyle: { backgroundColor: c.surfaceRaised },
+              contentStyle: { backgroundColor: Platform.OS === 'web' ? 'transparent' : c.surfaceRaised },
             }}
           />
           <Stack.Screen
@@ -196,6 +208,7 @@ function AppNavigator() {
             options={{
               headerTitle: "",
               headerBackTitle: "Back",
+              headerShown: Platform.OS !== 'web',
             }}
           />
           <Stack.Screen

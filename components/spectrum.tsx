@@ -1,6 +1,6 @@
 import { LinearGradient } from 'expo-linear-gradient';
 import { useMemo } from 'react';
-import { StyleProp, StyleSheet, TextStyle, View } from 'react-native';
+import { Platform, StyleProp, StyleSheet, TextStyle, View } from 'react-native';
 import { type Palette } from '@/constants/theme';
 import { usePalette } from '@/hooks/use-palette';
 import { ThemedText } from './themed-text';
@@ -35,8 +35,7 @@ export default function Spectrum({width, height = 20, position, topic, textStyle
           style={{ width, height, borderRadius: 16}}
         />
         <View style={[styles.foreground, {
-          left: `${position*90}%`,
-          marginLeft: -5 + .05*width
+          left: Math.max(0, Math.min(width - 10, position * (width - 10))),
         }]}/>
 
       </View>
@@ -60,13 +59,17 @@ const makeStyles = (c: Palette) => StyleSheet.create({
     height: 20,
     borderRadius: 4,
     backgroundColor: c.spectrumThumb,
-    shadowColor: c.shadow,
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.25,
-    shadowRadius: 3.84,
+    ...(Platform.OS === 'web'
+      ? { boxShadow: `0 2px 4px ${c.shadow}40` }
+      : {
+          shadowColor: c.shadow,
+          shadowOffset: {
+            width: 0,
+            height: 2,
+          },
+          shadowOpacity: 0.25,
+          shadowRadius: 3.84,
+        }),
     elevation: 5,
   },
   topicText: {

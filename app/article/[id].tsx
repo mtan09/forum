@@ -3,6 +3,7 @@ import CommentList from '@/components/commentComponent';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { IconSymbol } from '@/components/ui/icon-symbol';
+import WebPageFrame from '@/components/web-page-frame';
 import { type Palette } from '@/constants/theme';
 import { usePalette } from '@/hooks/use-palette';
 import { api } from '@/lib/api';
@@ -93,13 +94,20 @@ export default function ArticleScreen() {
       style={{ flex: 1 }}
       keyboardVerticalOffset={100}
     >
-      <ScrollView keyboardShouldPersistTaps="handled">
-        <Article
-          article={article}
-        />
+      <ScrollView
+        keyboardShouldPersistTaps="handled"
+        showsVerticalScrollIndicator={false}
+        style={styles.scroll}
+        contentContainerStyle={styles.scrollContent}
+      >
+        <WebPageFrame maxWidth={760}>
+          <Article
+            article={article}
+            variant="detail"
+          />
 
-        {/* Read the original at the source */}
-        <ThemedView style={styles.container}>
+          {/* Read the original at the source */}
+          <ThemedView style={styles.container}>
           {/* Hand this article to forumAI as the chat subject */}
           <Pressable
             onPress={() =>
@@ -141,6 +149,7 @@ export default function ArticleScreen() {
                 value={commentText}
                 onChangeText={setCommentText}
                 multiline
+                numberOfLines={1}
                 style={styles.composerInput}
                 editable={!submitting}
               />
@@ -161,15 +170,22 @@ export default function ArticleScreen() {
 
             <CommentList articleId={articleId} refreshKey={refreshKey} />
           </ThemedView>
-        </ThemedView>
+          </ThemedView>
+        </WebPageFrame>
       </ScrollView>
     </KeyboardAvoidingView>
   );
 }
 
 const makeStyles = (c: Palette) => StyleSheet.create({
+  scroll: {
+    backgroundColor: Platform.OS === 'web' ? c.surface : c.background,
+  },
+  scrollContent: {
+    paddingBottom: Platform.OS === 'web' ? 32 : 0,
+  },
   container: {
-    padding: 16,
+    padding: Platform.OS === 'web' ? 20 : 16,
     gap: 12,
   },
   aiButton: {
@@ -214,9 +230,12 @@ const makeStyles = (c: Palette) => StyleSheet.create({
   composerInput: {
     flex: 1,
     fontSize: 15,
+    lineHeight: 20,
+    minHeight: 28,
     maxHeight: 96,
-    paddingTop: 0,
-    paddingBottom: 0,
+    paddingTop: 4,
+    paddingBottom: 4,
+    textAlignVertical: 'center',
     color: c.text,
   },
   composerError: {

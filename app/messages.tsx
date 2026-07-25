@@ -7,7 +7,7 @@ import { useRelativeTime } from '@/hooks/useRelativeTime';
 import { api } from '@/lib/api';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useCallback, useMemo, useState } from 'react';
-import { ActivityIndicator, Image, Pressable, ScrollView, StyleSheet } from 'react-native';
+import { ActivityIndicator, Image, Platform, Pressable, ScrollView, StyleSheet } from 'react-native';
 
 type Conversation = {
   conversation_id: string;
@@ -93,25 +93,43 @@ export default function Messages() {
   }
 
   return (
-    <ScrollView
-      contentContainerStyle={styles.container}
-      refreshControl={
-        <AppRefreshControl refreshing={refreshing} onRefresh={onRefresh} />
-      }
-    >
-      {conversations.length === 0 ? (
-        <ThemedText style={styles.empty}>
-          No messages yet. Open someone&apos;s profile and tap Message to start a conversation.
-        </ThemedText>
-      ) : (
-        conversations.map((conv) => <ConversationRow key={conv.conversation_id} conv={conv} />)
-      )}
-    </ScrollView>
+    <ThemedView style={styles.page}>
+      <ScrollView
+        style={styles.screen}
+        contentContainerStyle={styles.container}
+        showsVerticalScrollIndicator={false}
+        refreshControl={
+          Platform.OS === 'web' ? undefined : <AppRefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+        }
+      >
+        {conversations.length === 0 ? (
+          <ThemedText style={styles.empty}>
+            No messages yet. Open someone&apos;s profile and tap Message to start a conversation.
+          </ThemedText>
+        ) : (
+          conversations.map((conv) => <ConversationRow key={conv.conversation_id} conv={conv} />)
+        )}
+      </ScrollView>
+    </ThemedView>
   );
 }
 
 const makeStyles = (c: Palette) => StyleSheet.create({
   center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
+  page: {
+    flex: 1,
+    alignItems: 'center',
+    padding: Platform.OS === 'web' ? 20 : 0,
+    backgroundColor: Platform.OS === 'web' ? c.surface : c.background,
+  },
+  screen: {
+    width: '100%',
+    maxWidth: Platform.OS === 'web' ? 760 : undefined,
+    borderWidth: Platform.OS === 'web' ? 1 : 0,
+    borderColor: c.border,
+    borderRadius: Platform.OS === 'web' ? 20 : 0,
+    backgroundColor: c.background,
+  },
   container: { paddingVertical: 8 },
   empty: {
     textAlign: 'center',
@@ -128,6 +146,7 @@ const makeStyles = (c: Palette) => StyleSheet.create({
     paddingVertical: 12,
     borderBottomWidth: StyleSheet.hairlineWidth,
     borderBottomColor: c.border,
+    backgroundColor: c.background,
   },
   avatar: { width: 50, height: 50, borderRadius: 25 },
   rowBody: { flex: 1, gap: 2 },

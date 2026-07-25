@@ -5,7 +5,10 @@ import {
   FlatList,
   NativeScrollEvent,
   NativeSyntheticEvent,
+  Platform,
+  Pressable,
   StyleSheet,
+  Text,
   View,
   ViewStyle,
 } from 'react-native';
@@ -29,6 +32,7 @@ type CarouselProps<T> = {
   dotSize?: number; // default: 8
   dotSpacing?: number; // default: 8
   paginationContainerStyle?: ViewStyle;
+  showControls?: boolean;
 };
 
 export default function Carousel<T>({
@@ -50,6 +54,7 @@ export default function Carousel<T>({
   dotSize = 8,
   dotSpacing = 8,
   paginationContainerStyle,
+  showControls = false,
 }: CarouselProps<T>) {
   const { c } = usePalette();
   const activeDot = dotActiveColor ?? c.accentDeep;
@@ -92,6 +97,16 @@ export default function Carousel<T>({
 
   const initialScrollIndex = data.length + activeIndex;
 
+  const moveBy = (delta: number) => {
+    const next = (activeIndex + delta + data.length) % data.length;
+    setActiveIndex(next);
+    onIndexChange?.(next);
+    flatListRef.current?.scrollToIndex({
+      index: data.length + next,
+      animated: true,
+    });
+  };
+
   // Build unique keys for extended (looped) items to avoid duplicate keys
   const getExtendedKey = (_: T, extendedIndex: number) => {
     const baseIndex = data.length > 0 ? extendedIndex % data.length : 0;
@@ -126,6 +141,27 @@ export default function Carousel<T>({
         )}
       />
 
+      {showControls && Platform.OS === 'web' && data.length > 1 && (
+        <>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Previous topic"
+            onPress={() => moveBy(-1)}
+            style={({ pressed }) => [styles.control, styles.controlPrevious, pressed && styles.controlPressed]}
+          >
+            <Text style={styles.controlText}>‹</Text>
+          </Pressable>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Next topic"
+            onPress={() => moveBy(1)}
+            style={({ pressed }) => [styles.control, styles.controlNext, pressed && styles.controlPressed]}
+          >
+            <Text style={styles.controlText}>›</Text>
+          </Pressable>
+        </>
+      )}
+
       {renderPagination
         ? renderPagination(activeIndex, data.length)
         : showPagination && data.length > 1 && (
@@ -154,6 +190,7 @@ export default function Carousel<T>({
 const styles = StyleSheet.create({
   container: {
     width: '100%',
+    position: 'relative',
   },
   pagination: {
     flexDirection: 'row',
@@ -163,5 +200,34 @@ const styles = StyleSheet.create({
   },
   dot: {
     // sized dynamically
+  },
+  control: {
+    position: 'absolute',
+    top: '50%',
+    width: 32,
+    height: 32,
+    marginTop: -16,
+    borderRadius: 16,
+    backgroundColor: 'rgba(0,0,0,0.46)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    zIndex: 4,
+    cursor: 'pointer',
+  },
+  controlPrevious: {
+    left: 24,
+  },
+  controlNext: {
+    right: 24,
+  },
+  controlPressed: {
+    opacity: 0.65,
+  },
+  controlText: {
+    color: '#FFFFFF',
+    fontSize: 27,
+    lineHeight: 28,
+    fontWeight: '600',
+    marginTop: -2,
   },
 });

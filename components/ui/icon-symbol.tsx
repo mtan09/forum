@@ -31,6 +31,7 @@ const MAPPING = {
   'chevron.left': 'chevron-left',
   'chevron.right': 'chevron-right',
   'chevron.up': 'keyboard-arrow-up',
+  'chevron.down': 'keyboard-arrow-down',
   'chevron.left.forwardslash.chevron.right': 'code',
 
   // actions

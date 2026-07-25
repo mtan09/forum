@@ -137,9 +137,13 @@ export default function Profile() {
   const [upvoted, setUpvoted] = useState<MixedItem[] | null>(null);
   const [saved, setSaved] = useState<MixedItem[] | null>(null);
   const [tabLoading, setTabLoading] = useState(false);
+  const loadedTabsRef = useRef<Set<Tab>>(new Set());
 
-  const loadTab = useCallback(async (tab: Tab) => {
-    setTabLoading(true);
+  const loadTab = useCallback(async (
+    tab: Tab,
+    { showLoading = !loadedTabsRef.current.has(tab) }: { showLoading?: boolean } = {}
+  ): Promise<boolean> => {
+    if (showLoading) setTabLoading(true);
     try {
       if (tab === 'Posts') {
         const rows = await api<any[]>('/users/me/posts');
@@ -151,12 +155,18 @@ export default function Profile() {
       } else {
         setSaved(mapMixed(await api<any[]>('/bookmarks')));
       }
+      loadedTabsRef.current.add(tab);
+      return true;
     } catch (err: any) {
       console.log(`Error loading ${tab}:`, err?.message);
+      return false;
     } finally {
-      setTabLoading(false);
+      if (showLoading) setTabLoading(false);
     }
   }, []);
+
+  const activeTabRef = useRef<Tab>(activeTab);
+  useEffect(() => { activeTabRef.current = activeTab; }, [activeTab]);
 
   // Recompute the spectrum and refresh the open tab whenever the screen
   // gains focus — activity elsewhere in the app changes both.
@@ -179,24 +189,52 @@ export default function Profile() {
           })
           .catch(() => {});
       }
-      loadTab(activeTab);
+      loadTab(activeTabRef.current);
       return () => { active = false; };
-    }, [activeTab, loadTab, profile?.id])
+    }, [loadTab, profile?.id])
   );
 
   // Re-tapping the profile tab button jumps to the top and reloads the open tab
   const scrollRef = useRef<ScrollView>(null);
+  const currentOffsetRef = useRef(0);
+  const tabOffsetsRef = useRef<Partial<Record<Tab, number>>>({ Posts: 0 });
+  const switchRequestRef = useRef(0);
+
+  useEffect(() => {
+    if (tabLoading) return;
+    const frame = requestAnimationFrame(() => {
+      const y = tabOffsetsRef.current[activeTab] ?? currentOffsetRef.current;
+      scrollRef.current?.scrollTo({ y, animated: false });
+      currentOffsetRef.current = y;
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [activeTab, tabLoading]);
+
   useEffect(() => {
     return onTabRefresh('profile', () => {
+      tabOffsetsRef.current[activeTab] = 0;
+      currentOffsetRef.current = 0;
       scrollRef.current?.scrollTo({ y: 0, animated: true });
       loadTab(activeTab);
     });
   }, [loadTab, activeTab]);
 
-  const switchTab = (tab: Tab) => {
+  const switchTab = async (tab: Tab) => {
+    const request = ++switchRequestRef.current;
+    if (tab === activeTab) return;
     selectTick();
+    const currentOffset = currentOffsetRef.current;
+    tabOffsetsRef.current[activeTab] = currentOffset;
+    if (tabOffsetsRef.current[tab] == null) {
+      tabOffsetsRef.current[tab] = currentOffset;
+    }
+
+    if (!loadedTabsRef.current.has(tab)) {
+      const loaded = await loadTab(tab, { showLoading: false });
+      if (!loaded || request !== switchRequestRef.current) return;
+    }
+    activeTabRef.current = tab;
     setActiveTab(tab);
-    loadTab(tab);
   };
 
   const joined = profile?.created_at
@@ -232,7 +270,15 @@ export default function Profile() {
   };
 
   return (
-    <ScrollView ref={scrollRef}>
+    <ScrollView
+      ref={scrollRef}
+      scrollEventThrottle={16}
+      onScroll={(event) => {
+        const y = event.nativeEvent.contentOffset.y;
+        currentOffsetRef.current = y;
+        tabOffsetsRef.current[activeTabRef.current] = y;
+      }}
+    >
       <ScalableImage
         source={
           profile?.header_url

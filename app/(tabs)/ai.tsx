@@ -288,7 +288,13 @@ export default function AI() {
           <IconSymbol name="person.fill" size={14} color={c.muted} />
           <ThemedText style={styles.framingLabelText}>Answer for</ThemedText>
         </ThemedView>
-        <CustomDropdown options={framings} value={activeFraming} onValueChange={setActiveFraming} />
+        <CustomDropdown
+          options={framings}
+          value={activeFraming}
+          onValueChange={setActiveFraming}
+          title="Answer for"
+          subtitle="Choose who forumAI should write for."
+        />
       </ThemedView>
       <ThemedView style={styles.composer}>
         <TextInput

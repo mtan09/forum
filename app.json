@@ -11,7 +11,6 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.michaeltan.forum",
-      "buildNumber": "1",
       "infoPlist": {
         "NSPhotoLibraryUsageDescription": "Lets you attach photos to posts and set your profile picture and banner.",
         "ITSAppUsesNonExemptEncryption": false

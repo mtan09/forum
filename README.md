@@ -95,16 +95,41 @@ lib/sentry.ts     env-gated crash reporting (no-op without a DSN)
    npm run seed:expand  # optional: a lived-in community of users, posts, votes, debates
    ```
 
-2. **Start the app**
+2. **Install the app dependencies**
 
    ```bash
    npm install
-   npx expo start
    ```
 
-   Open in the iOS simulator, Android emulator, or Expo Go on a device on the same network.
+   Forum uses a project-specific Expo development build rather than Expo Go so
+   native behavior such as push notifications, permissions, fonts, splash
+   screens, and deep links matches the production app.
 
-3. **Log in** — create an account, or use a seeded dev user:
+3. **Install a development build** (one time, and again after native dependency
+   or app-config changes)
+
+   ```bash
+   npx eas-cli@latest build --platform ios --profile development  # iOS Simulator
+   npx eas-cli@latest device:create                               # physical iPhone, once
+   npx eas-cli@latest build --platform ios --profile device       # physical iPhone
+   ```
+
+   EAS physical-device builds and TestFlight require a paid Apple Developer
+   Program team. Without one, connect your own iPhone to this Mac, enable
+   Developer Mode, select your free Apple account in Xcode, and use
+   `npx expo run:ios --device`; iOS Simulator builds do not require Apple
+   signing.
+
+4. **Start the development server**
+
+   ```bash
+   npm start
+   ```
+
+   Open the installed Forum development app. It connects to Metro with fast
+   refresh, like Expo Go, but includes Forum's actual native configuration.
+
+5. **Log in** — create an account, or use a seeded dev user:
    `john@example.dev` / `jane@example.dev` / `alice@example.dev`, password `password123`
 
 To point the app at a deployed backend instead, set `EXPO_PUBLIC_API_URL` (e.g. in a `.env` file):
@@ -120,10 +145,17 @@ Local `.env` files are gitignored. Keep deployed API and Sentry values in local/
 ## Development
 
 ```bash
-npx expo start       # dev server (i = iOS simulator, a = Android, w = web)
+npm start            # Forum development client (i = iOS simulator, a = Android)
+npm run web          # browser development server
 npm run lint         # eslint
 npx tsc --noEmit     # typecheck
 ```
+
+The EAS `development` environment points cloud-built clients at the hosted API.
+For a different backend during local Metro development, override
+`EXPO_PUBLIC_API_URL` in the gitignored `.env.local`. A physical phone cannot
+reach a server at the phone's own `localhost`; use the hosted API or the Mac's
+LAN address.
 
 ### Web app
 

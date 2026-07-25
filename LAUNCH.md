@@ -69,15 +69,27 @@ DSN exists.
 
 Requires the $99/yr Apple Developer Program.
 
+The Apple ID currently used by EAS must belong to a Developer Team before
+physical-device EAS builds, TestFlight, or App Store submission will work. A
+free Apple ID can still install a local development build on its owner's
+connected iPhone with `npx expo run:ios --device`, but it cannot distribute
+through TestFlight.
+
 ```bash
 cd forum
 npm i -g eas-cli && eas login       # free Expo account
 eas init                            # one-time: writes the projectId into app.json
-eas build --profile device --platform ios   # dev build for a real device
+npx expo install expo-dev-client
+eas build --profile development --platform ios  # iOS Simulator dev client
+eas device:create                              # register a real iPhone once
+eas build --profile device --platform ios      # physical-iPhone dev client
 ```
 
-The dev build is Expo Go with your native modules — **push notifications
-and Sentry work there** (they can't in Expo Go). Then:
+The development build is Forum's own debuggable native app, with Metro fast
+refresh and the actual native modules/configuration. **Push notifications,
+permissions, deep links, the splash screen, and Sentry can be tested there**;
+Expo Go is intentionally not part of the production-app workflow. Start Metro
+with `npm start`. Then:
 
 ```bash
 eas build --profile production --platform ios
@@ -95,7 +107,7 @@ In App Store Connect fill in:
 ## 6. Android (later)
 
 Icon mapping and adaptive icon are done; `eas build --platform android` when
-ready. Do a QA pass in the emulator first (`npx expo start` → `a`).
+ready. Do a QA pass in the development client first (`npm run android`).
 
 ## Already done — no action needed
 

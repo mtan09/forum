@@ -7,35 +7,58 @@ import { type Palette } from '@/constants/theme';
 import { mapPost } from '@/context/postContext';
 import { usePalette } from '@/hooks/use-palette';
 import { api } from '@/lib/api';
-import { getPerspectiveToneForPosition } from '@/lib/perspective-colors';
 import { onTabRefresh } from '@/lib/tabRefresh';
 import { useRouter } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, Image, Keyboard, Platform, Pressable, ScrollView, StyleSheet, TextInput } from 'react-native';
+import { ActivityIndicator, Keyboard, Platform, Pressable, ScrollView, StyleSheet, TextInput } from 'react-native';
 
 type SearchResults = {
-  users: { id: string; username: string; avatar_url: string | null; bio: string | null }[];
-  sources: { name: string; lean: number | null; articles: number }[];
+  topics: SearchTopic[];
   posts: any[];
   articles: ArticleType[];
+  counts: SearchCounts;
 };
 
-type ResultFilter = 'All' | 'Stories' | 'People' | 'Sources';
+type ResultFilter = 'Articles' | 'Posts';
+
+type SearchCounts = {
+  topics: number;
+  posts: number;
+  articles: number;
+};
+
+type SearchTopic = {
+  id: string;
+  title: string;
+  short_summary?: string | null;
+  keywords?: string[];
+  article_count: number;
+  outlet_count: number;
+};
 
 type HotTopic = {
   id?: unknown;
   title?: unknown;
   short_summary?: unknown;
   volume?: unknown;
+  article_count?: unknown;
 };
 
 type QuickTopic = {
+  id?: string;
   title: string;
   summary?: string;
   volume?: number;
+  articleCount?: number;
 };
 
-const EMPTY: SearchResults = { users: [], sources: [], posts: [], articles: [] };
+const EMPTY_COUNTS: SearchCounts = { topics: 0, posts: 0, articles: 0 };
+const EMPTY: SearchResults = {
+  topics: [],
+  posts: [],
+  articles: [],
+  counts: EMPTY_COUNTS,
+};
 const FALLBACK_QUICK_TOPICS: QuickTopic[] = [
   { title: 'The economy' },
   { title: 'Immigration' },
@@ -53,9 +76,10 @@ export default function SearchTab() {
   const [results, setResults] = useState<SearchResults>(EMPTY);
   const [loading, setLoading] = useState(false);
   const [searchError, setSearchError] = useState<string | null>(null);
-  const [activeFilter, setActiveFilter] = useState<ResultFilter>('All');
+  const [activeFilter, setActiveFilter] = useState<ResultFilter>('Articles');
   const [quickTopics, setQuickTopics] = useState(FALLBACK_QUICK_TOPICS);
   const [hasLiveTopics, setHasLiveTopics] = useState(false);
+  const [selectedTopicId, setSelectedTopicId] = useState<string | null>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const scrollRef = useRef<ScrollView>(null);
   const searchRef = useRef<TextInput>(null);
@@ -67,9 +91,11 @@ export default function SearchTab() {
         ? payload.flatMap((topic): QuickTopic[] => {
             if (typeof topic?.title !== 'string' || !topic.title.trim()) return [];
             return [{
+              id: typeof topic.id === 'string' ? topic.id : undefined,
               title: topic.title.trim(),
               summary: typeof topic.short_summary === 'string' ? topic.short_summary.trim() : undefined,
               volume: typeof topic.volume === 'number' ? topic.volume : undefined,
+              articleCount: typeof topic.article_count === 'number' ? topic.article_count : undefined,
             }];
           }).filter((topic, index, all) => all.findIndex((item) => item.title === topic.title) === index).slice(0, 5)
         : [];
@@ -105,7 +131,7 @@ export default function SearchTab() {
       setResults(EMPTY);
       setLoading(false);
       setSearchError(null);
-      setActiveFilter('All');
+      setActiveFilter('Articles');
       return;
     }
 
@@ -113,14 +139,24 @@ export default function SearchTab() {
     setSearchError(null);
     debounceRef.current = setTimeout(async () => {
       try {
-        const payload = await api<Partial<SearchResults>>(`/search?q=${encodeURIComponent(q)}`);
+        const searchPath = selectedTopicId
+          ? `/search?topic_id=${encodeURIComponent(selectedTopicId)}&q=${encodeURIComponent(q)}`
+          : `/search?q=${encodeURIComponent(q)}`;
+        const payload = await api<Partial<SearchResults>>(searchPath);
         // A partial or malformed response should become an empty section,
         // never a render-time `.length`/`.map` crash.
+        const topics = Array.isArray(payload?.topics) ? payload.topics : [];
+        const posts = Array.isArray(payload?.posts) ? payload.posts : [];
+        const articles = Array.isArray(payload?.articles) ? payload.articles : [];
         setResults({
-          users: Array.isArray(payload?.users) ? payload.users : [],
-          sources: Array.isArray(payload?.sources) ? payload.sources : [],
-          posts: Array.isArray(payload?.posts) ? payload.posts : [],
-          articles: Array.isArray(payload?.articles) ? payload.articles : [],
+          topics,
+          posts,
+          articles,
+          counts: {
+            topics: Number(payload?.counts?.topics) || topics.length,
+            posts: Number(payload?.counts?.posts) || posts.length,
+            articles: Number(payload?.counts?.articles) || articles.length,
+          },
         });
       } catch (err: any) {
         console.warn('[search] request failed:', err?.message);
@@ -134,32 +170,29 @@ export default function SearchTab() {
     return () => {
       if (debounceRef.current) clearTimeout(debounceRef.current);
     };
-  }, [query]);
+  }, [query, selectedTopicId]);
 
   const trimmedQuery = query.trim();
-  const storyCount = results.posts.length + results.articles.length;
-  const totalCount = storyCount + results.users.length + results.sources.length;
   const hasQuery = trimmedQuery.length >= 2;
-  const showStories = activeFilter === 'All' || activeFilter === 'Stories';
-  const showPeople = activeFilter === 'All' || activeFilter === 'People';
-  const showSources = activeFilter === 'All' || activeFilter === 'Sources';
+  const showArticles = activeFilter === 'Articles';
+  const showPosts = activeFilter === 'Posts';
   const filters: { label: ResultFilter; count: number }[] = [
-    { label: 'All', count: totalCount },
-    { label: 'Stories', count: storyCount },
-    { label: 'People', count: results.users.length },
-    { label: 'Sources', count: results.sources.length },
+    { label: 'Articles', count: results.counts.articles },
+    { label: 'Posts', count: results.counts.posts },
   ];
   const filteredCount = filters.find((filter) => filter.label === activeFilter)?.count ?? 0;
 
   const chooseTopic = (topic: QuickTopic) => {
+    setSelectedTopicId(topic.id ?? null);
     setQuery(topic.title);
-    setActiveFilter('All');
-    searchRef.current?.focus();
+    setActiveFilter('Articles');
+    Keyboard.dismiss();
   };
 
   const clearSearch = () => {
+    setSelectedTopicId(null);
     setQuery('');
-    setActiveFilter('All');
+    setActiveFilter('Articles');
     Keyboard.dismiss();
   };
 
@@ -177,8 +210,11 @@ export default function SearchTab() {
         <TextInput
           ref={searchRef}
           value={query}
-          onChangeText={setQuery}
-          placeholder="Topic, person, source, or #hashtag"
+          onChangeText={(value) => {
+            setSelectedTopicId(null);
+            setQuery(value);
+          }}
+          placeholder="Search articles and posts"
           placeholderTextColor={c.muted}
           style={styles.searchInput}
           autoCapitalize="none"
@@ -207,39 +243,45 @@ export default function SearchTab() {
                 <ThemedText style={styles.sectionMeta}>{hasLiveTopics ? 'Trending now' : 'Suggested'}</ThemedText>
               </ThemedView>
               <ThemedView style={styles.topicGrid}>
-                {quickTopics.map((topic, index) => (
-                  <Pressable
-                    key={topic.title}
-                    onPress={() => chooseTopic(topic)}
-                    style={({ pressed }) => [
-                      styles.topicChip,
-                      index === 0 && styles.topicChipFeatured,
-                      IS_WEB && index === 0 && styles.topicChipFeaturedWeb,
-                      { opacity: pressed ? 0.65 : 1 },
-                    ]}
-                  >
-                    <ThemedView style={styles.topicCopy}>
-                      <ThemedText style={[styles.topicEyebrow, index === 0 && styles.topicEyebrowFeatured]}>
-                        {index === 0 ? 'TOP STORY' : topic.volume != null ? `${topic.volume} POSTS` : 'TRENDING'}
-                      </ThemedText>
-                      <ThemedText numberOfLines={2} style={[styles.topicText, index === 0 && styles.topicTextFeatured]}>{topic.title}</ThemedText>
-                      {topic.summary ? (
-                        <ThemedText numberOfLines={index === 0 ? 2 : 1} style={[styles.topicSummary, index === 0 && styles.topicSummaryFeatured]}>
-                          {topic.summary}
+                {quickTopics.map((topic, index) => {
+                  const count = topic.articleCount ?? topic.volume;
+                  const countLabel = count != null
+                    ? `${count} ${topic.articleCount != null ? `ARTICLE${count === 1 ? '' : 'S'}` : 'RELATED'}`
+                    : 'TRENDING';
+                  return (
+                    <Pressable
+                      key={topic.title}
+                      onPress={() => chooseTopic(topic)}
+                      style={({ pressed }) => [
+                        styles.topicChip,
+                        index === 0 && styles.topicChipFeatured,
+                        IS_WEB && index === 0 && styles.topicChipFeaturedWeb,
+                        { opacity: pressed ? 0.65 : 1 },
+                      ]}
+                    >
+                      <ThemedView style={styles.topicCopy}>
+                        <ThemedText style={[styles.topicEyebrow, index === 0 && styles.topicEyebrowFeatured]}>
+                          {index === 0 ? `TOP STORY · ${countLabel}` : countLabel}
                         </ThemedText>
-                      ) : null}
-                    </ThemedView>
-                    <ThemedView style={[styles.topicArrow, index === 0 && styles.topicArrowFeatured]}>
-                      <IconSymbol name="arrow.up.right" size={14} color={index === 0 ? c.onPrimary : c.primary} />
-                    </ThemedView>
-                  </Pressable>
-                ))}
+                        <ThemedText numberOfLines={2} style={[styles.topicText, index === 0 && styles.topicTextFeatured]}>{topic.title}</ThemedText>
+                        {topic.summary ? (
+                          <ThemedText numberOfLines={index === 0 ? 2 : 1} style={[styles.topicSummary, index === 0 && styles.topicSummaryFeatured]}>
+                            {topic.summary}
+                          </ThemedText>
+                        ) : null}
+                      </ThemedView>
+                      <ThemedView style={[styles.topicArrow, index === 0 && styles.topicArrowFeatured]}>
+                        <IconSymbol name="arrow.up.right" size={14} color={index === 0 ? c.onPrimary : c.primary} />
+                      </ThemedView>
+                    </Pressable>
+                  );
+                })}
               </ThemedView>
             </ThemedView>
           </>
         ) : (
           <>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filterRow}>
+            <ThemedView style={styles.filterRow}>
               {filters.map((filter) => {
                 const selected = filter.label === activeFilter;
                 return (
@@ -257,11 +299,13 @@ export default function SearchTab() {
                   </Pressable>
                 );
               })}
-            </ScrollView>
+            </ThemedView>
 
             <ThemedView style={styles.resultSummary}>
               <ThemedView>
-                <ThemedText style={styles.resultEyebrow}>{loading ? 'SEARCHING FOR' : `${filteredCount} ${activeFilter.toUpperCase()} RESULT${filteredCount === 1 ? '' : 'S'}`}</ThemedText>
+                <ThemedText style={styles.resultEyebrow}>
+                  {loading ? 'SEARCHING FOR' : `${filteredCount} MATCHING ${activeFilter.toUpperCase()}`}
+                </ThemedText>
                 <ThemedText style={styles.resultQuery}>“{trimmedQuery}”</ThemedText>
               </ThemedView>
               {loading && <ActivityIndicator color={c.primary} />}
@@ -273,62 +317,41 @@ export default function SearchTab() {
                   <IconSymbol name="magnifyingglass" size={25} color={c.primary} />
                 </ThemedView>
                 <ThemedText style={styles.emptyTitle}>{searchError ? 'Search could not connect' : 'Nothing in this lane yet'}</ThemedText>
-                <ThemedText style={styles.emptyText}>{searchError ?? 'Try a broader phrase, another spelling, or switch back to All results.'}</ThemedText>
+                <ThemedText style={styles.emptyText}>
+                  {searchError ?? `No matching ${activeFilter.toLowerCase()} yet. Try a broader phrase or check the other tab.`}
+                </ThemedText>
               </ThemedView>
             )}
 
-            {!loading && showSources && results.sources.length > 0 && (
+            {!loading && showArticles && results.topics.length > 0 && (
               <ThemedView style={styles.resultSection}>
                 <ThemedView style={styles.sectionTitleRow}>
-                  <ThemedText style={styles.sectionTitle}>Sources</ThemedText>
-                  <ThemedText style={styles.sectionMeta}>{results.sources.length}</ThemedText>
+                  <ThemedText style={styles.sectionTitle}>Story clusters</ThemedText>
+                  <ThemedText style={styles.sectionMeta}>Best context first</ThemedText>
                 </ThemedView>
-                <ThemedView style={styles.resultGroup}>
-                  {results.sources.map((source, index) => {
-                    const tag = getPerspectiveToneForPosition(source.lean, c);
-                    return (
-                      <Pressable
-                        key={source.name}
-                        onPress={() => router.push(`/source/${encodeURIComponent(source.name)}`)}
-                        style={({ pressed }) => [styles.resultRow, index > 0 && styles.resultRowDivider, { opacity: pressed ? 0.6 : 1 }]}
-                      >
-                        <ThemedView style={styles.sourceMark}>
-                          <IconSymbol name="newspaper.fill" size={18} color={c.primary} />
-                        </ThemedView>
-                        <ThemedView style={styles.rowCopy}>
-                          <ThemedText style={styles.rowTitle}>{source.name}</ThemedText>
-                          <ThemedText style={styles.rowMeta}>{source.articles} matching articles</ThemedText>
-                        </ThemedView>
-                        {tag && (
-                          <ThemedView style={[styles.leanTag, { backgroundColor: tag.background }]}>
-                            <ThemedText style={[styles.leanTagText, { color: tag.color }]}>{tag.label}</ThemedText>
-                          </ThemedView>
-                        )}
-                        <IconSymbol name="chevron.right" size={17} color={c.faint} />
-                      </Pressable>
-                    );
-                  })}
-                </ThemedView>
-              </ThemedView>
-            )}
-
-            {!loading && showPeople && results.users.length > 0 && (
-              <ThemedView style={styles.resultSection}>
-                <ThemedView style={styles.sectionTitleRow}>
-                  <ThemedText style={styles.sectionTitle}>People</ThemedText>
-                  <ThemedText style={styles.sectionMeta}>{results.users.length}</ThemedText>
-                </ThemedView>
-                <ThemedView style={styles.resultGroup}>
-                  {results.users.map((user, index) => (
+                <ThemedView style={styles.clusterGroup}>
+                  {results.topics.map((topic, index) => (
                     <Pressable
-                      key={user.id}
-                      onPress={() => router.push(`/user/${user.id}`)}
-                      style={({ pressed }) => [styles.resultRow, index > 0 && styles.resultRowDivider, { opacity: pressed ? 0.6 : 1 }]}
+                      key={topic.id}
+                      onPress={() => router.push(`/summary/${topic.id}`)}
+                      style={({ pressed }) => [
+                        styles.clusterRow,
+                        index > 0 && styles.resultRowDivider,
+                        { opacity: pressed ? 0.65 : 1 },
+                      ]}
                     >
-                      <Image source={user.avatar_url ? { uri: user.avatar_url } : require('@/assets/images/Default_pfp.jpg')} style={styles.userAvatar} />
+                      <ThemedView style={styles.clusterMark}>
+                        <IconSymbol name="rectangle.stack.fill" size={17} color={c.primary} />
+                      </ThemedView>
                       <ThemedView style={styles.rowCopy}>
-                        <ThemedText style={styles.rowTitle}>{user.username}</ThemedText>
-                        <ThemedText style={styles.rowMeta} numberOfLines={1}>{user.bio || 'forum community member'}</ThemedText>
+                        <ThemedText style={styles.clusterTitle} numberOfLines={2}>{topic.title}</ThemedText>
+                        {topic.short_summary ? (
+                          <ThemedText style={styles.clusterSummary} numberOfLines={2}>{topic.short_summary}</ThemedText>
+                        ) : null}
+                        <ThemedText style={styles.clusterMeta}>
+                          {topic.article_count} article{topic.article_count === 1 ? '' : 's'}
+                          {topic.outlet_count > 0 ? ` · ${topic.outlet_count} outlet${topic.outlet_count === 1 ? '' : 's'}` : ''}
+                        </ThemedText>
                       </ThemedView>
                       <IconSymbol name="chevron.right" size={17} color={c.faint} />
                     </Pressable>
@@ -337,11 +360,15 @@ export default function SearchTab() {
               </ThemedView>
             )}
 
-            {!loading && showStories && results.posts.length > 0 && (
+            {!loading && showPosts && results.posts.length > 0 && (
               <ThemedView style={styles.storySection}>
                 <ThemedView style={styles.storyHeading}>
                   <ThemedText style={styles.sectionTitle}>Community posts</ThemedText>
-                  <ThemedText style={styles.sectionMeta}>{results.posts.length}</ThemedText>
+                  <ThemedText style={styles.sectionMeta}>
+                    {results.posts.length < results.counts.posts
+                      ? `${results.posts.length} of ${results.counts.posts}`
+                      : results.counts.posts}
+                  </ThemedText>
                 </ThemedView>
                 <ThemedView style={styles.storyGrid}>
                   {results.posts.map((row) => {
@@ -360,11 +387,15 @@ export default function SearchTab() {
               </ThemedView>
             )}
 
-            {!loading && showStories && results.articles.length > 0 && (
+            {!loading && showArticles && results.articles.length > 0 && (
               <ThemedView style={styles.storySection}>
                 <ThemedView style={styles.storyHeading}>
                   <ThemedText style={styles.sectionTitle}>Reporting</ThemedText>
-                  <ThemedText style={styles.sectionMeta}>{results.articles.length}</ThemedText>
+                  <ThemedText style={styles.sectionMeta}>
+                    {results.articles.length < results.counts.articles
+                      ? `${results.articles.length} of ${results.counts.articles}`
+                      : results.counts.articles}
+                  </ThemedText>
                 </ThemedView>
                 <ThemedView style={styles.storyGrid}>
                   {results.articles.map((article) => (
@@ -389,7 +420,7 @@ export default function SearchTab() {
 const makeStyles = (c: Palette) => StyleSheet.create({
   screen: { flex: 1, paddingTop: IS_WEB ? 32 : 88 },
   header: { paddingHorizontal: IS_WEB ? 28 : 16, backgroundColor: 'transparent' },
-  title: { color: c.primary, fontSize: IS_WEB ? 34 : undefined, lineHeight: IS_WEB ? 40 : undefined },
+  title: { color: c.primary, fontSize: IS_WEB ? 34 : 32, lineHeight: IS_WEB ? 40 : 38 },
   subtitle: { color: c.muted, marginTop: 3, marginBottom: 8, fontSize: IS_WEB ? 15 : 14, lineHeight: 20 },
   searchShell: {
     minHeight: IS_WEB ? 64 : 58,
@@ -435,8 +466,18 @@ const makeStyles = (c: Palette) => StyleSheet.create({
   topicSummaryFeatured: { color: c.onPrimaryMuted },
   topicArrow: { width: 28, height: 28, borderRadius: 9, backgroundColor: c.accentSoftBg, alignItems: 'center', justifyContent: 'center' },
   topicArrowFeatured: { backgroundColor: c.onPrimaryOverlay },
-  filterRow: { gap: 8, paddingHorizontal: IS_WEB ? 28 : 16, paddingTop: 17, paddingBottom: 7 },
-  filterChip: { minHeight: 38, flexDirection: 'row', alignItems: 'center', gap: 7, borderRadius: 12, borderWidth: 1, borderColor: c.border, backgroundColor: c.background, paddingHorizontal: 12, paddingVertical: 7 },
+  filterRow: {
+    flexDirection: 'row',
+    gap: 4,
+    marginHorizontal: IS_WEB ? 28 : 16,
+    marginTop: 17,
+    padding: 4,
+    borderRadius: 15,
+    borderWidth: 1,
+    borderColor: c.border,
+    backgroundColor: c.inputBg,
+  },
+  filterChip: { minHeight: 38, flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 7, borderRadius: 11, backgroundColor: 'transparent', paddingHorizontal: 12, paddingVertical: 7 },
   filterChipSelected: { backgroundColor: c.primary, borderColor: c.primary },
   filterText: { color: c.subtle, fontSize: 12, lineHeight: 16, fontWeight: '800' },
   filterTextSelected: { color: c.onPrimary },
@@ -452,16 +493,14 @@ const makeStyles = (c: Palette) => StyleSheet.create({
   emptyTitle: { fontSize: 17, lineHeight: 22, fontWeight: '900', marginTop: 13 },
   emptyText: { color: c.muted, textAlign: 'center', fontSize: 13, lineHeight: 19, marginTop: 6 },
   resultSection: { marginTop: 21, paddingHorizontal: IS_WEB ? 28 : 16, backgroundColor: 'transparent' },
-  resultGroup: { borderRadius: 17, borderWidth: 1, borderColor: c.cardBorder, backgroundColor: c.card, overflow: 'hidden' },
-  resultRow: { minHeight: 68, flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 11, paddingVertical: 9, backgroundColor: 'transparent' },
+  clusterGroup: { borderRadius: 17, borderWidth: 1, borderColor: c.cardBorder, backgroundColor: c.card, overflow: 'hidden' },
+  clusterRow: { minHeight: 96, flexDirection: 'row', alignItems: 'center', gap: 11, paddingHorizontal: 12, paddingVertical: 12, backgroundColor: 'transparent' },
+  clusterMark: { width: 40, height: 40, borderRadius: 13, backgroundColor: c.accentSoftBg, alignItems: 'center', justifyContent: 'center' },
+  clusterTitle: { color: c.text, fontSize: 14, lineHeight: 19, fontWeight: '900' },
+  clusterSummary: { color: c.subtle, fontSize: 11, lineHeight: 16, marginTop: 3 },
+  clusterMeta: { color: c.primary, fontSize: 9, lineHeight: 13, fontWeight: '900', letterSpacing: 0.35, marginTop: 5 },
   resultRowDivider: { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: c.cardBorder },
-  sourceMark: { width: 42, height: 42, borderRadius: 13, backgroundColor: c.accentSoftBg, alignItems: 'center', justifyContent: 'center' },
   rowCopy: { flex: 1, minWidth: 0, backgroundColor: 'transparent' },
-  rowTitle: { fontSize: 14, lineHeight: 18, fontWeight: '900' },
-  rowMeta: { color: c.muted, fontSize: 11, lineHeight: 15, marginTop: 2 },
-  leanTag: { borderRadius: 8, paddingHorizontal: 7, paddingVertical: 3 },
-  leanTagText: { fontSize: 9, lineHeight: 12, fontWeight: '900' },
-  userAvatar: { width: 42, height: 42, borderRadius: 14 },
   storySection: { marginTop: 23, backgroundColor: 'transparent' },
   storyHeading: { flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between', paddingHorizontal: IS_WEB ? 28 : 16, marginBottom: 8, backgroundColor: 'transparent' },
   storyGrid: {

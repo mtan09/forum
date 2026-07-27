@@ -144,7 +144,9 @@ export default function SummaryScreen() {
             </ThemedText>
             <ThemedView style={styles.metaWrap}>
               <ThemedView style={styles.volumePill}>
-                <ThemedText style={styles.volumeText}>{formatCount(summary?.volume ?? 0)} posts</ThemedText>
+                <ThemedText style={styles.volumeText}>
+                  {formatCount(articles.length)} article{articles.length === 1 ? '' : 's'}
+                </ThemedText>
               </ThemedView>
               {(summary?.keywords ?? []).slice(0, 6).map((keyword) => (
                 <ThemedView key={keyword} style={styles.keywordPill}>

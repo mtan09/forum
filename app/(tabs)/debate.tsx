@@ -227,8 +227,8 @@ const makeStyles = (c: Palette) => StyleSheet.create({
   },
   title: {
     color: c.primary,
-    fontSize: Platform.OS === 'web' ? 34 : undefined,
-    lineHeight: Platform.OS === 'web' ? 40 : undefined,
+    fontSize: Platform.OS === 'web' ? 34 : 32,
+    lineHeight: Platform.OS === 'web' ? 40 : 38,
   },
   subtitle: {
     color: c.muted,

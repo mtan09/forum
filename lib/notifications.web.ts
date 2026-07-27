@@ -7,7 +7,13 @@ export async function enableFloorReminder(): Promise<boolean> {
 
 export async function disableFloorReminder(): Promise<void> {}
 
-export async function registerForPush(): Promise<void> {}
+export async function registerForPush(): Promise<boolean> {
+  return false;
+}
+
+export async function pushPermissionGranted(): Promise<boolean> {
+  return false;
+}
 
 export async function unregisterPush(): Promise<void> {}
 

@@ -8,7 +8,12 @@ import { useThemeMode, type ThemePreference } from '@/context/themeContext';
 import { usePalette } from '@/hooks/use-palette';
 import { api, API_URL } from '@/lib/api';
 import { selectTick, tapLight } from '@/lib/haptics';
-import { disableFloorReminder, enableFloorReminder } from '@/lib/notifications';
+import {
+  disableFloorReminder,
+  enableFloorReminder,
+  pushPermissionGranted,
+  registerForPush,
+} from '@/lib/notifications';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import Constants from 'expo-constants';
 import * as WebBrowser from 'expo-web-browser';
@@ -16,31 +21,34 @@ import { useRouter } from 'expo-router';
 import { useEffect, useMemo, useState } from 'react';
 import { Alert, Platform, Pressable, ScrollView, StyleSheet } from 'react-native';
 
-// Local preference toggles — persisted on-device; no server wiring yet
 type Prefs = {
   pushNotifications: boolean;
   emailNotifications: boolean;
-  replyNotifications: boolean;
-  upvoteNotifications: boolean;
-  dmNotifications: boolean;
+  pushReplies: boolean;
+  pushUpvotes: boolean;
+  pushDms: boolean;
+  pushFollows: boolean;
+  emailReplies: boolean;
+  emailUpvotes: boolean;
+  emailDms: boolean;
+  emailFollows: boolean;
   floorReminder: boolean;
   privateAccount: boolean;
-  showLeanOnProfile: boolean;
-  autoplayMedia: boolean;
-  dataSaver: boolean;
 };
 
 const DEFAULT_PREFS: Prefs = {
   pushNotifications: true,
   emailNotifications: false,
-  replyNotifications: true,
-  upvoteNotifications: true,
-  dmNotifications: true,
+  pushReplies: true,
+  pushUpvotes: true,
+  pushDms: true,
+  pushFollows: true,
+  emailReplies: true,
+  emailUpvotes: false,
+  emailDms: true,
+  emailFollows: false,
   floorReminder: false,
   privateAccount: false,
-  showLeanOnProfile: true,
-  autoplayMedia: true,
-  dataSaver: false,
 };
 
 const PREFS_KEY = 'forum.settings';
@@ -190,57 +198,123 @@ function FeedContentRow() {
 
 export default function Settings() {
   const router = useRouter();
-  const { user, signOut } = useAuth();
+  const { user, signOut, refreshUser } = useAuth();
 
   const [prefs, setPrefs] = useState<Prefs>(DEFAULT_PREFS);
+  const [devicePushReady, setDevicePushReady] = useState(false);
 
   useEffect(() => {
     AsyncStorage.getItem(PREFS_KEY)
       .then((raw) => { if (raw) setPrefs({ ...DEFAULT_PREFS, ...JSON.parse(raw) }); })
       .catch(() => {});
     // Server is the source of truth for push delivery — sync it in
-    api<{ push_enabled: boolean; replies: boolean; upvotes: boolean; dms: boolean }>('/users/me/notification-prefs')
+    pushPermissionGranted().then(setDevicePushReady).catch(() => {});
+    api<{
+      push_enabled: boolean;
+      email_enabled: boolean;
+      push_replies: boolean;
+      push_upvotes: boolean;
+      push_dms: boolean;
+      push_follows: boolean;
+      email_replies: boolean;
+      email_upvotes: boolean;
+      email_dms: boolean;
+      email_follows: boolean;
+    }>('/users/me/notification-prefs')
       .then((server) => {
         setPrefs((prev) => ({
           ...prev,
           pushNotifications: server.push_enabled,
-          replyNotifications: server.replies,
-          upvoteNotifications: server.upvotes,
-          dmNotifications: server.dms,
+          emailNotifications: server.email_enabled,
+          pushReplies: server.push_replies,
+          pushUpvotes: server.push_upvotes,
+          pushDms: server.push_dms,
+          pushFollows: server.push_follows,
+          emailReplies: server.email_replies,
+          emailUpvotes: server.email_upvotes,
+          emailDms: server.email_dms,
+          emailFollows: server.email_follows,
+          privateAccount: !!user?.is_private,
         }));
       })
       .catch(() => {});
-  }, []);
+  }, [user?.is_private]);
 
   // Which server pref (if any) each local toggle drives
   const SERVER_KEYS: Partial<Record<keyof Prefs, string>> = {
     pushNotifications: 'push_enabled',
-    replyNotifications: 'replies',
-    upvoteNotifications: 'upvotes',
-    dmNotifications: 'dms',
+    emailNotifications: 'email_enabled',
+    pushReplies: 'push_replies',
+    pushUpvotes: 'push_upvotes',
+    pushDms: 'push_dms',
+    pushFollows: 'push_follows',
+    emailReplies: 'email_replies',
+    emailUpvotes: 'email_upvotes',
+    emailDms: 'email_dms',
+    emailFollows: 'email_follows',
   };
 
-  const setPref = (key: keyof Prefs) => (value: boolean) => {
-    setPrefs((prev) => {
-      const next = { ...prev, [key]: value };
-      AsyncStorage.setItem(PREFS_KEY, JSON.stringify(next)).catch(() => {});
-      return next;
-    });
-    const serverKey = SERVER_KEYS[key];
-    if (serverKey) {
-      api('/users/me/notification-prefs', { method: 'PUT', body: { [serverKey]: value } })
-        .catch((e: any) => console.log('Error saving notification pref:', e?.message));
+  const setPref = (key: keyof Prefs) => async (value: boolean) => {
+    const previous = prefs[key];
+    setPrefs((current) => ({ ...current, [key]: value }));
+    try {
+      if (key === 'privateAccount') {
+        await api('/users/me', { method: 'PATCH', body: { is_private: value } });
+        await refreshUser();
+      } else {
+        const serverKey = SERVER_KEYS[key];
+        if (serverKey) {
+          await api('/users/me/notification-prefs', {
+            method: 'PUT',
+            body: { [serverKey]: value },
+          });
+        }
+      }
+      setPrefs((current) => {
+        const next = { ...current, [key]: value };
+        AsyncStorage.setItem(PREFS_KEY, JSON.stringify(next)).catch(() => {});
+        return next;
+      });
+    } catch (e: any) {
+      setPrefs((current) => ({ ...current, [key]: previous }));
+      Alert.alert(
+        e?.code === 'EMAIL_NOT_VERIFIED' ? 'Verify your email first' : 'Could not save setting',
+        e?.message ?? 'Please try again.'
+      );
     }
+  };
+
+  const explainAndEnablePush = () => {
+    Alert.alert(
+      'Enable push notifications?',
+      'forum can notify you about replies, upvotes, direct messages, and follow activity. You can choose each type below.',
+      [
+        { text: 'Not now', style: 'cancel' },
+        {
+          text: 'Enable',
+          onPress: async () => {
+            const registered = await registerForPush();
+            setDevicePushReady(registered);
+            if (!registered) {
+              Alert.alert(
+                'Push is still off',
+                'Notification permission was not granted. You can enable it later in iPhone Settings.'
+              );
+            }
+          },
+        },
+      ]
+    );
   };
 
   // The Floor reminder schedules a real repeating local notification; if
   // the OS denies permission we roll the toggle back.
   const toggleFloorReminder = async (value: boolean) => {
-    setPref('floorReminder')(value);
+    await setPref('floorReminder')(value);
     if (value) {
       const ok = await enableFloorReminder();
       if (!ok) {
-        setPref('floorReminder')(false);
+        await setPref('floorReminder')(false);
         Alert.alert('Notifications are off', 'Enable notifications for this app in Settings to get daily debate reminders.');
       }
     } else {
@@ -259,7 +333,7 @@ export default function Settings() {
   const handleDeleteAccount = () => {
     Alert.alert(
       'Delete account?',
-      'This permanently deletes your profile, posts, comments, and votes. This cannot be undone.',
+      'This immediately deletes your account and app activity. Associated images and private feedback screenshots are removed from active storage within 24 hours. This cannot be undone.',
       [
         { text: 'Cancel', style: 'cancel' },
         {
@@ -315,26 +389,49 @@ export default function Settings() {
 
       <SectionHeader title="Notifications" />
       <Card>
-        <ToggleRow label="Push notifications" value={prefs.pushNotifications} onChange={setPref('pushNotifications')} />
+        <ToggleRow
+          label="Push notifications"
+          value={prefs.pushNotifications}
+          onChange={async (value) => {
+            await setPref('pushNotifications')(value);
+            if (value && !devicePushReady) explainAndEnablePush();
+          }}
+        />
         <ToggleRow label="Email notifications" value={prefs.emailNotifications} onChange={setPref('emailNotifications')} />
-        <ToggleRow label="Replies to my posts" value={prefs.replyNotifications} onChange={setPref('replyNotifications')} />
-        <ToggleRow label="Upvotes on my posts" value={prefs.upvoteNotifications} onChange={setPref('upvoteNotifications')} />
-        <ToggleRow label="Direct messages" value={prefs.dmNotifications} onChange={setPref('dmNotifications')} />
+        {prefs.pushNotifications && !devicePushReady && (
+          <Row label="Enable push on this iPhone" chevron onPress={explainAndEnablePush} />
+        )}
+      </Card>
+
+      <SectionHeader title="Push events" />
+      <Card>
+        <ToggleRow label="Replies" value={prefs.pushReplies} onChange={setPref('pushReplies')} />
+        <ToggleRow label="Upvotes" value={prefs.pushUpvotes} onChange={setPref('pushUpvotes')} />
+        <ToggleRow label="Direct messages" value={prefs.pushDms} onChange={setPref('pushDms')} />
+        <ToggleRow label="Follow activity" value={prefs.pushFollows} onChange={setPref('pushFollows')} />
         <ToggleRow label="Daily debate reminder" value={prefs.floorReminder} onChange={toggleFloorReminder} />
+      </Card>
+
+      <SectionHeader title="Email events" />
+      <Card>
+        <ToggleRow label="Replies" value={prefs.emailReplies} onChange={setPref('emailReplies')} />
+        <ToggleRow label="Upvote digest" value={prefs.emailUpvotes} onChange={setPref('emailUpvotes')} />
+        <ToggleRow label="Direct messages" value={prefs.emailDms} onChange={setPref('emailDms')} />
+        <ToggleRow label="Follow activity" value={prefs.emailFollows} onChange={setPref('emailFollows')} />
       </Card>
 
       <SectionHeader title="Privacy" />
       <Card>
         <ToggleRow label="Private account" value={prefs.privateAccount} onChange={setPref('privateAccount')} />
-        <ToggleRow label="Show my lean on profile" value={prefs.showLeanOnProfile} onChange={setPref('showLeanOnProfile')} />
+        {prefs.privateAccount && (
+          <Row label="Follow requests" chevron onPress={() => router.push('/follow-requests')} />
+        )}
         <Row label="Blocked accounts" chevron onPress={() => router.push('/blocked')} />
       </Card>
 
       <SectionHeader title="Content" />
       <Card>
         <FeedContentRow />
-        <ToggleRow label="Autoplay media" value={prefs.autoplayMedia} onChange={setPref('autoplayMedia')} />
-        <ToggleRow label="Data saver" value={prefs.dataSaver} onChange={setPref('dataSaver')} />
       </Card>
 
       {user?.is_admin && (
@@ -342,13 +439,21 @@ export default function Settings() {
           <SectionHeader title="Moderation" />
           <Card>
             <Row label="Review reports" chevron onPress={() => router.push('/admin')} />
+            <Row label="Beta feedback" chevron onPress={() => router.push('/admin-feedback')} />
+            <Row label="Moderation audit" chevron onPress={() => router.push('/admin-moderation')} />
+            <Row label="Ingest status" chevron onPress={() => router.push('/admin-ingest')} />
           </Card>
         </>
       )}
 
       <SectionHeader title="About" />
       <Card>
-        <Row label="Version" value={Constants.expoConfig?.version ?? '1.0.0'} />
+        <Row
+          label="Version"
+          value={`${Constants.nativeAppVersion ?? Constants.expoConfig?.version ?? '1.0.0'} (${Constants.nativeBuildVersion ?? 'dev'})`}
+        />
+        <Row label="Send Beta Feedback" chevron onPress={() => router.push('/feedback')} />
+        <Row label="Support" chevron onPress={() => WebBrowser.openBrowserAsync(`${API_URL}/support`)} />
         <Row label="Terms of Service" chevron onPress={() => WebBrowser.openBrowserAsync(`${API_URL}/legal/terms`)} />
         <Row label="Privacy Policy" chevron onPress={() => WebBrowser.openBrowserAsync(`${API_URL}/legal/privacy`)} />
       </Card>

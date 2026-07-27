@@ -1,6 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage'
 import React, { createContext, ReactNode, useContext, useEffect, useMemo, useState } from 'react'
 import { api, getToken, setToken } from '../lib/api'
+import { unregisterPush } from '../lib/notifications'
 
 const ONBOARDING_KEY = 'forum.needsOnboarding'
 
@@ -10,6 +11,7 @@ export type AuthUser = {
   email?: string
   email_verified?: boolean
   is_admin?: boolean
+  is_private?: boolean
   avatar_url?: string | null
   bio?: string | null
   header_url?: string | null
@@ -111,6 +113,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   }
 
   const signOut = async () => {
+    await unregisterPush().catch(() => {})
     await setToken(null)
     setUser(null)
   }

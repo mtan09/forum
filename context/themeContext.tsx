@@ -18,7 +18,8 @@ type ThemeModeValue = {
 const ThemeModeContext = createContext<ThemeModeValue | null>(null);
 
 export function ThemeModeProvider({ children }: { children: ReactNode }) {
-  const system = useSystemColorScheme() ?? 'light';
+  const detectedSystem = useSystemColorScheme();
+  const system: ResolvedScheme = detectedSystem === 'dark' ? 'dark' : 'light';
   const [preference, setPreferenceState] = useState<ThemePreference>('system');
   const [hydrated, setHydrated] = useState(false);
 
@@ -59,7 +60,8 @@ export function useThemeMode(): ThemeModeValue {
 // the device scheme so nothing crashes during auth/loading edge cases).
 export function useResolvedScheme(): ResolvedScheme {
   const ctx = useContext(ThemeModeContext);
-  const system = useSystemColorScheme() ?? 'light';
+  const detectedSystem = useSystemColorScheme();
+  const system: ResolvedScheme = detectedSystem === 'dark' ? 'dark' : 'light';
   if (!ctx) return system;
   return ctx.scheme;
 }

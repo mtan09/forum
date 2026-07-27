@@ -1,123 +1,242 @@
-# Launch checklist
+# TestFlight release runbook
 
-Everything code-side is done and env-gated. This file is the ordered list of
-steps that need **your accounts** — each one activates a feature that is
-already built and waiting for a key.
+This is the ordered release checklist for the iPhone-only forum beta. Code and
+safe defaults live in git; credentials, reviewer passwords, Apple keys, Sentry
+tokens, and every `.env` file do not.
 
-## 1. Deploy the API (~20 min) — unblocks everything else
+External testing is intentionally blocked until a permanent domain is selected,
+verified for email, and used for the final support/privacy URLs. Internal
+TestFlight can begin before that gate.
 
-The API has a `Dockerfile`, `/health` with a DB check, and all migrations
-applied to Neon already.
+## 1. Local release gate
 
-```bash
-cd forum-api
-# Railway (simplest):
-npm i -g @railway/cli && railway login
-railway init          # create project "forum-api"
-railway up            # builds the Dockerfile and deploys
-```
-
-Then in the Railway dashboard set the environment variables (copy values
-from your local `forum-api/.env`, they already point at Neon):
-
-| Variable | Value |
-|---|---|
-| `DATABASE_URL` | your Neon connection string (already in `.env`) |
-| `JWT_SECRET` | same value as local — **or** rotate it (logs everyone out) |
-| `OPENAI_API_KEY` | your OpenAI key |
-| `INGEST_INTERVAL_MINUTES` | `60` — news refresh runs in-process |
-| `AI_DAILY_LIMIT` | `50` (forumAI chats per user per day) |
-
-Verify: `curl https://<your-app>.up.railway.app/health` → `{"status":"ok","db":"ok"}`.
-
-Point local development at it with
-`EXPO_PUBLIC_API_URL=https://<your-app>.up.railway.app` in `forum/.env.local`.
-For cloud builds and hosting, keep the URL out of `eas.json` and set it in
-the linked EAS project environments:
+Run from `forum-api`:
 
 ```bash
-eas env:set preview --name EXPO_PUBLIC_API_URL \
-  --value https://<your-app>.up.railway.app --visibility plaintext
-eas env:set production --name EXPO_PUBLIC_API_URL \
-  --value https://<your-app>.up.railway.app --visibility plaintext
+npm ci
+npm run typecheck
+npm test
+npm audit
 ```
 
-## 2. R2 image storage (~10 min)
-
-Uploads currently write to the server's disk, which is wiped on redeploy.
-Create an R2 bucket (Cloudflare dashboard → R2 → Create bucket `forum-media`
-→ Settings → enable public access), create an API token, then set on Railway:
-`R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`,
-`R2_BUCKET_NAME`, `R2_PUBLIC_URL`. The upload route switches over automatically.
-
-## 3. Resend email (~10 min)
-
-Email verification + password reset are live but currently log emails to the
-server console. Create a free account at resend.com, add + verify your
-sending domain (or use their test domain first), create an API key, set on
-Railway: `RESEND_API_KEY`, `EMAIL_FROM=forum <no-reply@yourdomain.com>`,
-`LEGAL_CONTACT_EMAIL=you@yourdomain.com`. Emails start sending immediately.
-
-## 4. Sentry crash reporting (~10 min, optional but recommended)
-
-Create two projects at sentry.io (one Node, one React Native). Set
-`SENTRY_DSN` on Railway, and `EXPO_PUBLIC_SENTRY_DSN` in `forum/.env` +
-as an EAS secret. Both SDKs are installed and init automatically when the
-DSN exists.
-
-## 5. Apple Developer + EAS build (~1–2 h first time, mostly waiting)
-
-Requires the $99/yr Apple Developer Program.
-
-The Apple ID currently used by EAS must belong to a Developer Team before
-physical-device EAS builds, TestFlight, or App Store submission will work. A
-free Apple ID can still install a local development build on its owner's
-connected iPhone with `npx expo run:ios --device`, but it cannot distribute
-through TestFlight.
+Run from `forum`:
 
 ```bash
-cd forum
-npm i -g eas-cli && eas login       # free Expo account
-eas init                            # one-time: writes the projectId into app.json
-npx expo install expo-dev-client
-eas build --profile development --platform ios  # iOS Simulator dev client
-eas device:create                              # register a real iPhone once
-eas build --profile device --platform ios      # physical-iPhone dev client
+npm ci
+npx tsc --noEmit
+npm run lint
+npx expo-doctor
+npx expo export --platform ios --output-dir /tmp/forum-ios-export
 ```
 
-The development build is Forum's own debuggable native app, with Metro fast
-refresh and the actual native modules/configuration. **Push notifications,
-permissions, deep links, the splash screen, and Sentry can be tested there**;
-Expo Go is intentionally not part of the production-app workflow. Start Metro
-with `npm start`. Then:
+The native baseline is Expo SDK 57 / React Native 0.86 and iOS 16.4+. The app
+is iPhone-only (`ios.supportsTablet=false`). Expo 57 currently has upstream
+build/lint dependency advisories in its own current toolchain; do not use
+`npm audit fix --force` or downgrade Expo to silence them. Reassess the
+advisories before each release and require Expo Doctor, typecheck, lint, and
+the production export to pass.
+
+## 2. Production database and identities
+
+1. Back up the production database.
+2. Apply migration 016 once:
+
+   ```bash
+   railway run --service forum-api npm run migrate:release
+   ```
+
+3. Confirm the seeded `john@example.dev` content remains, its credentials no
+   longer exist, and its admin flag is false.
+4. Audit the mock corpus without deleting flagged content:
+
+   ```bash
+   railway run --service forum-api npm run audit:moderation
+   ```
+
+5. Create two new identities with `npm run account:release`:
+   - an owner-only admin account;
+   - a non-admin App Review account.
+
+Supply `RELEASE_ACCOUNT_EMAIL`, `RELEASE_ACCOUNT_USERNAME`, and
+`RELEASE_ACCOUNT_ROLE` only in the invoking shell. Put the generated password
+directly into a password manager or App Store Connect. Never paste either
+credential into docs, tickets, chat, or committed files.
+
+Migration 016 is backward compatible: private-account fields default public,
+existing follows become accepted, existing push preferences migrate, and email
+delivery defaults off.
+
+## 3. Railway services
+
+The production project has two services from the same repository:
+
+| Service | Start command | Schedule/restart |
+|---|---|---|
+| `forum-api` | `npm start` | always on; health check `/health`, 30 s timeout |
+| `forum-ingest` | `npm run ingest` | cron `0 * * * *`; restart policy `Never` |
+
+Both use the production `DATABASE_URL`. The ingest service performs database
+warm-up retries, takes a Postgres advisory lock, retries sources independently,
+persists `ingest_runs`, and clusters after successful ingestion. Do not restore
+`INGEST_INTERVAL_MINUTES`; ingestion must not run inside the API process.
+
+Required production variables:
+
+```text
+DATABASE_URL
+JWT_SECRET
+OPENAI_API_KEY
+AI_DAILY_LIMIT
+R2_ACCOUNT_ID
+R2_ACCESS_KEY_ID
+R2_SECRET_ACCESS_KEY
+R2_BUCKET_NAME
+R2_PUBLIC_URL
+R2_FEEDBACK_BUCKET_NAME
+SENTRY_DSN
+SENTRY_ENVIRONMENT
+SENTRY_RELEASE
+WEB_APP_URL
+```
+
+Create/verify the private feedback bucket:
 
 ```bash
-eas build --profile production --platform ios
-eas submit --platform ios           # uploads to App Store Connect
+railway run --service forum-api npm run storage:feedback
 ```
 
-In App Store Connect fill in:
-- **Privacy Policy URL**: `https://<your-api>/legal/privacy` (already live)
-- **App Privacy** answers (matches the policy): collects Email, User content,
-  Identifiers (push token) — all "linked to you", none used for tracking.
-- **Age rating**: 17+ (user-generated content, mature themes possible)
-- Reviewer notes: mention the demo login (`john@example.dev` / `password123`)
-  and that reports are reviewed at Settings → Moderation with an admin account.
+The media bucket is public; the feedback bucket must stay private. Confirm its
+lifecycle policy and test a five-minute admin-authorized screenshot URL.
 
-## 6. Android (later)
+Deploy migrations first, then `forum-api`, then `forum-ingest`. Wait for
+Railway `SUCCESS`, call `/health`, inspect deploy/runtime logs, and trigger one
+manual ingest. Confirm one successful `ingest_runs` row before removing any
+legacy API variable. Simulate two concurrent ingests and verify one records
+`skipped_locked`.
 
-Icon mapping and adaptive icon are done; `eas build --platform android` when
-ready. Do a QA pass in the development client first (`npm run android`).
+## 4. Observability and delivery
 
-## Already done — no action needed
+Backend Sentry needs `SENTRY_DSN`; mobile Sentry needs:
 
-- Rate limiting everywhere + per-user daily forumAI budget (`ai_usage` table)
-- Email verification + reset-code flows (screens + API), Terms + Privacy at
-  `/legal/*`, share pages with OG tags at `/p/:id`, `/a/:id`
-- Follows + Following feed, DMs with unread badges, onboarding flow
-- Push: token registration, prefs, and server sends on replies/upvotes/DMs
-- Moderation: report review UI (Settings → Moderation as admin), hide/ban,
-  banned-account lockout; john@example.dev is admin in dev + Neon
-- Posts pagination, image resizing + EXIF strip, FTS search, spectrum cache
-- Tests (scorer/limiter/hashtags) + CI workflows in both repos
-- Store icon (opaque), adaptive icon, bundle IDs, `eas.json`
+```text
+EXPO_PUBLIC_SENTRY_DSN
+EXPO_PUBLIC_SENTRY_ENVIRONMENT
+SENTRY_ORG
+SENTRY_PROJECT
+SENTRY_AUTH_TOKEN
+```
+
+Store mobile values in EAS environments/secrets. `SENTRY_AUTH_TOKEN` is for
+source-map upload only and must never reach the app bundle. Verify controlled
+backend and frontend errors produce readable, symbolicated events with no
+authorization headers, cookies, email addresses, usernames, IP addresses, or
+raw rejected moderation input.
+
+Configure monitors/alerts for:
+
+- API health or database degradation;
+- stale or repeatedly failing ingestion;
+- repeated Resend/Expo Push failures;
+- account media cleanup older than 24 hours;
+- unexpected forumAI spend or limit growth.
+
+`AI_DAILY_LIMIT` must be explicit in production.
+
+## 5. Permanent-domain gate
+
+Do not open external registration or external TestFlight until a permanent
+domain has been chosen.
+
+After selection:
+
+1. Register the domain.
+2. Add it to Resend and verify SPF, DKIM, and DMARC.
+3. Set `RESEND_API_KEY`, `EMAIL_FROM`, `SUPPORT_EMAIL`, and
+   `LEGAL_CONTACT_EMAIL`.
+4. Set `WEB_APP_URL` to the permanent HTTPS web app.
+5. Use the permanent `/support` and `/legal/privacy` URLs in App Store Connect.
+6. Verify signup verification, password reset, reply email, DM email, and
+   coalesced upvote email end to end.
+
+Production never logs verification links or reset codes when email is missing.
+Email verification gates email delivery only, not ordinary participation.
+
+## 6. EAS and physical-iPhone QA
+
+The app requests push permission only after the user taps the contextual
+Settings control. Generate/configure APNs credentials through EAS, then test
+registration, routing, unregister-on-sign-out, and delivery on a physical
+iPhone.
+
+```bash
+npx eas-cli@latest build --platform ios --profile development
+npx eas-cli@latest device:create
+npx eas-cli@latest build --platform ios --profile device
+```
+
+Set `EXPO_PUBLIC_API_URL` to the Railway production origin in EAS development,
+preview, and production environments. Test every main screen in light and dark
+mode on the smallest and largest supported iPhones. Validate login, signup,
+verification, reset, moderation allow/reject/outage, private profiles, follow
+requests, notification combinations, feedback screenshots, account deletion,
+push routing, and forumAI.
+
+Reject the build for render errors, native faults, unhandled promise warnings,
+unexplained server errors, or VirtualizedList regressions.
+
+## 7. App Store Connect record
+
+Create the record only after checking the exact name:
+
+- Name: `forum`, if Apple accepts it.
+- Bundle ID: `com.michaeltan.forum`.
+- Primary category: News.
+- Secondary category: Social Networking.
+- Device support: iPhone only.
+
+If Apple rejects the exact name `forum`, stop and make a branding decision. Do
+not invent a fallback.
+
+Accept pending Apple agreements, complete export compliance, and put the
+generated App Store Connect Apple ID into
+`submit.production.ascAppId` in `eas.json`.
+
+Answer UGC/content-rights and age-rating questions honestly. Complete App
+Privacy for email, account identifiers, user content, messages, interactions,
+push tokens, diagnostics/Sentry, and data sent to OpenAI. The hosted privacy
+policy must match actual Railway, Neon, R2, Expo, OpenAI, Sentry, and Resend
+behavior.
+
+## 8. Internal TestFlight
+
+Build and submit:
+
+```bash
+npx eas-cli@latest build --platform ios --profile production
+npx eas-cli@latest submit --platform ios --profile production
+```
+
+Create an `Internal QA` group for the owner and a small trusted group. Add the
+beta description, feedback email, review contact, non-admin reviewer account,
+and detailed What to Test notes. Keep TestFlight native crash/screenshot
+feedback enabled alongside the in-app structured feedback queue.
+
+Observe the internal build for at least 24 hours. Review Railway logs, Sentry,
+ingest freshness, push/email delivery, TestFlight feedback, and in-app feedback.
+Resolve regressions and send a new build when necessary.
+
+## 9. External TestFlight
+
+External readiness requires every item below:
+
+- permanent domain and final support/privacy URLs;
+- working verification and password recovery email;
+- active text/image moderation and reviewed mock corpus;
+- backend/mobile Sentry receiving redacted symbolicated events;
+- fresh hourly ingestion with healthy left/center/right sources;
+- private feedback screenshots and full account-media cleanup verified;
+- no known/shared admin credentials;
+- 24-hour internal observation with no unresolved crash/log regression.
+
+Then create `Founding Testers`, submit the build to TestFlight Beta App Review,
+and invite 10–25 external testers. Review TestFlight and in-app feedback daily.

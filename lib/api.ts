@@ -1,5 +1,5 @@
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import Constants from 'expo-constants';
+import { readStoredToken, writeStoredToken } from './token-storage';
 
 // Resolution order: EXPO_PUBLIC_API_URL env var, then the Expo dev server's
 // host (so a phone on the same LAN reaches the API without config), then localhost.
@@ -16,26 +16,28 @@ function resolveApiUrl(): string {
 
 export const API_URL = resolveApiUrl();
 
-const TOKEN_KEY = 'forum.auth.token';
 let cachedToken: string | null | undefined;
 
 export async function getToken(): Promise<string | null> {
   if (cachedToken !== undefined) return cachedToken;
-  cachedToken = await AsyncStorage.getItem(TOKEN_KEY);
+  cachedToken = await readStoredToken();
   return cachedToken;
 }
 
 export async function setToken(token: string | null): Promise<void> {
   cachedToken = token;
-  if (token) await AsyncStorage.setItem(TOKEN_KEY, token);
-  else await AsyncStorage.removeItem(TOKEN_KEY);
+  await writeStoredToken(token);
 }
 
 export class ApiError extends Error {
   status: number;
-  constructor(status: number, message: string) {
+  code?: string;
+  retryable?: boolean;
+  constructor(status: number, message: string, code?: string, retryable?: boolean) {
     super(message);
     this.status = status;
+    this.code = code;
+    this.retryable = retryable;
   }
 }
 
@@ -84,7 +86,12 @@ export async function api<T = any>(path: string, options: ApiOptions = {}): Prom
 
   const data = await res.json().catch(() => null);
   if (!res.ok) {
-    throw new ApiError(res.status, data?.error ?? `Request failed (${res.status})`);
+    throw new ApiError(
+      res.status,
+      data?.error ?? `Request failed (${res.status})`,
+      data?.code,
+      data?.retryable
+    );
   }
   return data as T;
 }
@@ -117,4 +124,28 @@ export async function uploadImage(uri: string): Promise<string> {
   const data = await res.json().catch(() => null);
   if (!res.ok) throw new ApiError(res.status, data?.error ?? 'Upload failed');
   return data.url as string;
+}
+
+export async function uploadFeedbackScreenshot(uri: string): Promise<string> {
+  const fileRes = await fetch(uri);
+  const buffer = await fileRes.arrayBuffer();
+  const token = await getToken();
+  const res = await fetch(`${API_URL}/feedback/screenshot`, {
+    method: 'POST',
+    headers: {
+      'content-type': 'image/jpeg',
+      ...(token ? { authorization: `Bearer ${token}` } : {}),
+    },
+    body: buffer,
+  });
+  const data = await res.json().catch(() => null);
+  if (!res.ok) {
+    throw new ApiError(
+      res.status,
+      data?.error ?? 'Screenshot upload failed',
+      data?.code,
+      data?.retryable
+    );
+  }
+  return data.key as string;
 }

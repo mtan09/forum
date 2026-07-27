@@ -25,6 +25,9 @@ type PublicUser = {
   created_at?: string;
   blocked_by_me?: boolean;
   followed_by_me?: boolean;
+  follow_status?: 'pending' | 'accepted' | null;
+  is_private?: boolean;
+  can_view_history?: boolean;
   follower_count?: number;
   following_count?: number;
 };
@@ -57,7 +60,7 @@ export default function PublicProfile() {
   const [posts, setPosts] = useState<PostType[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [blocked, setBlocked] = useState(false);
-  const [following, setFollowing] = useState(false);
+  const [followStatus, setFollowStatus] = useState<'pending' | 'accepted' | null>(null);
   const [followerCount, setFollowerCount] = useState(0);
 
   const isSelf = !!me && me.id === userId;
@@ -66,14 +69,25 @@ export default function PublicProfile() {
   const toggleFollow = async () => {
     if (!userId) return;
     tapLight();
-    const next = !following;
-    setFollowing(next);
-    setFollowerCount((n) => Math.max(0, n + (next ? 1 : -1)));
+    const previous = followStatus;
+    const removing = previous === 'pending' || previous === 'accepted';
+    setFollowStatus(removing ? null : user?.is_private ? 'pending' : 'accepted');
+    if (previous === 'accepted') setFollowerCount((n) => Math.max(0, n - 1));
+    if (!removing && !user?.is_private) setFollowerCount((n) => n + 1);
     try {
-      await api(`/users/${userId}/follow`, next ? { body: {} } : { method: 'DELETE' });
+      if (removing) {
+        await api(`/users/${userId}/follow`, { method: 'DELETE' });
+      } else {
+        const response = await api<{ follow_status: 'pending' | 'accepted' }>(
+          `/users/${userId}/follow`,
+          { body: {} }
+        );
+        setFollowStatus(response.follow_status);
+      }
     } catch (err: any) {
-      setFollowing(!next);
-      setFollowerCount((n) => Math.max(0, n + (next ? -1 : 1)));
+      setFollowStatus(previous);
+      if (previous === 'accepted') setFollowerCount((n) => n + 1);
+      if (!removing && !user?.is_private) setFollowerCount((n) => Math.max(0, n - 1));
       Alert.alert('Could not update follow', err?.message ?? 'Please try again.');
     }
   };
@@ -119,16 +133,20 @@ export default function PublicProfile() {
     Promise.all([
       api<PublicUser>(`/users/${userId}`),
       api<SpectrumData>(`/users/${userId}/spectrum`),
-      api<any[]>(`/posts?user_id=${userId}`),
     ])
-      .then(([u, s, p]) => {
+      .then(async ([u, s]) => {
         if (!active) return;
         setUser(u);
         setBlocked(!!u.blocked_by_me);
-        setFollowing(!!u.followed_by_me);
+        setFollowStatus(u.follow_status ?? (u.followed_by_me ? 'accepted' : null));
         setFollowerCount(u.follower_count ?? 0);
         setSpectrum(s);
-        setPosts(p.map(mapPost));
+        if (u.can_view_history !== false) {
+          const p = await api<any[]>(`/posts?user_id=${userId}`);
+          if (active) setPosts(p.map(mapPost));
+        } else {
+          setPosts(null);
+        }
       })
       .catch((err: any) => { if (active) setError(err?.message ?? 'Failed to load profile'); });
     return () => { active = false; };
@@ -199,10 +217,14 @@ export default function PublicProfile() {
                 </Pressable>
                 <Pressable
                   onPress={toggleFollow}
-                  style={[styles.followBtn, following && styles.followingBtn]}
+                  style={[styles.followBtn, followStatus && styles.followingBtn]}
                 >
-                  <ThemedText style={[styles.followText, following && styles.followingText]}>
-                    {following ? 'Following' : 'Follow'}
+                  <ThemedText style={[styles.followText, followStatus && styles.followingText]}>
+                    {followStatus === 'accepted'
+                      ? 'Following'
+                      : followStatus === 'pending'
+                        ? 'Requested'
+                        : 'Follow'}
                   </ThemedText>
                 </Pressable>
                 <ContentActions
@@ -257,6 +279,17 @@ export default function PublicProfile() {
       <ThemedView style={styles.postsHeader}>
         <ThemedText type="defaultSemiBold" style={{ fontWeight: '800' }}>Posts</ThemedText>
       </ThemedView>
+      {user.can_view_history === false && (
+        <ThemedView style={styles.privateHistory}>
+          <IconSymbol name="lock.fill" size={20} color={c.primary} />
+          <ThemedView style={styles.privateHistoryCopy}>
+            <ThemedText style={styles.privateHistoryTitle}>Private profile history</ThemedText>
+            <ThemedText style={styles.privateHistoryText}>
+              Follow this account to browse its posts and other activity in one place.
+            </ThemedText>
+          </ThemedView>
+        </ThemedView>
+      )}
       {posts && posts.length === 0 && (
         <ThemedText style={styles.emptyText}>No posts yet.</ThemedText>
       )}
@@ -418,6 +451,20 @@ const makeStyles = (c: Palette) => StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: c.border,
   },
+  privateHistory: {
+    margin: 16,
+    padding: 16,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: c.cardBorder,
+    backgroundColor: c.card,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  privateHistoryCopy: { flex: 1, backgroundColor: 'transparent' },
+  privateHistoryTitle: { fontWeight: '900', fontSize: 15 },
+  privateHistoryText: { color: c.muted, fontSize: 13, lineHeight: 18, marginTop: 3 },
   emptyText: {
     textAlign: 'center',
     color: c.muted,

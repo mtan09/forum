@@ -1,8 +1,9 @@
-import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native';
+import { DarkTheme, DefaultTheme, ThemeProvider } from 'expo-router/react-navigation';
 import { Redirect, Stack, usePathname, useRouter } from "expo-router";
 import { StatusBar } from 'expo-status-bar';
 
 import { IconSymbol } from '@/components/ui/icon-symbol';
+import { AppErrorBoundary } from '@/components/app-error-boundary';
 import WebStackHeader from '@/components/web-stack-header';
 
 import { usePalette } from '@/hooks/use-palette';
@@ -18,8 +19,9 @@ import { ActivityIndicator, Platform, Pressable, Text, View } from 'react-native
 
 import { useEffect } from 'react';
 
-import { attachNotificationRouter, registerForPush } from '@/lib/notifications';
+import { attachNotificationRouter } from '@/lib/notifications';
 import { initSentry } from '@/lib/sentry';
+import { rememberProductRoute } from '@/lib/route-context';
 
 initSentry();
 
@@ -30,13 +32,15 @@ initSentry();
 
 export default function RootLayout() {
   return (
-    <ThemeModeProvider>
-      <FeedPreferenceProvider>
-        <AuthProvider>
-          <ThemedShell />
-        </AuthProvider>
-      </FeedPreferenceProvider>
-    </ThemeModeProvider>
+    <AppErrorBoundary>
+      <ThemeModeProvider>
+        <FeedPreferenceProvider>
+          <AuthProvider>
+            <ThemedShell />
+          </AuthProvider>
+        </FeedPreferenceProvider>
+      </ThemeModeProvider>
+    </AppErrorBoundary>
   );
 }
 
@@ -72,11 +76,14 @@ function AppNavigator() {
   const router = useRouter();
   const { c } = usePalette();
 
-  // Once signed in: register this device for push and route notification
-  // taps to the content they reference. (No-ops inside Expo Go.)
+  useEffect(() => {
+    rememberProductRoute(pathname);
+  }, [pathname]);
+
+  // Route notification taps once signed in. Permission and device-token
+  // registration happen contextually from Settings, never right after login.
   useEffect(() => {
     if (!session) return;
-    registerForPush();
     return attachNotificationRouter();
   }, [session]);
 
@@ -250,6 +257,9 @@ function AppNavigator() {
               headerBackTitle: "Back",
             }}
           />
+          <Stack.Screen name="admin-feedback" options={{ title: 'Beta Feedback', headerBackTitle: 'Back' }} />
+          <Stack.Screen name="admin-moderation" options={{ title: 'Moderation Audit', headerBackTitle: 'Back' }} />
+          <Stack.Screen name="admin-ingest" options={{ title: 'Ingest Status', headerBackTitle: 'Back' }} />
           <Stack.Screen
             name="messages"
             options={{
@@ -274,6 +284,14 @@ function AppNavigator() {
               title: 'Blocked Accounts',
               headerBackTitle: "Back",
             }}
+          />
+          <Stack.Screen
+            name="follow-requests"
+            options={{ title: 'Follow Requests', headerBackTitle: 'Back' }}
+          />
+          <Stack.Screen
+            name="feedback"
+            options={{ title: 'Beta Feedback', headerBackTitle: 'Back' }}
           />
           <Stack.Screen
             name="source/[name]"

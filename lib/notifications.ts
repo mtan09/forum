@@ -64,32 +64,38 @@ export async function disableFloorReminder(): Promise<void> {
 // Expo Go silent instead of crashing.
 const PUSH_TOKEN_KEY = 'forum.pushToken';
 
-export async function registerForPush(): Promise<void> {
+export async function registerForPush(): Promise<boolean> {
   try {
     const settings = await Notifications.getPermissionsAsync();
     let granted = settings.granted;
     if (!granted && settings.canAskAgain) {
       granted = (await Notifications.requestPermissionsAsync()).granted;
     }
-    if (!granted) return;
+    if (!granted) return false;
 
     const projectId =
       Constants.expoConfig?.extra?.eas?.projectId ?? Constants.easConfig?.projectId;
     // Local Expo manifests do not have an EAS project id until `eas init`
     // has linked the app. Push is unavailable in that state, so skip cleanly
     // instead of invoking Expo's token API and producing a noisy warning.
-    if (!projectId) return;
+    if (!projectId) return false;
 
     const token = (await Notifications.getExpoPushTokenAsync({ projectId })).data;
     await api('/users/me/push-token', { body: { token, platform: Platform.OS } });
     await AsyncStorage.setItem(PUSH_TOKEN_KEY, token);
+    return true;
   } catch (err: any) {
     const message = String(err?.message ?? 'Unknown push registration error');
     // Expo Go cannot register remote push on current SDKs. That is an
     // expected capability gap; surface other failures so they remain visible.
-    if (/expo go|development build/i.test(message)) return;
+    if (/expo go|development build/i.test(message)) return false;
     console.warn('[push] registration failed:', message);
+    return false;
   }
+}
+
+export async function pushPermissionGranted(): Promise<boolean> {
+  return (await Notifications.getPermissionsAsync()).granted;
 }
 
 export async function unregisterPush(): Promise<void> {

@@ -1,12 +1,13 @@
 // SF Symbols are Apple-only assets. This fallback preserves their semantic
 // names and closely matches their outline/filled silhouettes on web/Android.
 
-import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
+import MaterialCommunityIcons from '@react-native-vector-icons/material-design-icons';
 import type { SymbolViewProps, SymbolWeight } from 'expo-symbols';
 import type { ComponentProps } from 'react';
 import type { OpaqueColorValue, StyleProp, TextStyle } from 'react-native';
 
-type IconMapping = Record<SymbolViewProps['name'], ComponentProps<typeof MaterialCommunityIcons>['name']>;
+type SFSymbolName = Extract<SymbolViewProps['name'], string>;
+type IconMapping = Record<SFSymbolName, ComponentProps<typeof MaterialCommunityIcons>['name']>;
 
 const MAPPING = {
   // Navigation

@@ -21,15 +21,17 @@ A political discussion social media app built with Expo / React Native. The feed
 - **Follows + Following feed** — follow anyone from their profile; Home stays focused on `For You / Random / Against You`, while a dedicated Following feed lives on your profile alongside follower counts
 - **Direct messages** — a full DM inbox (envelope on your profile) with per-thread unread badges, optimistic sends, and block-aware delivery
 - **Shareable cards** — export a branded image of your lean or a debate stance to the native share sheet; post shares link to web share pages with rich previews and an open-in-app button
-- **Moderation** — report posts/articles/comments/users, and block users (blocked accounts vanish from feed, comments, search, and DMs); admins get a report-review queue (Settings → Moderation) with hide/ban/dismiss actions
+- **Moderation** — hybrid deterministic + OpenAI multimodal checks run before posts, comments, DMs, profile text, forumAI prompts, and image uploads are stored; report/block tools remain available and admins get separate report and pre-publication review queues
 - **Onboarding** — new accounts pick interests and follow suggested active users before landing in the feed
-- **Push notifications** — replies, upvotes, and DMs notify for real (Expo push; requires a dev/production build), gated by per-user server-side toggles in Settings
+- **Private accounts** — private profiles expose only their basic identity and spectrum until a follow request is accepted; requests can be approved, declined, cancelled, and removed, while individually encountered posts remain in feeds, search, and threads
+- **Notifications** — Push and Email are independently configurable for replies, upvotes, DMs, and follow activity. Push permission is requested contextually from Settings, replies/DM emails are immediate, and opted-in upvote email is coalesced
+- **Beta feedback** — authenticated structured feedback captures category, route, theme, version/build, device metadata, and an optional privately stored screenshot; admins can triage it as open, planned, resolved, or dismissed
 - **Posting**: a partial-height composer keeps the feed visible behind it, with an explicit close control, image/hashtag tools, and a unified send action; uploaded images are server-resized and EXIF-stripped
 - **Reliable article media** — remote images render from a stable 16:9 frame, resize from the successful load event instead of a separate size probe, and fall back cleanly when an outlet returns a dead or malformed URL. The app also rejects the known article-URL-plus-caption shape before making a native image request
 - **Interactions** — persistent up/downvotes, nested comments with replies, real bookmarks, and consistent vote/bookmark colors and spacing in both themes
 - **forumAI**: a guided three-perspective workspace that streams Left / Center / Right readings in a focused lens view, automatically searches the app's own article corpus for specific topics, current headlines, or the hottest story, and supports audience framing, starter prompts, conversation memory, and an "Ask forumAI" entry point from article and post pages
   - "Explain like I'm: …" framing selector (student, policymaker, skeptic, …)
-- **Settings** — account (edit profile, change password, email verification + password reset by emailed code), **Appearance (Light / Dark / Match system)**, a persisted home-feed content choice (**posts + articles / posts only / articles only**), real notification toggles incl. a **daily Floor reminder**, privacy (blocked accounts), Terms + Privacy pages, and account deletion
+- **Settings** — account (edit profile, change password, private-account control, follow requests, email verification + password reset), **Appearance (Light / Dark / Match system)**, a persisted home-feed content choice (**posts + articles / posts only / articles only**), per-channel notification preferences, beta feedback, privacy/blocking, version/build information, Terms + Privacy, and account deletion
 
 ## UI color system
 
@@ -51,7 +53,7 @@ The app is a pure API client — no direct database or storage access. The backe
 
 All requests go through [`lib/api.ts`](lib/api.ts):
 
-- Auth token is a JWT kept in AsyncStorage (`signIn`/`signUp`/`signOut` via [`context/authContext.tsx`](context/authContext.tsx))
+- Native auth tokens live in the iOS Keychain/Android Keystore through `expo-secure-store`; a one-time migration deletes the legacy AsyncStorage copy. The web adapter retains browser storage. Sign-out unregisters the device push token before deleting the local token
 - The API base URL is `EXPO_PUBLIC_API_URL` if set; otherwise it's derived from the Expo dev server's host on port 3000, so a phone on the same Wi-Fi reaches your local backend with zero config
 - forumAI streams over SSE, consumed via `expo/fetch`'s `ReadableStream`
 
@@ -70,7 +72,9 @@ app/               screens (expo-router file-based routing)
   messages, dm/    direct-message inbox and conversation threads
   following        posts from accounts the current user follows
   onboarding       interest selection + suggested follows for new accounts
-  admin            report review and moderation actions
+  admin-*          reports, pre-publication moderation, feedback, ingest status
+  feedback         structured beta feedback + optional private screenshot
+  follow-requests  private-account request management
   settings, blocked, editprofile, changepassword
 components/        post/article/comment cards, spectrum bar + trail,
                   scorer receipts, share cards, report/block menu, carousels
@@ -83,6 +87,7 @@ lib/notifications.ts  native push registration/routing + Floor reminders
 lib/notifications.web.ts  web-safe notification no-ops
 lib/perspective-colors.ts  shared Left / Center / Right presentation mapping
 lib/sentry.ts     env-gated crash reporting (no-op without a DSN)
+lib/token-storage.*  SecureStore on native; browser storage on web
 ```
 
 ## Getting started
@@ -129,8 +134,9 @@ lib/sentry.ts     env-gated crash reporting (no-op without a DSN)
    Open the installed Forum development app. It connects to Metro with fast
    refresh, like Expo Go, but includes Forum's actual native configuration.
 
-5. **Log in** — create an account, or use a seeded dev user:
-   `john@example.dev` / `jane@example.dev` / `alice@example.dev`, password `password123`
+5. **Log in** — create an account or use a local fixture whose password you
+   set yourself. Release and reviewer credentials must never be written in
+   documentation or committed files.
 
 To point the app at a deployed backend instead, set `EXPO_PUBLIC_API_URL` (e.g. in a `.env` file):
 
@@ -141,6 +147,9 @@ EXPO_PUBLIC_API_URL=https://your-api.example.com
 > forumAI requires `OPENAI_API_KEY` in `forum-api/.env`; the endpoint returns a clear error until it's set.
 
 Local `.env` files are gitignored. Keep deployed API and Sentry values in local/EAS environment configuration; never commit them.
+
+The current native baseline is Expo SDK 57 / React Native 0.86. The beta is
+iPhone-only (`ios.supportsTablet=false`) and supports iOS 16.4 or newer.
 
 ## Development
 

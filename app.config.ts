@@ -12,7 +12,7 @@ export default ({ config }: ConfigContext): ExpoConfig => {
   if (organization && project) {
     plugins.splice(3, 0, [
       '@sentry/react-native/expo',
-      { organization, project },
+      { organization, project, url: 'https://sentry.io' },
     ]);
   }
 

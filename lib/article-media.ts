@@ -6,9 +6,13 @@ const IMAGE_EXTENSION = /\.(?:avif|gif|jpe?g|png|webp)$/i;
 export function getDisplayableArticleMedia(
   candidate: string | null | undefined,
   articleUrl: string,
-  imageMode: 'none' | 'remote_no_cache' | 'licensed_cache' | null | undefined
+  imageMode: 'none' | 'remote_no_cache' | 'managed_thumbnail' | 'licensed_cache' | null | undefined
 ): string | null {
-  if (imageMode !== 'remote_no_cache' && imageMode !== 'licensed_cache') return null;
+  if (
+    imageMode !== 'remote_no_cache' &&
+    imageMode !== 'managed_thumbnail' &&
+    imageMode !== 'licensed_cache'
+  ) return null;
   const value = candidate?.trim();
   if (!value) return null;
 
@@ -37,7 +41,9 @@ export function getDisplayableArticleMedia(
 }
 
 export function getArticleImageCachePolicy(
-  imageMode: 'none' | 'remote_no_cache' | 'licensed_cache' | null | undefined
+  imageMode: 'none' | 'remote_no_cache' | 'managed_thumbnail' | 'licensed_cache' | null | undefined
 ): 'none' | 'memory-disk' {
-  return imageMode === 'licensed_cache' ? 'memory-disk' : 'none';
+  return imageMode === 'managed_thumbnail' || imageMode === 'licensed_cache'
+    ? 'memory-disk'
+    : 'none';
 }

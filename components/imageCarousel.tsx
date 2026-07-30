@@ -1,5 +1,6 @@
 import { useMemo, useRef, useState } from 'react';
-import { FlatList, Image, NativeScrollEvent, NativeSyntheticEvent, Platform, Pressable, StyleSheet, useWindowDimensions } from 'react-native';
+import { Image } from 'expo-image';
+import { FlatList, Linking, NativeScrollEvent, NativeSyntheticEvent, Platform, Pressable, StyleSheet, useWindowDimensions } from 'react-native';
 import { type Palette } from '@/constants/theme';
 import { usePalette } from '@/hooks/use-palette';
 import { ThemedText } from './themed-text';
@@ -7,8 +8,15 @@ import { ThemedView } from './themed-view';
 import { IconSymbol } from './ui/icon-symbol';
 
 type ImageCarouselProps = {
-  images: string[];
+  images: CarouselImage[];
   height?: number;
+};
+
+export type CarouselImage = {
+  uri: string;
+  source: string;
+  articleUrl: string;
+  cachePolicy: 'none' | 'memory-disk';
 };
 
 export default function ImageCarousel({ images: allImages, height = 300 }: ImageCarouselProps) {
@@ -26,7 +34,7 @@ export default function ImageCarousel({ images: allImages, height = 300 }: Image
   // blank frame.
   const [failedUris, setFailedUris] = useState<Set<string>>(new Set());
   const images = useMemo(
-    () => allImages.filter((u) => !failedUris.has(u)),
+    () => allImages.filter((image) => !failedUris.has(image.uri)),
     [allImages, failedUris]
   );
 
@@ -79,22 +87,38 @@ export default function ImageCarousel({ images: allImages, height = 300 }: Image
         pagingEnabled
         decelerationRate="fast"
         removeClippedSubviews={false}
-        keyExtractor={(_, i) => String(i)}
+        keyExtractor={(item, i) => `${item.uri}-${i}`}
         showsHorizontalScrollIndicator={false}
         initialScrollIndex={images.length}
         onMomentumScrollEnd={handleMomentumEnd}
         viewabilityConfig={{ viewAreaCoveragePercentThreshold: 50 }}
         renderItem={({ item }) => (
-          <ThemedView style={[styles.imageContainer, { width: itemWidth, height }]}>
+          <Pressable
+            accessibilityRole="link"
+            accessibilityLabel={`Read the original reporting from ${item.source}`}
+            onPress={() => Linking.openURL(item.articleUrl)}
+            style={({ pressed }) => [
+              styles.imageContainer,
+              { width: itemWidth, height, opacity: pressed ? 0.86 : 1 },
+            ]}
+          >
             {/* Fixed frame + cover crop: every slide occupies the same
-                space regardless of the source image's dimensions */}
+                space regardless of the source image's dimensions. */}
             <Image
-              source={{ uri: item }}
+              source={{ uri: item.uri }}
               style={[styles.image, { width: itemWidth, height }]}
-              resizeMode="cover"
-              onError={() => setFailedUris((prev) => new Set(prev).add(item))}
+              contentFit="cover"
+              cachePolicy={item.cachePolicy}
+              recyclingKey={item.uri}
+              onError={() => setFailedUris((prev) => new Set(prev).add(item.uri))}
             />
-          </ThemedView>
+            <ThemedView style={styles.attribution}>
+              <ThemedText style={styles.attributionText} numberOfLines={1}>
+                {item.source} · Read original
+              </ThemedText>
+              <IconSymbol name="arrow.up.right" size={13} color={c.onImage} />
+            </ThemedView>
+          </Pressable>
         )}
         getItemLayout={(_, index) => ({
           length: itemWidth,
@@ -148,6 +172,27 @@ const makeStyles = (c: Palette) => StyleSheet.create({
   imageContainer: {
     overflow: 'hidden',
     borderRadius: 16,
+  },
+  attribution: {
+    position: 'absolute',
+    left: 12,
+    bottom: 12,
+    maxWidth: '75%',
+    minHeight: 30,
+    borderRadius: 10,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    backgroundColor: c.imageControlBg,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+  },
+  attributionText: {
+    color: c.onImage,
+    fontSize: 12,
+    lineHeight: 16,
+    fontWeight: '800',
+    flexShrink: 1,
   },
   counter: {
     position: 'absolute',

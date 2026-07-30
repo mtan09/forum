@@ -50,6 +50,11 @@ const reuseArticleSnapshot = (current: ArticleType | undefined, next: ArticleTyp
     current.source === next.source &&
     current.description === next.description &&
     current.media === next.media &&
+    current.media_thumbnail_url === next.media_thumbnail_url &&
+    current.media_large_url === next.media_large_url &&
+    current.media_width === next.media_width &&
+    current.media_height === next.media_height &&
+    current.media_status === next.media_status &&
     current.image_mode === next.image_mode &&
     current.text_mode === next.text_mode &&
     current.ai_mode === next.ai_mode &&
@@ -411,7 +416,11 @@ export default function Feed() {
       .slice(lastVisibleIndex + 1, lastVisibleIndex + 4)
       .map((item) => item.kind === 'post'
         ? item.data.media
-        : getDisplayableArticleMedia(item.data.media, item.data.url, item.data.image_mode))
+        : getDisplayableArticleMedia(
+            item.data.media_thumbnail_url ?? item.data.media,
+            item.data.url,
+            item.data.image_mode
+          ))
       .filter((url): url is string => typeof url === 'string' && /^https?:\/\//i.test(url));
     if (urls.length > 0) ExpoImage.prefetch(urls, 'memory-disk').catch(() => {});
   }).current;

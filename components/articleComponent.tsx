@@ -22,9 +22,14 @@ export type ArticleType = {
   source: string;
   description?: string | null;
   media: string | null;
+  media_thumbnail_url?: string | null;
+  media_large_url?: string | null;
+  media_width?: number | null;
+  media_height?: number | null;
+  media_status?: 'none' | 'pending' | 'ready' | 'failed';
   text_mode?: 'headline_only' | 'feed_description' | 'full_text';
-  image_mode?: 'none' | 'remote_no_cache' | 'licensed_cache';
-  ai_mode?: 'metadata_only' | 'permitted_text' | 'denied';
+  image_mode?: 'none' | 'remote_no_cache' | 'managed_thumbnail' | 'licensed_cache';
+  ai_mode?: 'metadata_only' | 'structured_evidence' | 'permitted_text' | 'denied';
   political_lean: number | null;
   content_type?: 'news_report' | 'opinion' | 'analysis' | 'factual_report' | null;
   lean_confidence?: number | null;
@@ -44,6 +49,17 @@ export type UserType = {
   id: string;
   username: string;
   avatar?: string;
+}
+
+// Restore the outlet favicon treatment from the pre-conservative UI. It is a
+// source identifier, not story art, and falls back cleanly to initials.
+function logoUrl(articleUrl: string): string | null {
+  try {
+    const host = new URL(articleUrl).hostname;
+    return `https://www.google.com/s2/favicons?domain=${host}&sz=128`;
+  } catch {
+    return null;
+  }
 }
 
 type Props = {
@@ -66,16 +82,25 @@ function Article({ article, variant = 'feed' }: Props) {
   const leanTag = getPerspectiveToneForPosition(sourceLean, c);
 
   const router = useRouter();
+  const [logoFailed, setLogoFailed] = useState(false);
   const [mediaFailed, setMediaFailed] = useState(false);
   const [receiptsOpen, setReceiptsOpen] = useState(false);
-  const media = getDisplayableArticleMedia(article.media, article.url, article.image_mode);
+  const logo = logoUrl(article.url);
+  const detail = variant === 'detail';
+  const preferredMedia = detail
+    ? article.media_large_url ?? article.media
+    : article.media_thumbnail_url ?? article.media;
+  const media = getDisplayableArticleMedia(preferredMedia, article.url, article.image_mode);
   const imageCachePolicy = getArticleImageCachePolicy(article.image_mode);
   const receiptPosition = article.political_lean ?? article.source_lean ?? null;
-  const detail = variant === 'detail';
 
   useEffect(() => {
     setMediaFailed(false);
   }, [media]);
+
+  useEffect(() => {
+    setLogoFailed(false);
+  }, [logo]);
 
   return (
     <ThemedView style={[styles.post, detail && styles.postDetailWeb]}>
@@ -88,21 +113,26 @@ function Article({ article, variant = 'feed' }: Props) {
             }}
           >
           <ThemedView style={styles.header}>
-            {/* Neutral outlet mark opens the source's detail page. */}
+            {/* Outlet mark opens the source's detail page. */}
             <Pressable
               onPress={() => router.push(`/source/${encodeURIComponent(article.source)}`)}
               style={({ pressed }) => ({ opacity: pressed ? 0.6 : 1.0 })}
             >
-              <ThemedView style={styles.logoFallback}>
-                <ThemedText style={styles.logoInitial}>
-                  {(article.source ?? '?')
-                    .split(/\s+/)
-                    .slice(0, 2)
-                    .map((word) => word.charAt(0))
-                    .join('')
-                    .toUpperCase()}
-                </ThemedText>
-              </ThemedView>
+              {logo && !logoFailed ? (
+                <Image
+                  source={{ uri: logo }}
+                  style={styles.logo}
+                  onError={() => setLogoFailed(true)}
+                  cachePolicy="memory-disk"
+                  recyclingKey={logo}
+                />
+              ) : (
+                <ThemedView style={styles.logoFallback}>
+                  <ThemedText style={styles.logoInitial}>
+                    {(article.source ?? '?').charAt(0).toUpperCase()}
+                  </ThemedText>
+                </ThemedView>
+              )}
             </Pressable>
             <ThemedView style={{flex: 1}}>
               <ThemedView style={styles.sourceRow}>
@@ -236,6 +266,11 @@ const makeStyles = (c: Palette) => StyleSheet.create({
     backgroundColor: c.accentFaint,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  logo: {
+    width: 50,
+    aspectRatio: 1,
+    borderRadius: 25,
   },
   logoInitial: {
     fontSize: 22,

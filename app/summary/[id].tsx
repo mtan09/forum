@@ -1,5 +1,5 @@
 import { ArticleType } from '@/components/articleComponent';
-import ImageCarousel from '@/components/imageCarousel';
+import ImageCarousel, { type CarouselImage } from '@/components/imageCarousel';
 import Spectrum from '@/components/spectrum';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
@@ -27,9 +27,9 @@ type Summary = {
   public_position: number | null;
 }
 
-// The generated long_summary contains attributed publisher headlines, not
-// copied article paragraphs.
-type Perspective = { lean: 'left' | 'center' | 'right'; source: string; headline: string };
+// The generated long_summary contains attributed, forum-original evidence
+// summaries (or a headline fallback), never a stored publisher body.
+type Perspective = { lean: 'left' | 'center' | 'right'; source: string; coverage: string };
 
 function readableExcerpt(text: string): string {
   const clean = text.trim();
@@ -49,7 +49,7 @@ function parsePerspectives(text: string): Perspective[] | null {
     return {
       lean: m[1].toLowerCase() as Perspective['lean'],
       source: m[2],
-      headline: readableExcerpt(text.slice(start, end)),
+      coverage: readableExcerpt(text.slice(start, end)),
     };
   });
 }
@@ -70,8 +70,6 @@ export default function SummaryScreen() {
 
   const [ summary, setSummary ] = useState<Summary | null>(null);
   const [ articles, setArticles ] = useState<ArticleType[]>([]);
-
-  const [ images, setImages ] = useState<string[]>([]);
 
   // Card images that fail to load fall back to the lettered placeholder
   const [failedMedia, setFailedMedia] = useState<Set<string>>(new Set());
@@ -102,12 +100,6 @@ export default function SummaryScreen() {
 
         setSummary(data);
         setArticles(data.articles ?? []);
-        setImages(
-          (data.articles ?? [])
-            .map((a) => getDisplayableArticleMedia(a.media, a.url, a.image_mode))
-            .filter((u): u is string => Boolean(u))
-            .slice(0, MAX_IMAGES)
-        );
       } catch (err: any) {
         console.log('Error fetching summary:', err?.message);
       }
@@ -117,6 +109,21 @@ export default function SummaryScreen() {
   }, [id]);
 
   const perspectives = summary?.long_summary ? parsePerspectives(summary.long_summary) : null;
+  const images = useMemo(() => {
+    const seen = new Set<string>();
+    return articles.flatMap((article): CarouselImage[] => {
+      const preferred = article.media_large_url ?? article.media_thumbnail_url ?? article.media;
+      const uri = getDisplayableArticleMedia(preferred, article.url, article.image_mode);
+      if (!uri || seen.has(uri)) return [];
+      seen.add(uri);
+      return [{
+        uri,
+        source: article.source,
+        articleUrl: article.url,
+        cachePolicy: getArticleImageCachePolicy(article.image_mode),
+      }];
+    }).slice(0, MAX_IMAGES);
+  }, [articles]);
   const outletCount = new Set(articles.map((a) => a.source)).size;
   const shownArticles = articles.slice(0, MAX_ARTICLES);
 
@@ -185,7 +192,7 @@ export default function SummaryScreen() {
           <ThemedView style={styles.section}>
             <ThemedView style={styles.sectionHeading}>
               <ThemedText style={styles.sectionTitle}>Three perspectives</ThemedText>
-              <ThemedText style={styles.sectionCaption}>How outlets headline the same story</ThemedText>
+              <ThemedText style={styles.sectionCaption}>How coverage frames the same story</ThemedText>
             </ThemedView>
             <ThemedView style={[styles.perspectives, !isWideWeb && styles.perspectivesStack]}>
               {perspectives.map((p) => {
@@ -206,7 +213,7 @@ export default function SummaryScreen() {
                       </ThemedView>
                       <ThemedText type="defaultSemiBold" style={styles.perspectiveSource}>{p.source}</ThemedText>
                     </ThemedView>
-                    <ThemedText style={styles.perspectiveQuote}>{p.headline}</ThemedText>
+                    <ThemedText style={styles.perspectiveQuote}>{p.coverage}</ThemedText>
                   </ThemedView>
                 );
               })}
@@ -285,7 +292,11 @@ export default function SummaryScreen() {
               scrollEventThrottle={16}
             >
               {shownArticles.map((item) => {
-                const media = getDisplayableArticleMedia(item.media, item.url, item.image_mode);
+                const media = getDisplayableArticleMedia(
+                  item.media_thumbnail_url ?? item.media,
+                  item.url,
+                  item.image_mode
+                );
                 return (
                 <Pressable
                   key={item.id}

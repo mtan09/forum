@@ -138,6 +138,24 @@ The source-rights registry may still select metadata-only analysis for sources
 with a concrete restriction. Do not apply a blanket metadata-only policy to all
 publishers without a current product and App Review reason.
 
+### Implemented architecture
+
+As of 2026-07-29, new ingestion follows this design:
+
+- `@extractus/article-extractor` restores the pre-conservative feed-first,
+  publisher-page-fallback extraction path.
+- Extracted text is an in-memory value passed to deterministic scoring and the
+  structured-evidence extractor; `articles.content` is inserted as `NULL`.
+- `article_evidence` stores a one-way source hash, word count, original summary,
+  attributed claims, timeline facts, relationships, disputed points, entities,
+  event terms, extraction method, confidence, and generator version.
+- If evidence-model access is unavailable or its daily cap is reached,
+  ingestion stores deterministic metadata evidence and continues.
+- forumAI and clustering join `article_evidence`; public article projections
+  never select `articles.content`.
+- Legacy rows move to the new boundary through an explicit, batched backfill
+  that is dry-run by default.
+
 ## forumAI coverage context
 
 Transient analysis does not mean re-fetching every full article for each user
@@ -182,6 +200,11 @@ Do not use a single publisher photograph as if it were forum's own story art.
 Summary image carousels are acceptable product UI: label each item with its
 publisher, keep it connected to the corresponding source link, use restrained
 thumbnail dimensions, and fall back cleanly when unavailable.
+
+The implemented cache creates only 640px and 1280px WebP variants, records the
+publisher image URL, content hash, original dimensions, cache time and expiry,
+and falls back to `remote_no_cache` when download, decoding, R2, or configuration
+fails. Expiry and admin takedown commands purge the `articles/<id>/` R2 prefix.
 
 ## Store positioning
 

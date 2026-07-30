@@ -1,4 +1,5 @@
 import CommentList from '@/components/commentComponent';
+import AppTextInput from '@/components/app-text-input';
 import Post from '@/components/postComponent';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
@@ -11,7 +12,7 @@ import { api } from '@/lib/api';
 import { tapMedium } from '@/lib/haptics';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useMemo, useState } from 'react';
-import { Keyboard, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, TextInput } from 'react-native';
+import { Keyboard, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet } from 'react-native';
 
 export default function PostScreen() {
   const router = useRouter();
@@ -96,28 +97,19 @@ export default function PostScreen() {
             <ThemedText type="defaultSemiBold" style={{ fontWeight: '800', marginBottom: 8 }}>Comments</ThemedText>
 
             {/* Composer */}
-            <ThemedView style={styles.composer}>
-              <TextInput
-                placeholder="Add a comment..."
-                placeholderTextColor={c.muted}
-                value={commentText}
-                onChangeText={setCommentText}
-                multiline
-                numberOfLines={1}
-                style={styles.composerInput}
-                editable={!submitting}
-              />
-              <Pressable
-                onPress={handleSubmitComment}
-                disabled={submitting || !commentText.trim()}
-              >
-                <IconSymbol
-                  name="arrow.up.circle.fill"
-                  size={28}
-                  color={commentText.trim() && !submitting ? c.primary : c.primaryDisabled}
-                />
-              </Pressable>
-            </ThemedView>
+            <AppTextInput
+              placeholder="Add a comment…"
+              value={commentText}
+              onChangeText={setCommentText}
+              multiline
+              numberOfLines={1}
+              editable={!submitting}
+              actionIcon="paperplane.fill"
+              actionLabel="Post comment"
+              actionDisabled={submitting || !commentText.trim()}
+              onAction={handleSubmitComment}
+              containerStyle={styles.composer}
+            />
             {!!commentError && (
               <ThemedText style={styles.composerError}>{commentError}</ThemedText>
             )}
@@ -156,26 +148,7 @@ const makeStyles = (c: Palette) => StyleSheet.create({
     color: c.onPrimary,
   },
   composer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    borderColor: c.accentFaint,
-    borderWidth: 2,
-    borderRadius: 16,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
     marginBottom: 12,
-  },
-  composerInput: {
-    flex: 1,
-    fontSize: 15,
-    lineHeight: 20,
-    minHeight: 28,
-    maxHeight: 96,
-    paddingTop: 4,
-    paddingBottom: 4,
-    textAlignVertical: 'center',
-    color: c.text,
   },
   composerError: {
     color: c.danger,

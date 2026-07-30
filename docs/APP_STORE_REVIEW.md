@@ -1,6 +1,6 @@
 # App Store Review strategy
 
-Last official-policy review: 2026-07-29
+Last official-policy review: 2026-07-30
 
 This is the durable release-policy record for forum. It exists so future work
 does not rely on conversational memory or repeatedly collapse Apple policy,
@@ -111,7 +111,8 @@ posture is:
 - the publisher remains the destination for the full reporting;
 - every publisher item is attributed and linked;
 - forum does not display a copied full article;
-- topic and perspective summaries are forum-original multi-source analysis; and
+- topic blurbs are original outlet-count notes and perspective cards are
+  clearly attributed publisher headlines; and
 - publisher material must not imply sponsorship or affiliation.
 
 Answer the Content Rights field truthfully. Keep a concise review attachment
@@ -121,90 +122,75 @@ the initial submission with every source-policy note unless Apple asks.
 
 ## Article-content strategy
 
-The preferred functionality-preserving design is transient analysis:
+Apple does not require transient-only analysis or deletion of ingested article
+text. The product has intentionally restored its original functionality-first
+architecture:
 
-1. Fetch eligible article text for processing.
-2. Keep raw text out of PostgreSQL, R2, logs, Sentry, analytics, backups, and
-   public/admin APIs.
-3. Extract structured coverage evidence, including entities, events, dates,
-   legislation, source claims, and cluster features.
-4. Remove copied phrasing from persisted evidence and summaries.
-5. Discard raw text immediately after successful processing.
-6. Persist the headline, publisher, canonical URL, date, structured evidence,
-   cluster membership, policy/provenance fields, and original synthesis.
-7. Never expose the raw body to users or use forum as a replacement reader.
+1. Fetch recent article text from the publisher feed or page.
+2. Store it in PostgreSQL for deterministic scoring, clustering, search,
+   rescoring, debugging, and forumAI retrieval.
+3. Store the publisher headline, source, canonical URL, date, and direct image
+   URL with the record.
+4. Do not display article bodies in the feed, article detail, search, profile,
+   or summary interfaces.
+5. Do not return the stored body from public article, bookmark, search, source,
+   profile-article, or topic-detail API responses.
+6. Keep the publisher as the destination for reading the complete article.
+7. Keep public multi-perspective summaries headline-only: one attributed
+   publisher headline for each available Left/Center/Right band.
 
-The source-rights registry may still select metadata-only analysis for sources
-with a concrete restriction. Do not apply a blanket metadata-only policy to all
-publishers without a current product and App Review reason.
+This is a deliberate product and engineering choice, not a claim that storing
+publisher text is affirmatively authorized by Apple. Publisher terms and
+copyright analysis remain separate risks. Do not describe private storage as an
+Apple requirement or tell App Review that the text is discarded.
 
 ### Implemented architecture
 
-As of 2026-07-29, new ingestion follows this design:
-
-- `@extractus/article-extractor` restores the pre-conservative feed-first,
-  publisher-page-fallback extraction path.
-- Extracted text is an in-memory value passed to deterministic scoring and the
-  structured-evidence extractor; `articles.content` is inserted as `NULL`.
-- `article_evidence` stores a one-way source hash, word count, original summary,
-  attributed claims, timeline facts, relationships, disputed points, entities,
-  event terms, extraction method, confidence, and generator version.
-- If evidence-model access is unavailable or its daily cap is reached,
-  ingestion stores deterministic metadata evidence and continues.
-- forumAI and clustering join `article_evidence`; public article projections
-  never select `articles.content`.
-- Legacy rows move to the new boundary through an explicit, batched backfill
-  that is dry-run by default.
+- `@extractus/article-extractor` uses substantial feed text first and falls
+  back to the publisher page.
+- `articles.content` stores the extracted text and feeds the scorer, hot-topic
+  clustering, full-text search, rescoring, and forumAI retrieval.
+- Public article projections omit `articles.content`; the React Native client
+  renders the headline, source, media, metadata, and publisher link.
+- Story `short_summary` is an original outlet-count coverage note.
+- Story `long_summary` contains only attributed publisher headlines. A
+  regression test verifies that article-body sentences never enter it.
+- The bounded `backfill:article-content` job repairs recent rows that were
+  stripped by the retired conservative migration before reclustering them.
 
 ## forumAI coverage context
 
-Transient analysis does not mean re-fetching every full article for each user
-question. The ingestion job may read eligible text once, convert it to
-structured evidence, discard the text, and persist only that evidence.
+forumAI retrieves a small, clamped set of relevant recent article bodies from
+PostgreSQL. Retrieval is deterministic, balances outlets and perspective bands
+when possible, and supports both topic-specific and broad "today's biggest
+story" prompts.
 
-forumAI should retrieve:
-
-- story and article IDs;
-- attributed headlines, publishers, URLs, and dates;
-- political/source bands;
-- entities and event terms;
-- structured source claims and timeline facts;
-- cross-source agreement and disagreement;
-- cluster heat/volume; and
-- forum-original coverage summaries.
-
-It should not retrieve stored article bodies because none should be retained.
-Responses must distinguish confirmed cross-source facts from claims attributed
-to one outlet, avoid long source-like phrasing, and provide publisher links.
+Stored text is private model context. The app does not expose a publisher-body
+reader, and forumAI must synthesize answers in fresh language, attribute
+outlet-specific claims, avoid long source-like passages, and provide publisher
+links. Passing an article or post ID may still pin the conversation to that
+subject.
 
 ## Publisher-image strategy
 
 Do not treat "never use R2" as an Apple requirement. Image delivery is a product,
 performance, privacy, and rights decision.
 
-Preferred supported modes:
-
-- `remote_no_cache`: load a reviewed publisher/feed thumbnail directly;
-- `managed_thumbnail`: keep a bounded, resized R2 thumbnail with provenance,
-  expiry, purge, and takedown support;
-- `licensed_cache`: retain an authorized image under its license; and
-- `none`: use forum-owned fallback artwork.
-
-A managed R2 thumbnail cache can improve consistency, latency, bandwidth, and
-layout quality. It also makes forum the server storing and distributing the
-image, so it should retain only card/carousel-sized variants rather than
-original full-resolution files, record the source article and image URL, expire
-unused files, and support immediate purge.
+The implemented app restores direct publisher/feed image delivery. Ingestion
+stores the selected image URL in `articles.media`; the client loads it with the
+normal device cache. It does not require the retired rights-mode fields or an
+R2 transformation before showing the image.
 
 Do not use a single publisher photograph as if it were forum's own story art.
 Summary image carousels are acceptable product UI: label each item with its
 publisher, keep it connected to the corresponding source link, use restrained
 thumbnail dimensions, and fall back cleanly when unavailable.
 
-The implemented cache creates only 640px and 1280px WebP variants, records the
-publisher image URL, content hash, original dimensions, cache time and expiry,
-and falls back to `remote_no_cache` when download, decoding, R2, or configuration
-fails. Expiry and admin takedown commands purge the `articles/<id>/` R2 prefix.
+Validation remains narrow and product-driven: malformed article-path metadata
+and explicit audio/video/HLS assets are rejected, while valid extensionless CDN
+image URLs remain eligible. A failed publisher image falls back to forum-owned
+purple artwork. R2 remains in use for user uploads and private beta-feedback
+screenshots, not as a mandatory publisher-image proxy.
 
 ## Store positioning
 

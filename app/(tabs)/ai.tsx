@@ -1,4 +1,5 @@
 import { CustomDropdown } from '@/components/customDropdown';
+import AppTextInput from '@/components/app-text-input';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { IconSymbol } from '@/components/ui/icon-symbol';
@@ -10,7 +11,7 @@ import Markdown from '@ronradtke/react-native-markdown-display';
 import { useLocalSearchParams } from 'expo-router';
 import { fetch as expoFetch } from 'expo/fetch';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Animated, Keyboard, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, TextInput, useWindowDimensions } from 'react-native';
+import { Animated, Keyboard, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, useWindowDimensions } from 'react-native';
 
 type Message = {
   id: string;
@@ -298,30 +299,20 @@ export default function AI() {
           subtitle="Choose who forumAI should write for."
         />
       </ThemedView>
-      <ThemedView style={styles.composer}>
-        <TextInput
-          value={inputText}
-          onChangeText={setInputText}
-          placeholder={subject ? `Ask about this ${subject.kind}…` : 'Ask a political question…'}
-          placeholderTextColor={c.muted}
-          multiline
-          numberOfLines={1}
-          style={styles.textInput}
-          scrollEnabled
-          textAlignVertical={inputText.length > 80 || inputText.includes('\n') ? 'top' : 'center'}
-          returnKeyType="send"
-          blurOnSubmit={false}
-        />
-        <Pressable
-          disabled={!canSend}
-          onPress={() => submit()}
-          style={[styles.sendButton, { backgroundColor: canSend ? c.primary : c.surfaceMuted }]}
-          accessibilityRole="button"
-          accessibilityLabel="Send question"
-        >
-          <IconSymbol name="paperplane.fill" size={18} color={canSend ? c.onPrimary : c.textDisabled} />
-        </Pressable>
-      </ThemedView>
+      <AppTextInput
+        value={inputText}
+        onChangeText={setInputText}
+        placeholder={subject ? `Ask about this ${subject.kind}…` : 'Ask a political question…'}
+        multiline
+        numberOfLines={1}
+        scrollEnabled
+        returnKeyType="send"
+        blurOnSubmit={false}
+        actionIcon="paperplane.fill"
+        actionLabel="Send question"
+        actionDisabled={!canSend}
+        onAction={() => submit()}
+      />
       {!compact && <ThemedText style={styles.disclaimer}>forumAI compares perspectives; verify important claims with primary sources.</ThemedText>}
     </ThemedView>
   );
@@ -540,9 +531,6 @@ const makeStyles = (c: Palette) => StyleSheet.create({
   framingRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: 'transparent', minHeight: 28 },
   framingLabel: { flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: 'transparent' },
   framingLabelText: { color: c.muted, fontSize: 12, fontWeight: '700' },
-  composer: { minHeight: 54, flexDirection: 'row', alignItems: 'flex-end', gap: 8, borderRadius: 15, borderWidth: 1.5, borderColor: c.accentFaint, backgroundColor: c.background, paddingLeft: 12, paddingRight: 7, paddingVertical: 7 },
-  textInput: { flex: 1, minHeight: 38, maxHeight: 92, color: c.text, fontSize: 15, lineHeight: 20, fontWeight: '600', paddingVertical: 7 },
-  sendButton: { width: 38, height: 38, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
   disclaimer: { color: c.muted, fontSize: 10, lineHeight: 14, textAlign: 'center' },
   suggestionsSection: { marginTop: 26, backgroundColor: 'transparent' },
   sectionHeadingRow: { flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between', marginBottom: 8, backgroundColor: 'transparent' },

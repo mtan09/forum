@@ -17,9 +17,10 @@ import { Platform, Pressable, ScrollView, StyleSheet, useWindowDimensions } from
 
 const MAX_IMAGES = 6;
 const MAX_ARTICLES = 12;
-const MAX_PERSPECTIVE_CHARS = 280;
+const MAX_PERSPECTIVE_CHARS = 180;
 
 type Summary = {
+  id: string;
   title: string;
   long_summary: string;
   keywords: string[];
@@ -27,8 +28,8 @@ type Summary = {
   public_position: number | null;
 }
 
-// The generated long_summary contains attributed, forum-original evidence
-// summaries (or a headline fallback), never a stored publisher body.
+// The generated long_summary contains one attributed publisher headline per
+// perspective. Stored article bodies are analysis input and never render here.
 type Perspective = { lean: 'left' | 'center' | 'right'; source: string; coverage: string };
 
 function readableExcerpt(text: string): string {
@@ -70,6 +71,7 @@ export default function SummaryScreen() {
 
   const [ summary, setSummary ] = useState<Summary | null>(null);
   const [ articles, setArticles ] = useState<ArticleType[]>([]);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   // Card images that fail to load fall back to the lettered placeholder
   const [failedMedia, setFailedMedia] = useState<Set<string>>(new Set());
@@ -95,18 +97,26 @@ export default function SummaryScreen() {
   useEffect(() => {
     const loadSummary = async () => {
       try {
+        setLoadError(null);
         // subtopic detail comes back with its articles nested
         const data = await api<Summary & { articles: ArticleType[] }>(`/topics/subtopics/${id}`);
-
+        if (!data.articles?.length) {
+          setLoadError('This story is no longer active.');
+          return;
+        }
         setSummary(data);
         setArticles(data.articles ?? []);
+        if (data.id && data.id !== id) {
+          router.replace(`/summary/${data.id}`);
+        }
       } catch (err: any) {
         console.log('Error fetching summary:', err?.message);
+        setLoadError(err?.message ?? 'This story could not be loaded.');
       }
     };
 
     loadSummary();
-  }, [id]);
+  }, [id, router]);
 
   const perspectives = summary?.long_summary ? parsePerspectives(summary.long_summary) : null;
   const images = useMemo(() => {
@@ -126,6 +136,19 @@ export default function SummaryScreen() {
   }, [articles]);
   const outletCount = new Set(articles.map((a) => a.source)).size;
   const shownArticles = articles.slice(0, MAX_ARTICLES);
+
+  if (loadError && !summary) {
+    return (
+      <ThemedView style={styles.unavailable}>
+        <IconSymbol name="newspaper.fill" size={30} color={c.primary} />
+        <ThemedText style={styles.unavailableTitle}>Story updated</ThemedText>
+        <ThemedText style={styles.unavailableText}>{loadError}</ThemedText>
+        <Pressable onPress={() => router.replace('/(tabs)/search')} style={styles.unavailableButton}>
+          <ThemedText style={styles.unavailableButtonText}>Open Discover</ThemedText>
+        </Pressable>
+      </ThemedView>
+    );
+  }
 
   return (
 
@@ -190,7 +213,7 @@ export default function SummaryScreen() {
         {/* Coverage by perspective — one voice per side of the spectrum */}
         {perspectives ? (
           <ThemedView style={styles.section}>
-            <ThemedView style={styles.sectionHeading}>
+            <ThemedView style={[styles.sectionHeading, !isWideWeb && styles.sectionHeadingStack]}>
               <ThemedText style={styles.sectionTitle}>Three perspectives</ThemedText>
               <ThemedText style={styles.sectionCaption}>How coverage frames the same story</ThemedText>
             </ThemedView>
@@ -354,6 +377,39 @@ export default function SummaryScreen() {
 }
 
 const makeStyles = (c: Palette) => StyleSheet.create({
+  unavailable: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 32,
+    backgroundColor: c.background,
+  },
+  unavailableTitle: {
+    marginTop: 12,
+    fontSize: 20,
+    lineHeight: 26,
+    fontWeight: '900',
+  },
+  unavailableText: {
+    marginTop: 6,
+    color: c.muted,
+    textAlign: 'center',
+    fontSize: 14,
+    lineHeight: 20,
+  },
+  unavailableButton: {
+    marginTop: 18,
+    minHeight: 42,
+    borderRadius: 13,
+    backgroundColor: c.primary,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 18,
+  },
+  unavailableButtonText: {
+    color: c.onPrimary,
+    fontWeight: '800',
+  },
   container: {
     flex: 1,
     width: '100%',
@@ -505,12 +561,19 @@ const makeStyles = (c: Palette) => StyleSheet.create({
     justifyContent: 'space-between',
     backgroundColor: 'transparent',
   },
+  sectionHeadingStack: {
+    flexDirection: 'column',
+    alignItems: 'flex-start',
+    justifyContent: 'flex-start',
+    gap: 2,
+  },
   sectionTitle: {
     fontSize: 17,
     lineHeight: 22,
     fontWeight: '900',
   },
   sectionCaption: {
+    flexShrink: 1,
     color: c.muted,
     fontSize: 12,
     lineHeight: 16,

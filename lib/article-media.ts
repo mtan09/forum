@@ -1,20 +1,17 @@
 const IMAGE_EXTENSION = /\.(?:avif|gif|jpe?g|png|webp)$/i;
+const NON_IMAGE_EXTENSION =
+  /\.(?:m3u8|m4a|m4v|mov|mp3|mp4|mpeg|mpg|ogg|ogv|wav|webm)(?:$|[?#])/i;
 
-// Defensive counterpart to the API's ingestion validation. It prevents a
-// malformed source value from becoming a native image request if older or
-// externally-written article data reaches the app.
+// The restored API returns the article's direct image URL. Keep validation
+// deliberately narrow: reject actual audio/video assets and malformed
+// article-path values, but do not require the retired rights-mode flags.
 export function getDisplayableArticleMedia(
   candidate: string | null | undefined,
   articleUrl: string,
-  imageMode: 'none' | 'remote_no_cache' | 'managed_thumbnail' | 'licensed_cache' | null | undefined
+  _imageMode?: 'none' | 'remote_no_cache' | 'managed_thumbnail' | 'licensed_cache' | null
 ): string | null {
-  if (
-    imageMode !== 'remote_no_cache' &&
-    imageMode !== 'managed_thumbnail' &&
-    imageMode !== 'licensed_cache'
-  ) return null;
   const value = candidate?.trim();
-  if (!value) return null;
+  if (!value || NON_IMAGE_EXTENSION.test(value)) return null;
 
   try {
     const image = new URL(value, articleUrl);
@@ -41,9 +38,7 @@ export function getDisplayableArticleMedia(
 }
 
 export function getArticleImageCachePolicy(
-  imageMode: 'none' | 'remote_no_cache' | 'managed_thumbnail' | 'licensed_cache' | null | undefined
+  _imageMode?: 'none' | 'remote_no_cache' | 'managed_thumbnail' | 'licensed_cache' | null
 ): 'none' | 'memory-disk' {
-  return imageMode === 'managed_thumbnail' || imageMode === 'licensed_cache'
-    ? 'memory-disk'
-    : 'none';
+  return 'memory-disk';
 }

@@ -1,4 +1,5 @@
 import Article, { ArticleType } from '@/components/articleComponent';
+import AppTextInput from '@/components/app-text-input';
 import Post from '@/components/postComponent';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
@@ -203,30 +204,24 @@ export default function SearchTab() {
         <ThemedText style={styles.subtitle}>Search the whole conversation.</ThemedText>
       </ThemedView>
 
-      <ThemedView style={styles.searchShell}>
-        <ThemedView style={styles.searchIcon}>
-          <IconSymbol name="magnifyingglass" size={19} color={c.primary} />
-        </ThemedView>
-        <TextInput
-          ref={searchRef}
-          value={query}
-          onChangeText={(value) => {
-            setSelectedTopicId(null);
-            setQuery(value);
-          }}
-          placeholder="Search articles and posts"
-          placeholderTextColor={c.muted}
-          style={styles.searchInput}
-          autoCapitalize="none"
-          autoCorrect={false}
-          returnKeyType="search"
-        />
-        {query.length > 0 && (
-          <Pressable accessibilityRole="button" accessibilityLabel="Clear search" onPress={clearSearch} hitSlop={8}>
-            <IconSymbol name="x.circle.fill" size={19} color={c.faint} />
-          </Pressable>
-        )}
-      </ThemedView>
+      <AppTextInput
+        ref={searchRef}
+        value={query}
+        onChangeText={(value) => {
+          setSelectedTopicId(null);
+          setQuery(value);
+        }}
+        placeholder="Search articles and posts"
+        leadingIcon="magnifyingglass"
+        actionIcon={query.length > 0 ? 'x.circle.fill' : undefined}
+        actionLabel="Clear search"
+        actionDisabled={false}
+        onAction={query.length > 0 ? clearSearch : undefined}
+        autoCapitalize="none"
+        autoCorrect={false}
+        returnKeyType="search"
+        containerStyle={styles.searchShell}
+      />
 
       <ScrollView
         ref={scrollRef}
@@ -423,19 +418,9 @@ const makeStyles = (c: Palette) => StyleSheet.create({
   title: { color: c.primary, fontSize: IS_WEB ? 34 : 32, lineHeight: IS_WEB ? 40 : 38 },
   subtitle: { color: c.muted, marginTop: 3, marginBottom: 8, fontSize: IS_WEB ? 15 : 14, lineHeight: 20 },
   searchShell: {
-    minHeight: IS_WEB ? 64 : 58,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 9,
     marginHorizontal: IS_WEB ? 28 : 16,
     marginTop: 18,
     marginBottom: 5,
-    borderWidth: 1.5,
-    borderColor: c.accentFaint,
-    borderRadius: 18,
-    paddingHorizontal: 9,
-    paddingVertical: 8,
-    backgroundColor: c.card,
     ...(IS_WEB
       ? { boxShadow: `0 5px 13px ${c.primary}17` }
       : {
@@ -446,8 +431,6 @@ const makeStyles = (c: Palette) => StyleSheet.create({
         }),
     elevation: 3,
   },
-  searchIcon: { width: 38, height: 38, borderRadius: 12, backgroundColor: c.accentSoftBg, alignItems: 'center', justifyContent: 'center' },
-  searchInput: { flex: 1, minHeight: 38, color: c.text, fontSize: 15, lineHeight: 20, fontWeight: '700', paddingVertical: 9, textAlignVertical: 'center' },
   scrollContent: { paddingBottom: 44 },
   topicSection: { marginTop: 25, paddingHorizontal: IS_WEB ? 28 : 16, backgroundColor: 'transparent' },
   sectionTitleRow: { flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between', marginBottom: 10, backgroundColor: 'transparent' },

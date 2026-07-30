@@ -17,7 +17,7 @@ import { ThemeModeProvider } from '@/context/themeContext';
 
 import { ActivityIndicator, Platform, Pressable, Text, View } from 'react-native';
 
-import { useEffect } from 'react';
+import { useEffect, useMemo } from 'react';
 
 import { attachNotificationRouter } from '@/lib/notifications';
 import { initSentry } from '@/lib/sentry';
@@ -36,7 +36,9 @@ export default function RootLayout() {
       <ThemeModeProvider>
         <FeedPreferenceProvider>
           <AuthProvider>
-            <ThemedShell />
+            <PostProvider>
+              <ThemedShell />
+            </PostProvider>
           </AuthProvider>
         </FeedPreferenceProvider>
       </ThemeModeProvider>
@@ -49,7 +51,7 @@ export default function RootLayout() {
 function ThemedShell() {
   const { c, scheme: colorScheme } = usePalette();
   const base = colorScheme === 'dark' ? DarkTheme : DefaultTheme;
-  const navTheme = {
+  const navTheme = useMemo(() => ({
     ...base,
     colors: {
       ...base.colors,
@@ -59,7 +61,7 @@ function ThemedShell() {
       border: c.border,
       text: c.text,
     },
-  };
+  }), [base, c]);
 
   return (
     <ThemeProvider value={navTheme}>
@@ -108,7 +110,6 @@ function AppNavigator() {
   }
 
   return (
-    <PostProvider>
         <Stack
           screenOptions={{
             headerTintColor: c.primary,
@@ -301,6 +302,5 @@ function AppNavigator() {
             }}
           />
         </Stack>
-    </PostProvider>
   );
 }

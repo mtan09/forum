@@ -5,9 +5,10 @@ import { IconSymbol } from '@/components/ui/icon-symbol';
 import { type Palette } from '@/constants/theme';
 import { usePalette } from '@/hooks/use-palette';
 import { useRelativeTime } from '@/hooks/useRelativeTime';
-import { getDisplayableArticleMedia } from '@/lib/article-media';
+import { getArticleImageCachePolicy, getDisplayableArticleMedia } from '@/lib/article-media';
 import { getPerspectiveToneForPosition } from '@/lib/perspective-colors';
 import { Image } from 'expo-image';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import { memo, useEffect, useMemo, useState } from 'react';
 import { Platform, Pressable, StyleSheet, useWindowDimensions } from 'react-native';
@@ -19,8 +20,11 @@ export type ArticleType = {
   url: string;
   title: string;
   source: string;
-  content: string;
-  media: string;
+  description?: string | null;
+  media: string | null;
+  text_mode?: 'headline_only' | 'feed_description' | 'full_text';
+  image_mode?: 'none' | 'remote_no_cache' | 'licensed_cache';
+  ai_mode?: 'metadata_only' | 'permitted_text' | 'denied';
   political_lean: number | null;
   content_type?: 'news_report' | 'opinion' | 'analysis' | 'factual_report' | null;
   lean_confidence?: number | null;
@@ -35,18 +39,6 @@ export type ArticleType = {
   my_vote?: 'up' | 'down' | null;
   my_bookmark?: boolean;
 }
-
-// Outlet logo from the article's own domain, so it covers every source
-// without storing logo URLs anywhere.
-function logoUrl(articleUrl: string): string | null {
-  try {
-    const host = new URL(articleUrl).hostname;
-    return `https://www.google.com/s2/favicons?domain=${host}&sz=128`;
-  } catch {
-    return null;
-  }
-}
-
 
 export type UserType = {
   id: string;
@@ -74,11 +66,10 @@ function Article({ article, variant = 'feed' }: Props) {
   const leanTag = getPerspectiveToneForPosition(sourceLean, c);
 
   const router = useRouter();
-  const [logoFailed, setLogoFailed] = useState(false);
   const [mediaFailed, setMediaFailed] = useState(false);
   const [receiptsOpen, setReceiptsOpen] = useState(false);
-  const logo = logoUrl(article.url);
-  const media = getDisplayableArticleMedia(article.media, article.url);
+  const media = getDisplayableArticleMedia(article.media, article.url, article.image_mode);
+  const imageCachePolicy = getArticleImageCachePolicy(article.image_mode);
   const receiptPosition = article.political_lean ?? article.source_lean ?? null;
   const detail = variant === 'detail';
 
@@ -97,26 +88,21 @@ function Article({ article, variant = 'feed' }: Props) {
             }}
           >
           <ThemedView style={styles.header}>
-            {/* Outlet logo opens the source's detail page */}
+            {/* Neutral outlet mark opens the source's detail page. */}
             <Pressable
               onPress={() => router.push(`/source/${encodeURIComponent(article.source)}`)}
               style={({ pressed }) => ({ opacity: pressed ? 0.6 : 1.0 })}
             >
-              {logo && !logoFailed ? (
-                <Image
-                  source={{ uri: logo }}
-                  style={styles.logo}
-                  onError={() => setLogoFailed(true)}
-                  cachePolicy="memory-disk"
-                  recyclingKey={logo}
-                />
-              ) : (
-                <ThemedView style={styles.logoFallback}>
-                  <ThemedText style={styles.logoInitial}>
-                    {(article.source ?? '?').charAt(0).toUpperCase()}
-                  </ThemedText>
-                </ThemedView>
-              )}
+              <ThemedView style={styles.logoFallback}>
+                <ThemedText style={styles.logoInitial}>
+                  {(article.source ?? '?')
+                    .split(/\s+/)
+                    .slice(0, 2)
+                    .map((word) => word.charAt(0))
+                    .join('')
+                    .toUpperCase()}
+                </ThemedText>
+              </ThemedView>
             </Pressable>
             <ThemedView style={{flex: 1}}>
               <ThemedView style={styles.sourceRow}>
@@ -147,7 +133,7 @@ function Article({ article, variant = 'feed' }: Props) {
                 source={{ uri: media }}
                 style={[styles.webMedia, { height: detail ? Math.min(contentWidth * 0.62, 420) : contentWidth * 9 / 16 }]}
                 contentFit={detail ? 'contain' : 'cover'}
-                cachePolicy="memory-disk"
+                cachePolicy={imageCachePolicy}
                 onError={() => setMediaFailed(true)}
               />
             ) : media && !mediaFailed ? (
@@ -156,9 +142,27 @@ function Article({ article, variant = 'feed' }: Props) {
                 type='width'
                 dimension={contentWidth}
                 style={styles.media}
+                cachePolicy={imageCachePolicy}
                 onError={() => setMediaFailed(true)}
               />
-            ) : null}
+            ) : (
+              <LinearGradient
+                colors={[c.card, c.accentSoftBg]}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={styles.storyArt}
+              >
+                <ThemedView style={styles.storyArtMark}>
+                  <IconSymbol name="newspaper.fill" size={22} color={c.primary} />
+                </ThemedView>
+                <ThemedView style={styles.storyArtCopy}>
+                  <ThemedText style={styles.storyArtEyebrow}>NEWS LINK</ThemedText>
+                  <ThemedText style={styles.storyArtSource} numberOfLines={1}>
+                    {article.source}
+                  </ThemedText>
+                </ThemedView>
+              </LinearGradient>
+            )}
             {media && mediaFailed && (
               <ThemedView style={styles.mediaFallback}>
                 <IconSymbol name="photo" size={24} color={c.muted} />
@@ -224,14 +228,6 @@ const makeStyles = (c: Palette) => StyleSheet.create({
           marginBottom: 0,
         }
       : {}),
-  },
-  logo: {
-    width: 50,
-    aspectRatio: 1,
-    borderRadius: 25,
-    backgroundColor: c.mediaSurface,
-    borderWidth: 1,
-    borderColor: c.border,
   },
   logoFallback: {
     width: 50,
@@ -299,5 +295,44 @@ const makeStyles = (c: Palette) => StyleSheet.create({
   mediaFallbackText: {
     color: c.muted,
     fontSize: 12,
+  },
+  storyArt: {
+    minHeight: 92,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: c.cardBorder,
+    marginBottom: 8,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  storyArtMark: {
+    width: 44,
+    height: 44,
+    borderRadius: 14,
+    backgroundColor: c.surfaceRaised,
+    borderWidth: 1,
+    borderColor: c.cardBorder,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  storyArtCopy: {
+    flex: 1,
+    backgroundColor: 'transparent',
+  },
+  storyArtEyebrow: {
+    color: c.primary,
+    fontSize: 10,
+    lineHeight: 14,
+    letterSpacing: 1.1,
+    fontWeight: '900',
+  },
+  storyArtSource: {
+    color: c.text,
+    fontSize: 17,
+    lineHeight: 22,
+    fontWeight: '800',
   },
 });

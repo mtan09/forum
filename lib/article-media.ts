@@ -5,8 +5,10 @@ const IMAGE_EXTENSION = /\.(?:avif|gif|jpe?g|png|webp)$/i;
 // externally-written article data reaches the app.
 export function getDisplayableArticleMedia(
   candidate: string | null | undefined,
-  articleUrl: string
+  articleUrl: string,
+  imageMode: 'none' | 'remote_no_cache' | 'licensed_cache' | null | undefined
 ): string | null {
+  if (imageMode !== 'remote_no_cache' && imageMode !== 'licensed_cache') return null;
   const value = candidate?.trim();
   if (!value) return null;
 
@@ -32,4 +34,10 @@ export function getDisplayableArticleMedia(
   } catch {
     return null;
   }
+}
+
+export function getArticleImageCachePolicy(
+  imageMode: 'none' | 'remote_no_cache' | 'licensed_cache' | null | undefined
+): 'none' | 'memory-disk' {
+  return imageMode === 'licensed_cache' ? 'memory-disk' : 'none';
 }

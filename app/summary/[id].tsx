@@ -7,11 +7,13 @@ import { IconSymbol } from '@/components/ui/icon-symbol';
 import { type Palette } from '@/constants/theme';
 import { usePalette } from '@/hooks/use-palette';
 import { api } from '@/lib/api';
-import { getDisplayableArticleMedia } from '@/lib/article-media';
+import { getArticleImageCachePolicy, getDisplayableArticleMedia } from '@/lib/article-media';
 import { getPerspectiveTone, type PerspectiveName } from '@/lib/perspective-colors';
+import { Image } from 'expo-image';
 import { useLocalSearchParams, useRouter } from 'expo-router';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Image, Platform, Pressable, ScrollView, StyleSheet, useWindowDimensions } from 'react-native';
+import { Platform, Pressable, ScrollView, StyleSheet, useWindowDimensions } from 'react-native';
 
 const MAX_IMAGES = 6;
 const MAX_ARTICLES = 12;
@@ -25,9 +27,9 @@ type Summary = {
   public_position: number | null;
 }
 
-// The generated long_summary has a fixed shape — "From the left (Source):
-// quote" paragraphs — so it parses cleanly into perspective cards.
-type Perspective = { lean: 'left' | 'center' | 'right'; source: string; quote: string };
+// The generated long_summary contains attributed publisher headlines, not
+// copied article paragraphs.
+type Perspective = { lean: 'left' | 'center' | 'right'; source: string; headline: string };
 
 function readableExcerpt(text: string): string {
   const clean = text.trim();
@@ -47,7 +49,7 @@ function parsePerspectives(text: string): Perspective[] | null {
     return {
       lean: m[1].toLowerCase() as Perspective['lean'],
       source: m[2],
-      quote: readableExcerpt(text.slice(start, end)),
+      headline: readableExcerpt(text.slice(start, end)),
     };
   });
 }
@@ -102,7 +104,7 @@ export default function SummaryScreen() {
         setArticles(data.articles ?? []);
         setImages(
           (data.articles ?? [])
-            .map((a) => getDisplayableArticleMedia(a.media, a.url))
+            .map((a) => getDisplayableArticleMedia(a.media, a.url, a.image_mode))
             .filter((u): u is string => Boolean(u))
             .slice(0, MAX_IMAGES)
         );
@@ -156,10 +158,25 @@ export default function SummaryScreen() {
             </ThemedView>
           </ThemedView>
 
-          {images.length > 0 && (
+          {images.length > 0 ? (
             <ThemedView style={[styles.heroMedia, isWideWeb && styles.heroMediaWide]}>
               <ImageCarousel images={images} height={isWideWeb ? 316 : 240} />
             </ThemedView>
+          ) : (
+            <LinearGradient
+              colors={[c.card, c.accentSoftBg]}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={[styles.heroPlaceholder, isWideWeb && styles.heroMediaWide]}
+            >
+              <ThemedView style={styles.heroPlaceholderIcon}>
+                <IconSymbol name="newspaper.fill" size={30} color={c.primary} />
+              </ThemedView>
+              <ThemedText style={styles.heroPlaceholderLabel}>MULTI-SOURCE STORY</ThemedText>
+              <ThemedText style={styles.heroPlaceholderMeta}>
+                {outletCount} outlet{outletCount === 1 ? '' : 's'} compared
+              </ThemedText>
+            </LinearGradient>
           )}
         </ThemedView>
 
@@ -168,7 +185,7 @@ export default function SummaryScreen() {
           <ThemedView style={styles.section}>
             <ThemedView style={styles.sectionHeading}>
               <ThemedText style={styles.sectionTitle}>Three perspectives</ThemedText>
-              <ThemedText style={styles.sectionCaption}>How coverage frames the same story</ThemedText>
+              <ThemedText style={styles.sectionCaption}>How outlets headline the same story</ThemedText>
             </ThemedView>
             <ThemedView style={[styles.perspectives, !isWideWeb && styles.perspectivesStack]}>
               {perspectives.map((p) => {
@@ -189,7 +206,7 @@ export default function SummaryScreen() {
                       </ThemedView>
                       <ThemedText type="defaultSemiBold" style={styles.perspectiveSource}>{p.source}</ThemedText>
                     </ThemedView>
-                    <ThemedText style={styles.perspectiveQuote}>{p.quote}</ThemedText>
+                    <ThemedText style={styles.perspectiveQuote}>{p.headline}</ThemedText>
                   </ThemedView>
                 );
               })}
@@ -268,7 +285,7 @@ export default function SummaryScreen() {
               scrollEventThrottle={16}
             >
               {shownArticles.map((item) => {
-                const media = getDisplayableArticleMedia(item.media, item.url);
+                const media = getDisplayableArticleMedia(item.media, item.url, item.image_mode);
                 return (
                 <Pressable
                   key={item.id}
@@ -283,17 +300,29 @@ export default function SummaryScreen() {
                       <Image
                         source={{ uri: media }}
                         style={styles.articleImage}
-                        resizeMode="cover"
+                        contentFit="cover"
+                        cachePolicy={getArticleImageCachePolicy(item.image_mode)}
                         onError={() =>
                           setFailedMedia((prev) => new Set(prev).add(media))
                         }
                       />
                     ) : (
-                      <ThemedView style={[styles.articleImage, styles.articleImagePlaceholder]}>
+                      <LinearGradient
+                        colors={[c.card, c.accentSoftBg]}
+                        start={{ x: 0, y: 0 }}
+                        end={{ x: 1, y: 1 }}
+                        style={[styles.articleImage, styles.articleImagePlaceholder]}
+                      >
+                        <IconSymbol name="newspaper.fill" size={26} color={c.primary} />
                         <ThemedText style={styles.articleImageInitial}>
-                          {(item.source ?? '?').charAt(0).toUpperCase()}
+                          {(item.source ?? '?')
+                            .split(/\s+/)
+                            .slice(0, 2)
+                            .map((word) => word.charAt(0))
+                            .join('')
+                            .toUpperCase()}
                         </ThemedText>
-                      </ThemedView>
+                      </LinearGradient>
                     )}
                     <ThemedText style={styles.articleSource} numberOfLines={1}>{item.source}</ThemedText>
                     <ThemedText type="defaultSemiBold" style={styles.articleHeadline} numberOfLines={3}>
@@ -365,6 +394,39 @@ const makeStyles = (c: Palette) => StyleSheet.create({
   },
   heroMediaWide: {
     flex: 1.12,
+  },
+  heroPlaceholder: {
+    minHeight: 220,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: c.cardBorder,
+    padding: 24,
+    justifyContent: 'flex-end',
+    alignItems: 'flex-start',
+  },
+  heroPlaceholderIcon: {
+    width: 56,
+    height: 56,
+    borderRadius: 18,
+    backgroundColor: c.surfaceRaised,
+    borderWidth: 1,
+    borderColor: c.cardBorder,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 28,
+  },
+  heroPlaceholderLabel: {
+    color: c.primary,
+    fontSize: 10,
+    lineHeight: 14,
+    letterSpacing: 1.2,
+    fontWeight: '900',
+  },
+  heroPlaceholderMeta: {
+    color: c.text,
+    fontSize: 18,
+    lineHeight: 24,
+    fontWeight: '800',
   },
   eyebrow: {
     color: c.primary,

@@ -6,8 +6,11 @@ import { forwardRef, useMemo } from 'react';
 import {
   Pressable,
   StyleSheet,
+  type StyleProp,
+  Text,
   TextInput,
   type TextInputProps,
+  View,
   type ViewStyle,
 } from 'react-native';
 import { ThemedView } from './themed-view';
@@ -20,7 +23,7 @@ type AppTextInputProps = TextInputProps & {
   actionLabel?: string;
   actionDisabled?: boolean;
   onAction?: () => void;
-  containerStyle?: ViewStyle;
+  containerStyle?: StyleProp<ViewStyle>;
 };
 
 /**
@@ -37,6 +40,8 @@ const AppTextInput = forwardRef<TextInput, AppTextInputProps>(function AppTextIn
     onAction,
     containerStyle,
     multiline = false,
+    scrollEnabled = multiline ? false : undefined,
+    onContentSizeChange,
     style,
     ...inputProps
   },
@@ -44,6 +49,11 @@ const AppTextInput = forwardRef<TextInput, AppTextInputProps>(function AppTextIn
 ) {
   const { c } = usePalette();
   const styles = useMemo(() => makeStyles(c), [c]);
+  const measuredText = typeof inputProps.value === 'string'
+    ? inputProps.value
+    : typeof inputProps.defaultValue === 'string'
+      ? inputProps.defaultValue
+      : '';
 
   return (
     <ThemedView style={[styles.shell, multiline && styles.shellMultiline, containerStyle]}>
@@ -52,14 +62,28 @@ const AppTextInput = forwardRef<TextInput, AppTextInputProps>(function AppTextIn
           <IconSymbol name={leadingIcon} size={19} color={c.primary} />
         </ThemedView>
       ) : null}
-      <TextInput
-        ref={ref}
-        multiline={multiline}
-        placeholderTextColor={c.muted}
-        textAlignVertical="center"
-        style={[styles.input, multiline && styles.inputMultiline, style]}
-        {...inputProps}
-      />
+      <View style={styles.inputWrap}>
+        {multiline ? (
+          <Text
+            accessibilityElementsHidden
+            importantForAccessibility="no-hide-descendants"
+            pointerEvents="none"
+            style={[styles.measureText, style, styles.measureHidden]}
+          >
+            {measuredText || ' '}
+          </Text>
+        ) : null}
+        <TextInput
+          ref={ref}
+          multiline={multiline}
+          scrollEnabled={scrollEnabled}
+          onContentSizeChange={onContentSizeChange}
+          placeholderTextColor={c.muted}
+          textAlignVertical="center"
+          style={[styles.input, multiline && styles.inputMultiline, style]}
+          {...inputProps}
+        />
+      </View>
       {actionIcon && onAction ? (
         <Pressable
           accessibilityRole="button"
@@ -109,8 +133,12 @@ const makeStyles = (c: Palette) => StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  input: {
+  inputWrap: {
     flex: 1,
+    minHeight: 38,
+    minWidth: 0,
+  },
+  measureText: {
     minHeight: 38,
     color: c.text,
     fontSize: 15,
@@ -119,8 +147,22 @@ const makeStyles = (c: Palette) => StyleSheet.create({
     paddingHorizontal: 4,
     paddingVertical: 7,
   },
+  measureHidden: { opacity: 0 },
+  input: {
+    position: 'absolute',
+    top: 0,
+    right: 0,
+    bottom: 0,
+    left: 0,
+    color: c.text,
+    fontSize: 15,
+    lineHeight: 20,
+    fontWeight: '600',
+    paddingHorizontal: 4,
+    paddingVertical: 7,
+  },
   inputMultiline: {
-    maxHeight: 96,
+    minHeight: 38,
   },
   action: {
     width: 38,

@@ -1,3 +1,4 @@
+import AppTextInput from '@/components/app-text-input';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { type Palette } from '@/constants/theme';
@@ -6,7 +7,7 @@ import { api } from '@/lib/api';
 import { notifySuccess, tapMedium } from '@/lib/haptics';
 import { useRouter } from 'expo-router';
 import { useMemo, useState } from 'react';
-import { Alert, KeyboardAvoidingView, Platform, Pressable, StyleSheet, TextInput } from 'react-native';
+import { Alert, KeyboardAvoidingView, Platform, Pressable, StyleSheet } from 'react-native';
 
 export default function ChangePassword() {
   const router = useRouter();
@@ -60,29 +61,26 @@ export default function ChangePassword() {
 
         <ThemedView style={styles.form}>
           <ThemedText style={styles.label}>Current password</ThemedText>
-          <TextInput
+          <AppTextInput
             value={current}
             onChangeText={setCurrent}
-            style={styles.input}
             secureTextEntry
             autoCapitalize="none"
           />
 
           <ThemedText style={styles.label}>New password</ThemedText>
-          <TextInput
+          <AppTextInput
             value={next}
             onChangeText={setNext}
-            style={styles.input}
             secureTextEntry
             autoCapitalize="none"
           />
           <ThemedText style={styles.hint}>At least 6 characters.</ThemedText>
 
           <ThemedText style={styles.label}>Confirm new password</ThemedText>
-          <TextInput
+          <AppTextInput
             value={confirm}
             onChangeText={setConfirm}
-            style={styles.input}
             secureTextEntry
             autoCapitalize="none"
           />
@@ -127,16 +125,6 @@ const makeStyles = (c: Palette) => StyleSheet.create({
     fontSize: 13,
     color: c.subtle,
     marginTop: 10,
-  },
-  input: {
-    borderWidth: 2,
-    borderColor: c.accentFaint,
-    borderRadius: 12,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    fontSize: 16,
-    fontWeight: '600',
-    color: c.text,
   },
   hint: {
     color: c.muted,

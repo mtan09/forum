@@ -238,9 +238,22 @@ export default function PublicProfile() {
             )
           )}
         </ThemedView>
-        <ThemedText style={styles.followCounts}>
-          {followerCount} follower{followerCount === 1 ? '' : 's'} · {user.following_count ?? 0} following
-        </ThemedText>
+        <ThemedView style={styles.followCountsRow}>
+          <Pressable
+            onPress={() => router.push({ pathname: '/connections/[userId]', params: { userId: user.id, tab: 'followers' } })}
+            style={({ pressed }) => [styles.countButton, pressed && styles.countPressed]}
+          >
+            <ThemedText style={styles.followCountNumber}>{followerCount}</ThemedText>
+            <ThemedText style={styles.followCounts}>follower{followerCount === 1 ? '' : 's'}</ThemedText>
+          </Pressable>
+          <Pressable
+            onPress={() => router.push({ pathname: '/connections/[userId]', params: { userId: user.id, tab: 'following' } })}
+            style={({ pressed }) => [styles.countButton, pressed && styles.countPressed]}
+          >
+            <ThemedText style={styles.followCountNumber}>{user.following_count ?? 0}</ThemedText>
+            <ThemedText style={styles.followCounts}>following</ThemedText>
+          </Pressable>
+        </ThemedView>
         {blocked && (
           <ThemedView style={styles.blockedBanner}>
             <IconSymbol name="hand.raised.fill" size={14} color={c.amber} />
@@ -372,7 +385,17 @@ const makeStyles = (c: Palette) => StyleSheet.create({
   followCounts: {
     color: c.muted,
     fontSize: 13,
+    lineHeight: 18,
   },
+  followCountsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 20,
+    backgroundColor: 'transparent',
+  },
+  countButton: { flexDirection: 'row', alignItems: 'baseline', gap: 4 },
+  followCountNumber: { color: c.text, fontSize: 13, lineHeight: 18, fontWeight: '600' },
+  countPressed: { opacity: 0.55 },
   username: {
     fontWeight: '800',
     fontSize: 22,

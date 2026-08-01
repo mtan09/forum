@@ -1,3 +1,4 @@
+import UserAvatar from '@/components/user-avatar';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { IconSymbol } from '@/components/ui/icon-symbol';
@@ -9,7 +10,7 @@ import { notifySuccess, selectTick, tapLight, tapMedium } from '@/lib/haptics';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useRouter } from 'expo-router';
 import { useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, Image, Pressable, ScrollView, StyleSheet } from 'react-native';
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet } from 'react-native';
 
 // First-run welcome: pick interests (stored for personalization) and follow
 // a few active accounts so the Following tab and feed aren't empty on day 1.
@@ -174,10 +175,7 @@ export default function Onboarding() {
               const on = followed.has(u.id);
               return (
                 <ThemedView key={u.id} style={styles.userRow}>
-                  <Image
-                    source={u.avatar_url ? { uri: u.avatar_url } : require('@/assets/images/Default_pfp.jpg')}
-                    style={styles.avatar}
-                  />
+                  <UserAvatar userId={u.id} avatarUrl={u.avatar_url} size={46} />
                   <ThemedView style={{ flex: 1 }}>
                     <ThemedText type="defaultSemiBold" style={styles.userName}>{u.username}</ThemedText>
                     <ThemedText style={styles.userMeta} numberOfLines={1}>
@@ -290,7 +288,6 @@ const makeStyles = (c: Palette) => StyleSheet.create({
   chipText: { fontWeight: '600', fontSize: 15, color: c.subtle },
   chipTextOn: { color: c.onAccentFaint, fontWeight: '800' },
   userRow: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 10 },
-  avatar: { width: 46, height: 46, borderRadius: 23 },
   userName: { fontWeight: '700', fontSize: 16 },
   userMeta: { color: c.muted, fontSize: 13 },
   followBtn: {

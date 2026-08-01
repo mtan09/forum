@@ -1,4 +1,5 @@
 import AppRefreshControl from '@/components/appRefreshControl';
+import AppTextInput from '@/components/app-text-input';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { type Palette } from '@/constants/theme';
@@ -7,7 +8,7 @@ import { api } from '@/lib/api';
 import { notifySuccess, tapLight } from '@/lib/haptics';
 import * as WebBrowser from 'expo-web-browser';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, TextInput } from 'react-native';
+import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet } from 'react-native';
 
 type FeedbackStatus = 'open' | 'planned' | 'resolved' | 'dismissed';
 type Feedback = {
@@ -77,13 +78,13 @@ function FeedbackCard({ item, onDone }: { item: Feedback; onDone: (id: string) =
           <ThemedText style={styles.screenshotText}>Open private screenshot</ThemedText>
         </Pressable>
       ) : null}
-      <TextInput
+      <AppTextInput
         value={notes}
         onChangeText={setNotes}
         placeholder="Admin notes"
-        placeholderTextColor={c.muted}
         multiline
-        style={styles.notes}
+        containerStyle={styles.notes}
+        textAlignVertical="top"
       />
       <ThemedView style={styles.actions}>
         <Pressable onPress={() => update('planned')} style={styles.secondary}><ThemedText style={styles.secondaryText}>Plan</ThemedText></Pressable>
@@ -130,7 +131,7 @@ const makeStyles = (c: Palette) => StyleSheet.create({
   context: { color: c.muted, fontSize: 11, lineHeight: 16 },
   screenshotButton: { borderWidth: 1, borderColor: c.primary, borderRadius: 10, padding: 9, alignItems: 'center' },
   screenshotText: { color: c.primary, fontWeight: '800', fontSize: 12 },
-  notes: { minHeight: 70, color: c.text, backgroundColor: c.inputBg, borderRadius: 10, padding: 10, textAlignVertical: 'top' },
+  notes: { minHeight: 70, alignItems: 'flex-start' },
   actions: { flexDirection: 'row', gap: 8, backgroundColor: 'transparent' },
   secondary: { flex: 1, borderWidth: 1, borderColor: c.border, borderRadius: 10, padding: 9, alignItems: 'center' },
   secondaryText: { color: c.subtle, fontWeight: '800', fontSize: 12 },

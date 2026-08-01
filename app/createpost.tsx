@@ -1,3 +1,4 @@
+import AppTextInput from '@/components/app-text-input';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { IconSymbol } from '@/components/ui/icon-symbol';
@@ -9,7 +10,7 @@ import { notifySuccess, tapLight, tapMedium } from '@/lib/haptics';
 import * as ImagePicker from 'expo-image-picker';
 import { useRouter } from 'expo-router';
 import { useMemo, useState } from 'react';
-import { Image, Keyboard, Platform, Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
+import { Image, Keyboard, Platform, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 
 export default function CreatePost() {
   const router = useRouter();
@@ -143,7 +144,7 @@ export default function CreatePost() {
             </Pressable>
           </ThemedView>
 
-          <TextInput
+          <AppTextInput
             placeholder="What do you want to post?"
             value={post.content}
             onChangeText={(text) => setPost((prev) => ({ ...prev, content: text }))}
@@ -152,8 +153,8 @@ export default function CreatePost() {
             multiline
             onSubmitEditing={Keyboard.dismiss}
             textAlignVertical="top"
-            style={styles.input}
-            placeholderTextColor={c.muted}
+            containerStyle={styles.postInput}
+            style={styles.postInputText}
           />
 
           {pickedImage && (
@@ -196,15 +197,13 @@ export default function CreatePost() {
                   ))}
                 </View>
               )}
-              <TextInput
+              <AppTextInput
                 placeholder="Add hashtags (space to add)"
                 value={tagInput}
                 onChangeText={onTagInputChange}
                 onSubmitEditing={() => { commitTag(tagInput); setTagInput(''); }}
                 autoCapitalize="none"
                 autoCorrect={false}
-                style={styles.tagInput}
-                placeholderTextColor={c.muted}
               />
             </ThemedView>
           </ThemedView>
@@ -280,20 +279,16 @@ const makeStyles = (c: Palette) => StyleSheet.create({
     borderColor: c.border,
     transform: [{ translateY: Platform.OS === 'web' ? 0 : -3 }],
   },
-  input: {
+  postInput: {
     width: '100%',
     minHeight: 140,
-    borderWidth: 2,
-    borderColor: c.accentFaint,
-    borderRadius: 16,
-    paddingHorizontal: Platform.OS === 'web' ? 24 : 16,
-    paddingVertical: 12,
     marginBottom: 16,
+    alignItems: 'flex-start',
+  },
+  postInputText: {
+    minHeight: 116,
     fontSize: 16,
-    fontWeight: '600',
     textAlignVertical: 'top',
-    color: c.text,
-    backgroundColor: c.background,
   },
   imageContainer: {
     width: '100%',
@@ -353,18 +348,6 @@ const makeStyles = (c: Palette) => StyleSheet.create({
     color: c.primary,
     fontWeight: '700',
     fontSize: 14,
-  },
-  tagInput: {
-    width: '100%',
-    borderWidth: 2,
-    borderColor: c.accentFaint,
-    borderRadius: 16,
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    fontSize: 15,
-    fontWeight: '600',
-    color: c.text,
-    backgroundColor: c.background,
   },
   secondaryButton: {
     flexDirection: 'row',

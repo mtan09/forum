@@ -346,11 +346,24 @@ export default function Profile() {
         </ThemedView>
 
         <ThemedText type="defaultSemiBold" style={styles.username}>{profile?.username}</ThemedText>
-        {followCounts && (
-          <ThemedText style={styles.joinedText}>
-            {followCounts.followers} follower{followCounts.followers === 1 ? '' : 's'} · {followCounts.following} following
-          </ThemedText>
-        )}
+        {followCounts && profile?.id ? (
+          <ThemedView style={styles.followCountsRow}>
+            <Pressable
+              onPress={() => router.push({ pathname: '/connections/[userId]', params: { userId: profile.id, tab: 'followers' } })}
+              style={({ pressed }) => [styles.countButton, pressed && styles.countPressed]}
+            >
+              <ThemedText style={styles.followCountNumber}>{followCounts.followers}</ThemedText>
+              <ThemedText style={styles.followCountLabel}>follower{followCounts.followers === 1 ? '' : 's'}</ThemedText>
+            </Pressable>
+            <Pressable
+              onPress={() => router.push({ pathname: '/connections/[userId]', params: { userId: profile.id, tab: 'following' } })}
+              style={({ pressed }) => [styles.countButton, pressed && styles.countPressed]}
+            >
+              <ThemedText style={styles.followCountNumber}>{followCounts.following}</ThemedText>
+              <ThemedText style={styles.followCountLabel}>following</ThemedText>
+            </Pressable>
+          </ThemedView>
+        ) : null}
 
         <Pressable
           onPress={() => { tapLight(); router.push('/following'); }}
@@ -597,6 +610,16 @@ const makeStyles = (c: Palette) => StyleSheet.create({
     color: c.muted,
     fontSize: 13,
   },
+  followCountsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 20,
+    backgroundColor: 'transparent',
+  },
+  countButton: { flexDirection: 'row', alignItems: 'baseline', gap: 4 },
+  followCountNumber: { color: c.text, fontSize: 13, lineHeight: 18, fontWeight: '600' },
+  followCountLabel: { color: c.muted, fontSize: 13, lineHeight: 18 },
+  countPressed: { opacity: 0.55 },
   followingFeedButton: {
     minHeight: 56,
     borderRadius: 16,

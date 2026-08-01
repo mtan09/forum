@@ -18,6 +18,12 @@
       "distribution": "internal",
       "environment": "preview"
     },
+    "screenshot": {
+      "distribution": "internal",
+      "environment": "production",
+      "developmentClient": false,
+      "ios": { "simulator": true }
+    },
     "production": {
       "autoIncrement": true,
       "environment": "production"

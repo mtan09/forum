@@ -1,11 +1,12 @@
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
+import UserAvatar from '@/components/user-avatar';
 import { type Palette } from '@/constants/theme';
 import { usePalette } from '@/hooks/use-palette';
 import { api } from '@/lib/api';
 import { notifySuccess, tapLight } from '@/lib/haptics';
 import { useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, Alert, Image, Pressable, StyleSheet } from 'react-native';
+import { ActivityIndicator, Alert, Pressable, StyleSheet } from 'react-native';
 
 type FollowRequest = {
   id: string;
@@ -52,10 +53,7 @@ export default function FollowRequestsScreen() {
       ) : (
         requests.map((request) => (
           <ThemedView key={request.id} style={styles.row}>
-            <Image
-              source={request.avatar_url ? { uri: request.avatar_url } : require('@/assets/images/Default_pfp.jpg')}
-              style={styles.avatar}
-            />
+            <UserAvatar userId={request.id} avatarUrl={request.avatar_url} size={46} />
             <ThemedView style={styles.copy}>
               <ThemedText style={styles.name}>{request.username}</ThemedText>
               {request.bio ? <ThemedText numberOfLines={1} style={styles.bio}>{request.bio}</ThemedText> : null}
@@ -80,7 +78,6 @@ const makeStyles = (c: Palette) =>
     emptyTitle: { fontSize: 18, fontWeight: '900' },
     emptyText: { color: c.muted, marginTop: 6 },
     row: { minHeight: 74, flexDirection: 'row', alignItems: 'center', gap: 10, borderWidth: 1, borderColor: c.cardBorder, backgroundColor: c.card, borderRadius: 16, padding: 10 },
-    avatar: { width: 46, height: 46, borderRadius: 23 },
     copy: { flex: 1, minWidth: 0, backgroundColor: 'transparent' },
     name: { fontWeight: '900', fontSize: 15 },
     bio: { color: c.muted, fontSize: 12, marginTop: 2 },

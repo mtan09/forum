@@ -1,3 +1,4 @@
+import AppTextInput from '@/components/app-text-input';
 import ScalableImage from '@/components/scalable-image';
 import { type Palette } from '@/constants/theme';
 import { useAuth } from '@/context/authContext';
@@ -7,7 +8,7 @@ import { tapMedium } from '@/lib/haptics';
 import * as WebBrowser from 'expo-web-browser';
 import { useRouter } from 'expo-router';
 import React, { useMemo, useState } from 'react';
-import { ActivityIndicator, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 export default function CreateAccount() {
   const { c } = usePalette();
@@ -62,42 +63,34 @@ export default function CreateAccount() {
 
       {!!err && <Text style={styles.error}>{err}</Text>}
 
-      <TextInput
+      <AppTextInput
         placeholder="Username"
         value={name}
         onChangeText={setName}
         autoCapitalize="none"
         autoCorrect={false}
-        style={styles.input}
-        placeholderTextColor={c.muted}
         editable={!loading}
       />
-      <TextInput
+      <AppTextInput
         placeholder="Email"
         value={email}
         onChangeText={setEmail}
         autoCapitalize="none"
         keyboardType="email-address"
-        style={styles.input}
-        placeholderTextColor={c.muted}
         editable={!loading}
       />
-      <TextInput
+      <AppTextInput
         placeholder="Password"
         value={password}
         onChangeText={setPassword}
         secureTextEntry
-        style={styles.input}
-        placeholderTextColor={c.muted}
         editable={!loading}
       />
-      <TextInput
+      <AppTextInput
         placeholder="Confirm password"
         value={confirm}
         onChangeText={setConfirm}
         secureTextEntry
-        style={styles.input}
-        placeholderTextColor={c.muted}
         editable={!loading}
       />
 
@@ -185,15 +178,6 @@ const makeStyles = (c: Palette) => StyleSheet.create({
     marginBottom: 8,
     textAlign: 'center',
     color: c.primary,
-  },
-  input: {
-    borderWidth: 1,
-    borderColor: c.border,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    borderRadius: 16,
-    color: c.text,
-    backgroundColor: c.surfaceMuted,
   },
   button: {
     backgroundColor: c.primary,

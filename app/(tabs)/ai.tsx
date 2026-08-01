@@ -306,8 +306,6 @@ export default function AI() {
         onChangeText={setInputText}
         placeholder={subject ? `Ask about this ${subject.kind}…` : 'Ask a political question…'}
         multiline
-        numberOfLines={1}
-        scrollEnabled
         returnKeyType="send"
         blurOnSubmit={false}
         actionIcon="paperplane.fill"

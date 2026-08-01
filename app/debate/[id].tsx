@@ -1,3 +1,4 @@
+import AppTextInput from '@/components/app-text-input';
 import CommentList from '@/components/commentComponent';
 import ShareCardModal from '@/components/shareCardModal';
 import { StanceShareCard } from '@/components/shareCards';
@@ -12,7 +13,7 @@ import { selectTick, tapLight, tapMedium } from '@/lib/haptics';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { GestureResponderEvent, Keyboard, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
+import { GestureResponderEvent, Keyboard, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 
 type Distribution = { bins: number[]; median: number | null };
 
@@ -295,28 +296,18 @@ export default function DebateScreen() {
             <ThemedText type="defaultSemiBold" style={{ fontWeight: '800', marginBottom: 8 }}>
               The thread
             </ThemedText>
-            <ThemedView style={styles.composer}>
-              <TextInput
-                placeholder={hasVoted ? 'Make your case...' : 'Take a stance to join the thread...'}
-                placeholderTextColor={c.muted}
-                value={commentText}
-                onChangeText={setCommentText}
-                multiline
-                numberOfLines={1}
-                style={styles.composerInput}
-                editable={hasVoted && !postingComment}
-              />
-              <Pressable
-                onPress={submitComment}
-                disabled={!hasVoted || postingComment || !commentText.trim()}
-              >
-                <IconSymbol
-                  name="arrow.up.circle.fill"
-                  size={28}
-                  color={hasVoted && commentText.trim() && !postingComment ? c.primary : c.primaryDisabled}
-                />
-              </Pressable>
-            </ThemedView>
+            <AppTextInput
+              placeholder={hasVoted ? 'Make your case…' : 'Take a stance to join the thread…'}
+              value={commentText}
+              onChangeText={setCommentText}
+              multiline
+              editable={hasVoted && !postingComment}
+              actionIcon="paperplane.fill"
+              actionLabel="Post to the thread"
+              actionDisabled={!hasVoted || postingComment || !commentText.trim()}
+              onAction={submitComment}
+              containerStyle={styles.composer}
+            />
 
             <CommentList debateId={debate.id} refreshKey={refreshKey} />
           </ThemedView>
@@ -471,25 +462,6 @@ const makeStyles = (c: Palette) => StyleSheet.create({
     borderTopRightRadius: 4,
   },
   composer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    borderColor: c.accentFaint,
-    borderWidth: 2,
-    borderRadius: 16,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
     marginBottom: 12,
-  },
-  composerInput: {
-    flex: 1,
-    fontSize: 15,
-    lineHeight: 20,
-    minHeight: 28,
-    maxHeight: 96,
-    paddingTop: 4,
-    paddingBottom: 4,
-    textAlignVertical: 'center',
-    color: c.text,
   },
 });

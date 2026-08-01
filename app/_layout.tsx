@@ -309,6 +309,10 @@ function AppNavigator() {
             options={{ title: 'Follow Requests', headerBackTitle: 'Back' }}
           />
           <Stack.Screen
+            name="connections/[userId]"
+            options={{ title: 'Connections', headerBackTitle: 'Back' }}
+          />
+          <Stack.Screen
             name="feedback"
             options={{ title: 'Beta Feedback', headerBackTitle: 'Back' }}
           />

@@ -303,11 +303,12 @@ export default function SummaryScreen() {
               decelerationRate="fast"
               snapToInterval={articleCardWidth + 12}
               snapToAlignment="start"
-              // Edge padding centers every snapped card on screen —
-              // including the first and last
               contentContainerStyle={{
                 gap: 12,
-                paddingHorizontal: isWeb ? 0 : (pageWidth - articleCardWidth) / 2 - 16,
+                // The rail already sits inside the page gutter. Starting at
+                // zero puts the first story at the left edge and preserves a
+                // partial next-card peek on phones.
+                paddingRight: isWeb ? 0 : 16,
               }}
               onScroll={(event) => {
                 coverageOffsetRef.current = event.nativeEvent.contentOffset.x;

@@ -1,3 +1,4 @@
+import AppTextInput from '@/components/app-text-input';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { IconSymbol } from '@/components/ui/icon-symbol';
@@ -19,7 +20,6 @@ import {
   Pressable,
   ScrollView,
   StyleSheet,
-  TextInput,
 } from 'react-native';
 
 const CATEGORIES = [
@@ -121,16 +121,16 @@ export default function FeedbackScreen() {
         })}
       </ThemedView>
 
-      <ThemedView style={styles.inputCard}>
-        <TextInput
+      <ThemedView style={styles.inputGroup}>
+        <AppTextInput
           value={message}
           onChangeText={setMessage}
           placeholder="What happened? What would make this better?"
-          placeholderTextColor={c.muted}
           multiline
           maxLength={5000}
           textAlignVertical="top"
-          style={styles.input}
+          containerStyle={styles.feedbackInput}
+          style={styles.feedbackInputText}
         />
         <ThemedText style={styles.counter}>{message.length}/5000</ThemedText>
       </ThemedView>
@@ -178,8 +178,9 @@ const makeStyles = (c: Palette) =>
     categorySelected: { borderColor: c.primary, backgroundColor: c.accentFaint },
     categoryText: { color: c.subtle, fontSize: 13, fontWeight: '700' },
     categoryTextSelected: { color: c.onAccentFaint, fontWeight: '900' },
-    inputCard: { borderWidth: 1, borderColor: c.cardBorder, borderRadius: 16, backgroundColor: c.card, padding: 14 },
-    input: { color: c.text, minHeight: 170, fontSize: 16, lineHeight: 22, padding: 0 },
+    inputGroup: { gap: 6, backgroundColor: 'transparent' },
+    feedbackInput: { minHeight: 170, alignItems: 'flex-start' },
+    feedbackInputText: { minHeight: 146, fontSize: 16, lineHeight: 22, textAlignVertical: 'top' },
     counter: { color: c.muted, fontSize: 12, textAlign: 'right', marginTop: 8 },
     attachButton: { minHeight: 48, borderRadius: 14, borderWidth: 1, borderColor: c.primary, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8 },
     attachText: { color: c.primary, fontWeight: '800' },

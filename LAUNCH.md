@@ -47,8 +47,8 @@ the production export to pass.
    railway run --service forum-api npm run migrate:017
    ```
 
-3. Confirm the seeded `john@example.dev` content remains, its credentials no
-   longer exist, and its admin flag is false.
+3. Confirm the seeded `john@example.dev` persona remains usable with the shared
+   development password and its admin flag is false.
 4. Audit the mock corpus without deleting flagged content:
 
    ```bash

@@ -1,13 +1,14 @@
 import AppRefreshControl from '@/components/appRefreshControl';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
+import UserAvatar from '@/components/user-avatar';
 import { type Palette } from '@/constants/theme';
 import { usePalette } from '@/hooks/use-palette';
 import { useRelativeTime } from '@/hooks/useRelativeTime';
 import { api } from '@/lib/api';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useCallback, useMemo, useState } from 'react';
-import { ActivityIndicator, Image, Platform, Pressable, ScrollView, StyleSheet } from 'react-native';
+import { ActivityIndicator, Platform, Pressable, ScrollView, StyleSheet } from 'react-native';
 
 type Conversation = {
   conversation_id: string;
@@ -26,15 +27,17 @@ function ConversationRow({ conv }: { conv: Conversation }) {
   const router = useRouter();
   const timeAgo = useRelativeTime(conv.last_message_at);
   return (
-    <Pressable
-      onPress={() => router.push(`/dm/${conv.user_id}`)}
-      style={({ pressed }) => [styles.row, { opacity: pressed ? 0.6 : 1 }]}
-    >
-      <Image
-        source={conv.avatar_url ? { uri: conv.avatar_url } : require('@/assets/images/Default_pfp.jpg')}
-        style={styles.avatar}
+    <ThemedView style={styles.row}>
+      <UserAvatar
+        userId={conv.user_id}
+        avatarUrl={conv.avatar_url}
+        size={50}
+        accessibilityLabel={`Open ${conv.username} profile`}
       />
-      <ThemedView style={styles.rowBody}>
+      <Pressable
+        onPress={() => router.push(`/dm/${conv.user_id}`)}
+        style={({ pressed }) => [styles.rowBody, pressed && styles.rowBodyPressed]}
+      >
         <ThemedView style={styles.rowTop}>
           <ThemedText type="defaultSemiBold" style={styles.name} numberOfLines={1}>{conv.username}</ThemedText>
           <ThemedText style={styles.time}>{timeAgo}</ThemedText>
@@ -52,8 +55,8 @@ function ConversationRow({ conv }: { conv: Conversation }) {
             </ThemedView>
           )}
         </ThemedView>
-      </ThemedView>
-    </Pressable>
+      </Pressable>
+    </ThemedView>
   );
 }
 
@@ -148,8 +151,8 @@ const makeStyles = (c: Palette) => StyleSheet.create({
     borderBottomColor: c.border,
     backgroundColor: c.background,
   },
-  avatar: { width: 50, height: 50, borderRadius: 25 },
   rowBody: { flex: 1, gap: 2 },
+  rowBodyPressed: { opacity: 0.6 },
   rowTop: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 },
   name: { fontWeight: '700', fontSize: 16, flexShrink: 1 },
   time: { color: c.muted, fontSize: 12 },

@@ -1,3 +1,4 @@
+import AppTextInput from '@/components/app-text-input';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { IconSymbol } from '@/components/ui/icon-symbol';
@@ -9,7 +10,7 @@ import { notifySuccess, tapLight, tapMedium } from '@/lib/haptics';
 import * as ImagePicker from 'expo-image-picker';
 import { useRouter } from 'expo-router';
 import { useMemo, useState } from 'react';
-import { Dimensions, Image, ImageBackground, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, TextInput } from 'react-native';
+import { Dimensions, Image, ImageBackground, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet } from 'react-native';
 
 const screenWidth = Dimensions.get('window').width;
 
@@ -114,24 +115,23 @@ export default function EditProfile() {
 
           <ThemedView style={styles.form}>
             <ThemedText style={styles.label}>Username</ThemedText>
-            <TextInput
+            <AppTextInput
               value={username}
               onChangeText={setUsername}
-              style={styles.input}
               autoCapitalize="none"
               autoCorrect={false}
               maxLength={24}
             />
 
             <ThemedText style={styles.label}>Bio</ThemedText>
-            <TextInput
+            <AppTextInput
               value={bio}
               onChangeText={setBio}
-              style={[styles.input, styles.bioInput]}
+              containerStyle={styles.bioInput}
               multiline
               maxLength={200}
               placeholder="Tell people about yourself..."
-              placeholderTextColor={c.muted}
+              textAlignVertical="top"
             />
             <ThemedText style={styles.charCount}>{bio.length}/200</ThemedText>
 
@@ -208,19 +208,9 @@ const makeStyles = (c: Palette) => StyleSheet.create({
     color: c.subtle,
     marginTop: 10,
   },
-  input: {
-    borderWidth: 2,
-    borderColor: c.accentFaint,
-    borderRadius: 12,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    fontSize: 16,
-    fontWeight: '600',
-    color: c.text,
-  },
   bioInput: {
     minHeight: 88,
-    textAlignVertical: 'top',
+    alignItems: 'flex-start',
   },
   charCount: {
     alignSelf: 'flex-end',

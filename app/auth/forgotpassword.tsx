@@ -1,10 +1,11 @@
+import AppTextInput from '@/components/app-text-input';
 import { type Palette } from '@/constants/theme';
 import { usePalette } from '@/hooks/use-palette';
 import { API_URL } from '@/lib/api';
 import { notifySuccess, tapMedium } from '@/lib/haptics';
 import { useRouter } from 'expo-router';
 import React, { useMemo, useState } from 'react';
-import { ActivityIndicator, KeyboardAvoidingView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, KeyboardAvoidingView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 // Two-step reset: request a 6-digit code by email, then enter it with a new
 // password. Codes expire after an hour and lock after 5 attempts (server).
@@ -96,14 +97,12 @@ export default function ForgotPassword() {
 
         {step === 'email' ? (
           <>
-            <TextInput
+            <AppTextInput
               placeholder="Email"
               value={email}
               onChangeText={setEmail}
               autoCapitalize="none"
               keyboardType="email-address"
-              style={styles.input}
-              placeholderTextColor={c.muted}
               editable={!loading}
             />
             <TouchableOpacity onPress={requestCode} disabled={loading} style={[styles.button, loading && styles.buttonDisabled]}>
@@ -112,32 +111,27 @@ export default function ForgotPassword() {
           </>
         ) : (
           <>
-            <TextInput
+            <AppTextInput
               placeholder="6-digit code"
               value={code}
               onChangeText={setCode}
               keyboardType="number-pad"
               maxLength={6}
-              style={[styles.input, styles.codeInput]}
-              placeholderTextColor={c.muted}
+              style={styles.codeInput}
               editable={!loading}
             />
-            <TextInput
+            <AppTextInput
               placeholder="New password"
               value={password}
               onChangeText={setPassword}
               secureTextEntry
-              style={styles.input}
-              placeholderTextColor={c.muted}
               editable={!loading}
             />
-            <TextInput
+            <AppTextInput
               placeholder="Confirm new password"
               value={confirm}
               onChangeText={setConfirm}
               secureTextEntry
-              style={styles.input}
-              placeholderTextColor={c.muted}
               editable={!loading}
             />
             <TouchableOpacity onPress={submitReset} disabled={loading} style={[styles.button, loading && styles.buttonDisabled]}>
@@ -166,15 +160,6 @@ const makeStyles = (c: Palette) => StyleSheet.create({
     color: c.subtle,
     lineHeight: 20,
     marginBottom: 8,
-  },
-  input: {
-    borderWidth: 1,
-    borderColor: c.border,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    borderRadius: 16,
-    color: c.text,
-    backgroundColor: c.surfaceMuted,
   },
   codeInput: {
     textAlign: 'center',

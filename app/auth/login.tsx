@@ -1,10 +1,11 @@
+import AppTextInput from '@/components/app-text-input';
 import { type Palette } from '@/constants/theme';
 import { useAuth } from '@/context/authContext';
 import { usePalette } from '@/hooks/use-palette';
 import { tapMedium } from '@/lib/haptics';
 import { useRouter } from 'expo-router';
 import React, { useMemo, useState } from 'react';
-import { ActivityIndicator, Platform, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Platform, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 export default function Login() {
   const { c } = usePalette();
@@ -40,23 +41,19 @@ export default function Login() {
 
       {!!err && <Text style={styles.error}>{err}</Text>}
 
-      <TextInput
+      <AppTextInput
         placeholder="Email"
         value={email}
         onChangeText={setEmail}
         autoCapitalize="none"
         keyboardType="email-address"
-        style={styles.input}
-        placeholderTextColor={c.muted}
         editable={!loading}
       />
-      <TextInput
+      <AppTextInput
         placeholder="Password"
         value={password}
         onChangeText={setPassword}
         secureTextEntry
-        style={styles.input}
-        placeholderTextColor={c.muted}
         editable={!loading}
       />
 
@@ -90,15 +87,6 @@ const makeStyles = (c: Palette) => StyleSheet.create({
     marginBottom: 8,
     textAlign: 'center',
     color: c.primary,
-  },
-  input: {
-    borderWidth: 1,
-    borderColor: c.border,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    borderRadius: 16,
-    color: c.text,
-    backgroundColor: c.surfaceMuted,
   },
   button: {
     backgroundColor: c.primary,

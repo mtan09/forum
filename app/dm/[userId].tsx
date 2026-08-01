@@ -1,6 +1,7 @@
+import AppTextInput from '@/components/app-text-input';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { IconSymbol } from '@/components/ui/icon-symbol';
+import UserAvatar from '@/components/user-avatar';
 import { type Palette } from '@/constants/theme';
 import { useAuth } from '@/context/authContext';
 import { usePalette } from '@/hooks/use-palette';
@@ -8,7 +9,8 @@ import { api } from '@/lib/api';
 import { tapMedium } from '@/lib/haptics';
 import { Stack, useLocalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { FlatList, KeyboardAvoidingView, Platform, Pressable, StyleSheet, TextInput } from 'react-native';
+import { FlatList, KeyboardAvoidingView, Platform, StyleSheet } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 type Message = {
   id: string;
@@ -29,8 +31,10 @@ export default function DmThread() {
   const { userId } = useLocalSearchParams();
   const otherId = Array.isArray(userId) ? userId[0] : userId;
   const { user: me } = useAuth();
+  const insets = useSafeAreaInsets();
 
   const [otherName, setOtherName] = useState('Chat');
+  const [otherAvatar, setOtherAvatar] = useState<string | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
   const [text, setText] = useState('');
   const [sending, setSending] = useState(false);
@@ -39,8 +43,11 @@ export default function DmThread() {
 
   useEffect(() => {
     if (!otherId) return;
-    api<{ username: string }>(`/users/${otherId}`)
-      .then((u) => setOtherName(u.username))
+    api<{ username: string; avatar_url?: string | null }>(`/users/${otherId}`)
+      .then((u) => {
+        setOtherName(u.username);
+        setOtherAvatar(u.avatar_url ?? null);
+      })
       .catch(() => {});
   }, [otherId]);
 
@@ -118,30 +125,37 @@ export default function DmThread() {
           renderItem={({ item }) => {
             const mine = item.sender_id === me?.id;
             return (
-              <ThemedView style={[styles.bubble, mine ? styles.mine : styles.theirs, item.pending && { opacity: 0.6 }]}>
-                <ThemedText style={mine ? styles.mineText : styles.theirsText}>{item.content}</ThemedText>
+              <ThemedView style={[styles.messageRow, mine && styles.messageRowMine, item.pending && styles.pending]}>
+                {!mine && otherId ? (
+                  <UserAvatar
+                    userId={otherId}
+                    avatarUrl={otherAvatar}
+                    size={30}
+                    accessibilityLabel={`Open ${otherName} profile`}
+                    containerStyle={styles.messageAvatar}
+                  />
+                ) : null}
+                <ThemedView style={[styles.bubble, mine ? styles.mine : styles.theirs]}>
+                  <ThemedText style={mine ? styles.mineText : styles.theirsText}>{item.content}</ThemedText>
+                </ThemedView>
               </ThemedView>
             );
           }}
         />
         {!!error && <ThemedText style={styles.error}>{error}</ThemedText>}
-        <ThemedView style={styles.composer}>
-          <TextInput
+        <ThemedView style={[styles.composerWrap, { paddingBottom: Math.max(insets.bottom, 12) }]}>
+          <AppTextInput
             value={text}
             onChangeText={setText}
-            placeholder={`Message ${otherName}...`}
-            placeholderTextColor={c.muted}
+            placeholder={`Message ${otherName}…`}
             multiline
-            numberOfLines={1}
-            style={styles.input}
+            editable={!sending}
+            actionIcon="paperplane.fill"
+            actionLabel="Send message"
+            actionDisabled={sending || !text.trim()}
+            onAction={send}
+            containerStyle={styles.composer}
           />
-          <Pressable onPress={send} disabled={sending || !text.trim()}>
-            <IconSymbol
-              name="arrow.up.circle.fill"
-              size={30}
-              color={text.trim() && !sending ? c.primary : c.primaryDisabled}
-            />
-          </Pressable>
         </ThemedView>
       </ThemedView>
     </KeyboardAvoidingView>
@@ -166,6 +180,15 @@ const makeStyles = (c: Palette) => StyleSheet.create({
     overflow: 'hidden',
   },
   listContent: { padding: 16, gap: 8, flexGrow: 1, justifyContent: 'flex-end' },
+  messageRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    gap: 8,
+    backgroundColor: 'transparent',
+  },
+  messageRowMine: { justifyContent: 'flex-end' },
+  messageAvatar: { alignSelf: 'flex-end', marginBottom: 2 },
+  pending: { opacity: 0.6 },
   bubble: {
     maxWidth: '80%',
     borderRadius: 16,
@@ -173,12 +196,10 @@ const makeStyles = (c: Palette) => StyleSheet.create({
     paddingVertical: 9,
   },
   mine: {
-    alignSelf: 'flex-end',
     backgroundColor: c.primary,
     borderBottomRightRadius: 4,
   },
   theirs: {
-    alignSelf: 'flex-start',
     backgroundColor: c.card,
     borderWidth: 1,
     borderColor: c.cardBorder,
@@ -187,27 +208,10 @@ const makeStyles = (c: Palette) => StyleSheet.create({
   mineText: { color: c.onPrimary, fontSize: 15, lineHeight: 20 },
   theirsText: { fontSize: 15, lineHeight: 20 },
   error: { color: c.danger, textAlign: 'center', paddingBottom: 4, fontSize: 13 },
-  composer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    marginHorizontal: 16,
-    marginBottom: 16,
-    borderWidth: 2,
-    borderColor: c.accentFaint,
-    borderRadius: 16,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
+  composerWrap: {
+    paddingHorizontal: 16,
+    paddingTop: 8,
+    backgroundColor: c.background,
   },
-  input: {
-    flex: 1,
-    fontSize: 15,
-    lineHeight: 20,
-    minHeight: 28,
-    maxHeight: 96,
-    paddingTop: 4,
-    paddingBottom: 4,
-    textAlignVertical: 'center',
-    color: c.text,
-  },
+  composer: { width: '100%' },
 });

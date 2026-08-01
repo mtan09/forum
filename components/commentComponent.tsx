@@ -1,15 +1,16 @@
+import AppTextInput from '@/components/app-text-input';
 import ContentActions from '@/components/contentActions';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { IconSymbol } from '@/components/ui/icon-symbol';
+import UserAvatar from '@/components/user-avatar';
 import { type Palette } from '@/constants/theme';
 import { usePalette } from '@/hooks/use-palette';
 import { tapLight, tapMedium } from '@/lib/haptics';
 import { useRelativeTime } from '@/hooks/useRelativeTime';
 import { api } from '@/lib/api';
-import { useRouter } from 'expo-router';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, Image, Keyboard, Pressable, StyleSheet, TextInput, View } from 'react-native';
+import { ActivityIndicator, Keyboard, Pressable, StyleSheet, View } from 'react-native';
 
 export type Comment = {
 	id: string;
@@ -141,7 +142,6 @@ function CommentItem({ comment }: { comment: Comment }) {
 	const [replySubmitting, setReplySubmitting] = useState(false);
 	const [replyRefresh, setReplyRefresh] = useState(0);
 	const [replyCount, setReplyCount] = useState(comment.reply_count);
-	const router = useRouter();
 	const timeAgo = useRelativeTime(comment.created_at);
 
 	// Optimistic vote state, reconciled with the server response
@@ -207,15 +207,12 @@ function CommentItem({ comment }: { comment: Comment }) {
 			{/* Header: avatar + username · time on one line; tapping the
 			    identity opens the author's public profile */}
 			<ThemedView style={styles.header}>
-				<Pressable
-					onPress={() => router.push(`/user/${comment.user_id}`)}
-					style={({ pressed }) => ({ opacity: pressed ? 0.6 : 1.0 })}
-				>
-					<Image
-						source={comment.avatar_url ? { uri: comment.avatar_url } : require('@/assets/images/Default_pfp.jpg')}
-						style={styles.avatar}
-					/>
-				</Pressable>
+				<UserAvatar
+					userId={comment.user_id}
+					avatarUrl={comment.avatar_url}
+					size={28}
+					accessibilityLabel={`Open ${comment.username ?? 'user'} profile`}
+				/>
 				<ThemedText type="defaultSemiBold" style={styles.username} numberOfLines={1}>
 					{comment.username ?? 'Anonymous'}
 					<ThemedText style={styles.timestamp}>{'   ·   '}{timeAgo}</ThemedText>
@@ -256,26 +253,19 @@ function CommentItem({ comment }: { comment: Comment }) {
 
 			{/* Inline reply composer */}
 			{replyOpen && (
-				<View style={styles.replyComposer}>
-					<TextInput
-						placeholder={`Reply to ${comment.username ?? 'comment'}...`}
-						placeholderTextColor={c.muted}
-						value={replyText}
-						onChangeText={setReplyText}
-						multiline
-						numberOfLines={1}
-						style={styles.replyInput}
-						editable={!replySubmitting}
-						autoFocus
-					/>
-					<Pressable onPress={submitReply} disabled={replySubmitting || !replyText.trim()}>
-						<IconSymbol
-							name="arrow.up.circle.fill"
-							size={24}
-							color={replyText.trim() && !replySubmitting ? c.primary : c.primaryDisabled}
-						/>
-					</Pressable>
-				</View>
+				<AppTextInput
+					placeholder={`Reply to ${comment.username ?? 'comment'}…`}
+					value={replyText}
+					onChangeText={setReplyText}
+					multiline
+					editable={!replySubmitting}
+					autoFocus
+					actionIcon="paperplane.fill"
+					actionLabel="Post reply"
+					actionDisabled={replySubmitting || !replyText.trim()}
+					onAction={submitReply}
+					containerStyle={styles.replyComposer}
+				/>
 			)}
 
 			{/* Nested replies */}
@@ -326,11 +316,6 @@ const makeStyles = (c: Palette) => StyleSheet.create({
 		alignItems: 'center',
 		gap: 8,
 	},
-	avatar: {
-		width: 28,
-		height: 28,
-		borderRadius: 14,
-	},
 	username: {
 		flex: 1,
 		fontSize: 14,
@@ -369,24 +354,6 @@ const makeStyles = (c: Palette) => StyleSheet.create({
 		fontWeight: '600',
 	},
 	replyComposer: {
-		flexDirection: 'row',
-		alignItems: 'center',
-		gap: 8,
-		borderColor: c.accentFaint,
-		borderWidth: 1.5,
-		borderRadius: 12,
-		paddingHorizontal: 10,
-		paddingVertical: 6,
-	},
-	replyInput: {
-		flex: 1,
-		fontSize: 14,
-		lineHeight: 19,
-		minHeight: 27,
-		maxHeight: 80,
-		paddingTop: 4,
-		paddingBottom: 4,
-		textAlignVertical: 'center',
-		color: c.text,
+		marginTop: 2,
 	},
 });

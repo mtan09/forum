@@ -1,12 +1,13 @@
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
+import UserAvatar from '@/components/user-avatar';
 import { type Palette } from '@/constants/theme';
 import { usePalette } from '@/hooks/use-palette';
 import { api } from '@/lib/api';
 import { tapLight } from '@/lib/haptics';
 import { useRouter } from 'expo-router';
 import { useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, Alert, Image, Pressable, ScrollView, StyleSheet } from 'react-native';
+import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet } from 'react-native';
 
 type BlockedUser = {
   id: string;
@@ -69,14 +70,11 @@ export default function BlockedAccounts() {
       ) : (
         users.map((u) => (
           <ThemedView key={u.id} style={styles.row}>
+            <UserAvatar userId={u.id} avatarUrl={u.avatar_url} />
             <Pressable
               style={({ pressed }) => [styles.identity, { opacity: pressed ? 0.6 : 1 }]}
               onPress={() => router.push(`/user/${u.id}`)}
             >
-              <Image
-                source={u.avatar_url ? { uri: u.avatar_url } : require('@/assets/images/Default_pfp.jpg')}
-                style={styles.avatar}
-              />
               <ThemedView style={{ flexShrink: 1 }}>
                 <ThemedText type="defaultSemiBold" style={styles.username}>{u.username}</ThemedText>
                 {u.bio ? <ThemedText style={styles.bio} numberOfLines={1}>{u.bio}</ThemedText> : null}
@@ -110,12 +108,10 @@ const makeStyles = (c: Palette) => StyleSheet.create({
     gap: 12,
   },
   identity: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
+    flex: 1,
+    justifyContent: 'center',
     flexShrink: 1,
   },
-  avatar: { width: 44, height: 44, borderRadius: 22 },
   username: { fontWeight: '700', fontSize: 16 },
   bio: { color: c.muted, fontSize: 13 },
   unblockBtn: {

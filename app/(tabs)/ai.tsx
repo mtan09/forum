@@ -5,6 +5,7 @@ import { ThemedView } from '@/components/themed-view';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { type Palette } from '@/constants/theme';
 import { usePalette } from '@/hooks/use-palette';
+import { requestAIConsent } from '@/lib/ai-consent';
 import { API_URL, getToken } from '@/lib/api';
 import { getPerspectiveTone } from '@/lib/perspective-colors';
 import Markdown from '@ronradtke/react-native-markdown-display';
@@ -265,9 +266,10 @@ export default function AI() {
     'Where do the left and right actually agree?',
   ];
 
-  const submit = (text = inputText) => {
+  const submit = async (text = inputText) => {
     const trimmed = text.trim();
     if (!trimmed || isLoading) return;
+    if (!(await requestAIConsent())) return;
     handleMessageSend(trimmed);
     setInputText('');
     Keyboard.dismiss();
@@ -311,7 +313,7 @@ export default function AI() {
         actionIcon="paperplane.fill"
         actionLabel="Send question"
         actionDisabled={!canSend}
-        onAction={() => submit()}
+        onAction={() => void submit()}
       />
       {!compact && <ThemedText style={styles.disclaimer}>forumAI compares perspectives; verify important claims with primary sources.</ThemedText>}
     </ThemedView>

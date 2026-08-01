@@ -4,9 +4,10 @@ This is the ordered release checklist for the iPhone-only forum beta. Code and
 safe defaults live in git; credentials, reviewer passwords, Apple keys, Sentry
 tokens, and every `.env` file do not.
 
-External testing is intentionally blocked until a permanent domain is selected,
-verified for email, and used for the final support/privacy URLs. Internal
-TestFlight can begin before that gate.
+The permanent domain and account-email infrastructure are now configured.
+External testing remains blocked only by the unchecked validation items in
+sections 5, 6, and 9. Internal TestFlight can continue while those checks are
+completed.
 
 ## 1. Local release gate
 
@@ -39,10 +40,11 @@ the production export to pass.
 ## 2. Production database and identities
 
 1. Back up the production database.
-2. Apply migration 016 once:
+2. Apply migrations 016 and 017 once:
 
    ```bash
    railway run --service forum-api npm run migrate:release
+   railway run --service forum-api npm run migrate:017
    ```
 
 3. Confirm the seeded `john@example.dev` content remains, its credentials no
@@ -62,9 +64,20 @@ Supply `RELEASE_ACCOUNT_EMAIL`, `RELEASE_ACCOUNT_USERNAME`, and
 directly into a password manager or App Store Connect. Never paste either
 credential into docs, tickets, chat, or committed files.
 
+Use a real inbox or controlled alias for the review identity and keep it
+available for the lifetime of the build. `RELEASE_ACCOUNT_ROLE=reviewer`
+explicitly removes admin access, including when it updates an existing account.
+Do not give Apple the owner account: it exposes controls ordinary users cannot
+access and does not represent the submitted product.
+
 Migration 016 is backward compatible: private-account fields default public,
 existing follows become accepted, existing push preferences migrate, and email
 delivery defaults off.
+
+Migration 017 is backward compatible with stored product data but intentionally
+does not grandfather existing users into third-party AI sharing. It records
+versioned allow/decline/withdrawal decisions and stores opaque Expo push ticket
+IDs until their delivery receipts are checked.
 
 ## 3. Railway services
 
@@ -97,6 +110,7 @@ SENTRY_DSN
 SENTRY_ENVIRONMENT
 SENTRY_RELEASE
 WEB_APP_URL
+PUBLIC_API_URL
 ```
 
 Create/verify the private feedback bucket:
@@ -144,29 +158,64 @@ Configure monitors/alerts for:
 
 ## 5. Permanent-domain gate
 
-Do not open external registration or external TestFlight until a permanent
-domain has been chosen.
+The permanent domain is `forumeveryside.com`. The following production state
+was verified on July 31, 2026:
 
-After selection:
+- `api.forumeveryside.com` routes to the Railway API and `/health` gates deploys.
+- Resend sends as `forum <accounts@updates.forumeveryside.com>` with the sending
+  domain verified.
+- `support@forumeveryside.com` routes through Cloudflare Email Routing to the
+  private support inbox. A real message was delivered; Gmail placed the first
+  new-domain test in Spam, where it should be marked **Not spam** to establish
+  inbox reputation.
+- Railway sets `SUPPORT_EMAIL` and `LEGAL_CONTACT_EMAIL` to
+  `support@forumeveryside.com`.
+- The permanent review URLs are
+  `https://api.forumeveryside.com/support` and
+  `https://api.forumeveryside.com/legal/privacy`; both return HTTP 200.
+- `WEB_APP_URL` is `https://mtan-forum.expo.app`, the validated EAS Hosting
+  production alias. Laptop and phone-width layouts render without console
+  errors. Attaching `forumeveryside.com` directly to EAS Hosting is optional and
+  requires a paid Expo plan.
+- `PUBLIC_API_URL` is `https://api.forumeveryside.com`, so verification emails
+  use the public HTTPS origin instead of Railway's internal HTTP request URL.
+- A disposable production signup received its verification message in the
+  controlled inbox, the message contained a direct HTTPS link, and redeeming it
+  returned `Email verified`.
+- A real password-reset message reached the controlled inbox. Its six-digit
+  code was redeemed successfully; the old password then returned 401, the new
+  password logged in, and the account reported `email_verified=true`.
+- All disposable accounts used for these checks were deleted afterward and
+  their temporary credentials were removed.
 
-1. Register the domain.
-2. Add it to Resend and verify SPF, DKIM, and DMARC.
-3. Set `RESEND_API_KEY`, `EMAIL_FROM`, `SUPPORT_EMAIL`, and
-   `LEGAL_CONTACT_EMAIL`.
-4. Set `WEB_APP_URL` to the permanent HTTPS web app.
-5. Use the permanent `/support` and `/legal/privacy` URLs in App Store Connect.
-6. Verify signup verification, password reset, reply email, DM email, and
-   coalesced upvote email end to end.
+Before external TestFlight, still repeat the reset redemption through the iOS
+UI and test reply email, DM email, and coalesced upvote email end to end. Put the
+permanent support and privacy URLs in App Store Connect; the full web app does
+not need to share their hostname.
 
 Production never logs verification links or reset codes when email is missing.
 Email verification gates email delivery only, not ordinary participation.
+New accounts see a third onboarding step with the destination address, resend,
+status-check, and continue-for-now actions; Settings retains the resend action
+for any account that remains unverified.
+The recovery API returning `{ "ok": true }` is not sufficient verification:
+request a reset for a controlled production account, receive the six-digit
+code, set a new password in the iOS app, and confirm the old password no longer
+works.
 
 ## 6. EAS and physical-iPhone QA
 
 The app requests push permission only after the user taps the contextual
 Settings control. Generate/configure APNs credentials through EAS, then test
-registration, routing, unregister-on-sign-out, and delivery on a physical
-iPhone.
+registration, registration repair after an already-granted permission,
+routing, unregister-on-sign-out, delivery, Expo receipt polling, and dead-token
+cleanup on a physical iPhone.
+
+Production currently has a valid EAS-managed APNs push key for
+`com.michaeltan.forum`. On July 31, 2026, a notification sent through forum's
+preference-aware backend path reached a registered physical iPhone. Expo ticket
+IDs were persisted for the five-minute background receipt checker. Still test
+tap routing, sign-out unregistration, and dead-token cleanup in the new binary.
 
 ```bash
 npx eas-cli@latest build --platform ios --profile development
@@ -174,12 +223,15 @@ npx eas-cli@latest device:create
 npx eas-cli@latest build --platform ios --profile device
 ```
 
-Set `EXPO_PUBLIC_API_URL` to the Railway production origin in EAS development,
-preview, and production environments. Test every main screen in light and dark
-mode on the smallest and largest supported iPhones. Validate login, signup,
-verification, reset, moderation allow/reject/outage, private profiles, follow
-requests, notification combinations, feedback screenshots, account deletion,
-push routing, and forumAI.
+Set production `EXPO_PUBLIC_API_URL` to
+`https://api.forumeveryside.com`; development and preview may use the same
+hosted API or an explicit local override. Test every main screen in light and dark
+mode on the smallest and largest supported iPhones. Validate signup with both
+OpenAI choices, the existing-user just-in-time disclosure, withdrawal and
+re-consent, and confirm no affected request reaches OpenAI before permission.
+Also validate login, verification, reset, moderation allow/reject/outage,
+private profiles, follow requests, notification combinations, feedback
+screenshots, account deletion, push routing, and forumAI.
 
 Reject the build for render errors, native faults, unhandled promise warnings,
 unexplained server errors, or VirtualizedList regressions.
@@ -188,14 +240,12 @@ unexplained server errors, or VirtualizedList regressions.
 
 Create the record only after checking the exact name:
 
-- Name: `forum`, if Apple accepts it.
+- Name: `forum: Every Side`.
 - Bundle ID: `com.michaeltan.forum`.
+- App Store Connect Apple ID: `6795639287`.
 - Primary category: News.
 - Secondary category: Social Networking.
 - Device support: iPhone only.
-
-If Apple rejects the exact name `forum`, stop and make a branding decision. Do
-not invent a fallback.
 
 Accept pending Apple agreements, complete export compliance, and put the
 generated App Store Connect Apple ID into
@@ -203,9 +253,10 @@ generated App Store Connect Apple ID into
 
 Answer UGC/content-rights and age-rating questions honestly. Complete App
 Privacy for email, account identifiers, user content, messages, interactions,
-push tokens, diagnostics/Sentry, and data sent to OpenAI. The hosted privacy
-policy must match actual Railway, Neon, R2, Expo, OpenAI, Sentry, and Resend
-behavior.
+push tokens, diagnostics/Sentry, and data sent to OpenAI. Review notes should
+identify the signup and Settings OpenAI controls and explain what remains
+available after decline. The hosted privacy policy must match actual Railway,
+Neon, R2, Expo, OpenAI, Sentry, and Resend behavior.
 
 ## 8. Internal TestFlight
 

@@ -1,5 +1,5 @@
 import { DarkTheme, DefaultTheme, ThemeProvider } from 'expo-router/react-navigation';
-import { Redirect, Stack, usePathname, useRouter } from "expo-router";
+import { Stack, usePathname, useRouter } from "expo-router";
 import { StatusBar } from 'expo-status-bar';
 
 import { IconSymbol } from '@/components/ui/icon-symbol';
@@ -11,13 +11,14 @@ import { usePalette } from '@/hooks/use-palette';
 import { PostProvider } from '../context/postContext';
 
 import { AuthProvider, useAuth } from '@/context/authContext';
+import { AIConsentProvider } from '@/context/aiConsentContext';
 
 import { FeedPreferenceProvider } from '@/context/feedPreferenceContext';
 import { ThemeModeProvider } from '@/context/themeContext';
 
 import { ActivityIndicator, Platform, Pressable, Text, View } from 'react-native';
 
-import { useEffect, useMemo } from 'react';
+import { useCallback, useEffect, useMemo, useRef } from 'react';
 
 import { attachNotificationRouter } from '@/lib/notifications';
 import { initSentry } from '@/lib/sentry';
@@ -36,9 +37,11 @@ export default function RootLayout() {
       <ThemeModeProvider>
         <FeedPreferenceProvider>
           <AuthProvider>
-            <PostProvider>
-              <ThemedShell />
-            </PostProvider>
+            <AIConsentProvider>
+              <PostProvider>
+                <ThemedShell />
+              </PostProvider>
+            </AIConsentProvider>
           </AuthProvider>
         </FeedPreferenceProvider>
       </ThemeModeProvider>
@@ -72,11 +75,21 @@ function ThemedShell() {
 }
 
 function AppNavigator() {
-  // const { session, loading } = useAuth();
   const { session, loading, needsOnboarding } = useAuth();
   const pathname = usePathname();
   const router = useRouter();
   const { c } = usePalette();
+  const lastRedirectRef = useRef<string | null>(null);
+
+  const redirectTarget = loading
+    ? null
+    : session === null && !pathname.startsWith('/auth')
+      ? '/auth/landingpage'
+      : session && needsOnboarding && pathname !== '/onboarding'
+        ? '/onboarding'
+        : session && pathname.startsWith('/auth')
+          ? '/'
+          : null;
 
   useEffect(() => {
     rememberProductRoute(pathname);
@@ -89,7 +102,57 @@ function AppNavigator() {
     return attachNotificationRouter();
   }, [session]);
 
-  if (loading) {
+  // Navigating from an effect avoids a render-time Redirect repeatedly
+  // updating the native stack when Fast Refresh temporarily preserves a
+  // pathname from the previous auth state. The ref also makes the operation
+  // one-shot if a native transition takes more than one render to settle.
+  useEffect(() => {
+    if (!redirectTarget) {
+      lastRedirectRef.current = null;
+      return;
+    }
+    if (lastRedirectRef.current === redirectTarget) return;
+    lastRedirectRef.current = redirectTarget;
+    router.replace(redirectTarget);
+  }, [redirectTarget, router]);
+
+  const headerLeft = useCallback(
+    ({ canGoBack }: { canGoBack?: boolean }) =>
+      canGoBack ? (
+        <Pressable
+          onPress={() => router.back()}
+          hitSlop={12}
+          style={({ pressed }) => ({
+            flexDirection: 'row',
+            alignItems: 'center',
+            opacity: pressed ? 0.5 : 1,
+            paddingRight: 12,
+          })}
+        >
+          <IconSymbol name="chevron.left" size={22} color={c.primary} />
+          <Text style={{ color: c.primary, fontSize: 17 }}>Back</Text>
+        </Pressable>
+      ) : null,
+    [c.primary, router]
+  );
+
+  const stackScreenOptions = useMemo(
+    () => ({
+      headerTintColor: c.primary,
+      contentStyle: {
+        backgroundColor: Platform.OS === 'web' ? c.surface : c.background,
+      },
+      ...(Platform.OS === 'web'
+        ? {
+            header: () => <WebStackHeader />,
+          }
+        : {}),
+      headerLeft,
+    }),
+    [c.background, c.primary, c.surface, headerLeft]
+  );
+
+  if (loading || redirectTarget) {
     return (
       <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
         <ActivityIndicator size="large" />
@@ -97,54 +160,9 @@ function AppNavigator() {
     );
   }
 
-  if (session === null && !pathname.startsWith('/auth')) {
-    return <Redirect href="/auth/landingpage" />;
-  }
-
-  if (session && needsOnboarding && pathname !== '/onboarding') {
-    return <Redirect href="/onboarding" />;
-  }
-
-  if (session && pathname.startsWith('/auth')) {
-    return <Redirect href="/" />;
-  }
-
   return (
         <Stack
-          screenOptions={{
-            headerTintColor: c.primary,
-            contentStyle: {
-              backgroundColor: Platform.OS === 'web' ? c.surface : c.background,
-            },
-            ...(Platform.OS === 'web'
-              ? {
-                  header: () => <WebStackHeader />,
-                }
-              : {}),
-            // header title color comes from the navigation theme, so it
-            // flips with light/dark automatically
-            //
-            // Custom back button: the native header back button can go
-            // unresponsive in Expo Go on iOS, so render our own press
-            // target that drives expo-router directly. Swipe-back still
-            // works natively.
-            headerLeft: ({ canGoBack }) =>
-              canGoBack ? (
-                <Pressable
-                  onPress={() => router.back()}
-                  hitSlop={12}
-                  style={({ pressed }) => ({
-                    flexDirection: 'row',
-                    alignItems: 'center',
-                    opacity: pressed ? 0.5 : 1,
-                    paddingRight: 12,
-                  })}
-                >
-                  <IconSymbol name="chevron.left" size={22} color={c.primary} />
-                  <Text style={{ color: c.primary, fontSize: 17 }}>Back</Text>
-                </Pressable>
-              ) : null,
-          }}
+          screenOptions={stackScreenOptions}
         >
           <Stack.Screen
             name="auth/landingpage"

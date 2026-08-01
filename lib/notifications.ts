@@ -64,11 +64,13 @@ export async function disableFloorReminder(): Promise<void> {
 // Expo Go silent instead of crashing.
 const PUSH_TOKEN_KEY = 'forum.pushToken';
 
-export async function registerForPush(): Promise<boolean> {
+export async function registerForPush(
+  options: { requestPermission?: boolean } = {}
+): Promise<boolean> {
   try {
     const settings = await Notifications.getPermissionsAsync();
     let granted = settings.granted;
-    if (!granted && settings.canAskAgain) {
+    if (!granted && settings.canAskAgain && options.requestPermission !== false) {
       granted = (await Notifications.requestPermissionsAsync()).granted;
     }
     if (!granted) return false;
@@ -98,14 +100,29 @@ export async function pushPermissionGranted(): Promise<boolean> {
   return (await Notifications.getPermissionsAsync()).granted;
 }
 
+// Permission alone does not mean this installation can receive remote push.
+// The token is persisted only after the API confirms server registration.
+export async function pushRegistrationReady(): Promise<boolean> {
+  const [permission, token] = await Promise.all([
+    pushPermissionGranted(),
+    AsyncStorage.getItem(PUSH_TOKEN_KEY),
+  ]);
+  return permission && !!token;
+}
+
 export async function unregisterPush(): Promise<void> {
+  const token = await AsyncStorage.getItem(PUSH_TOKEN_KEY).catch(() => null);
   try {
-    const token = await AsyncStorage.getItem(PUSH_TOKEN_KEY);
     if (token) {
       await api('/users/me/push-token', { method: 'DELETE', body: { token } });
-      await AsyncStorage.removeItem(PUSH_TOKEN_KEY);
     }
-  } catch {}
+  } catch {
+    // Signing out must still discard the local ownership marker. If the
+    // network deletion failed, the next signed-in user repairs ownership by
+    // re-registering the same device token from Settings.
+  } finally {
+    await AsyncStorage.removeItem(PUSH_TOKEN_KEY).catch(() => {});
+  }
 }
 
 // Tapping a notification routes to the content it's about (the server puts

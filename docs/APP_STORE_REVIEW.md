@@ -98,6 +98,35 @@ permissions contextually, provide consent withdrawal where required, and keep
 in-app account deletion functional. Disclose relevant OpenAI, Sentry, Expo,
 Railway, Neon, R2, Resend, and push-notification behavior.
 
+Guideline 5.1.2(i) explicitly requires disclosure of where personal data is
+shared with third parties, including third-party AI, and explicit permission
+before sharing. It does not require forum to use third-party AI.
+
+forum's implemented OpenAI posture is:
+
+- Current consent version: `2026-07-30`.
+- Signup presents separate Allow and Not now choices before the username can be
+  sent to OpenAI. Not now still creates an account; deterministic on-server
+  username rules run without OpenAI.
+- Existing users are not grandfathered. Before the next affected action, a
+  review-visible sheet identifies OpenAI, the data categories, moderation and
+  forumAI purposes, the Privacy Policy, the effect of declining, and withdrawal.
+- The backend enforces current consent before OpenAI moderation or forumAI, so
+  old clients cannot bypass the UI.
+- Declining or withdrawing preserves browsing, voting, saving, and following.
+  Posting, commenting, DMs, moderated profile edits, image uploads, feedback
+  screenshots, and forumAI ask again because they use OpenAI safety or
+  generation.
+- Settings → Privacy → OpenAI processing shows current status and allows
+  withdrawal. Withdrawal stops future sharing and never claims to reverse
+  processing that already occurred.
+- Permission evidence stores user id, disclosure version, decision status, and
+  timestamp. No rejected raw content is stored in the moderation audit.
+
+Keep the consent copy, hosted policy, App Privacy answers, age rating, and
+Review Notes aligned. If the provider, purposes, or data categories materially
+change, bump the version and require a new decision.
+
 ### 5.2 — Intellectual property and third-party services
 
 Apple requires apps that access or display third-party content to be permitted
@@ -204,8 +233,17 @@ screenshots, not as a mandatory publisher-image proxy.
 
 - Production backend, database, email/reset links, push setup, forumAI, images,
   support, privacy, and deletion are reachable.
+- The review-facing URLs are
+  `https://api.forumeveryside.com/support` and
+  `https://api.forumeveryside.com/legal/privacy`. The browser beta currently
+  lives at `https://mtan-forum.expo.app`; Apple does not require the full web
+  client and the review URLs to share a hostname.
+- Signup allow/decline, existing-user just-in-time OpenAI permission, withdrawal,
+  and re-consent work; no affected request reaches OpenAI before current consent.
 - Reviewer credentials are non-admin, stable, and stored only in App Store
-  Connect.
+  Connect. The review account uses a controlled real inbox and remains
+  available for the lifetime of the reviewed build; the separate owner account
+  is never supplied to Apple.
 - UGC filtering, report, block, admin response, and contact paths work.
 - App Privacy and age-rating answers match the build.
 - Screenshots show the real app using controlled demo accounts/content.

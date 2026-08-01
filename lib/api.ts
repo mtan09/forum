@@ -1,4 +1,5 @@
 import Constants from 'expo-constants';
+import { requestAIConsent } from './ai-consent';
 import { readStoredToken, writeStoredToken } from './token-storage';
 
 // Resolution order: EXPO_PUBLIC_API_URL env var, then the Expo dev server's
@@ -46,6 +47,8 @@ type ApiOptions = {
   body?: unknown;
   /** Retry once when the browser/device cannot establish a network request. */
   retryNetwork?: boolean;
+  /** Internal loop guard for the one-time consent-and-retry flow. */
+  consentRetried?: boolean;
 };
 
 const NETWORK_ERROR_MESSAGE = 'Couldn’t reach Forum. Check your connection and try again.';
@@ -86,6 +89,13 @@ export async function api<T = any>(path: string, options: ApiOptions = {}): Prom
 
   const data = await res.json().catch(() => null);
   if (!res.ok) {
+    if (
+      data?.code === 'AI_CONSENT_REQUIRED' &&
+      !options.consentRetried &&
+      (await requestAIConsent())
+    ) {
+      return api<T>(path, { ...options, consentRetried: true });
+    }
     throw new ApiError(
       res.status,
       data?.error ?? `Request failed (${res.status})`,
@@ -97,7 +107,7 @@ export async function api<T = any>(path: string, options: ApiOptions = {}): Prom
 }
 
 // Uploads a local image (picker URI) as raw bytes; returns its public URL.
-export async function uploadImage(uri: string): Promise<string> {
+export async function uploadImage(uri: string, consentRetried = false): Promise<string> {
   const fileRes = await fetch(uri);
   const buffer = await fileRes.arrayBuffer();
 
@@ -122,11 +132,28 @@ export async function uploadImage(uri: string): Promise<string> {
   });
 
   const data = await res.json().catch(() => null);
-  if (!res.ok) throw new ApiError(res.status, data?.error ?? 'Upload failed');
+  if (!res.ok) {
+    if (
+      data?.code === 'AI_CONSENT_REQUIRED' &&
+      !consentRetried &&
+      (await requestAIConsent())
+    ) {
+      return uploadImage(uri, true);
+    }
+    throw new ApiError(
+      res.status,
+      data?.error ?? 'Upload failed',
+      data?.code,
+      data?.retryable
+    );
+  }
   return data.url as string;
 }
 
-export async function uploadFeedbackScreenshot(uri: string): Promise<string> {
+export async function uploadFeedbackScreenshot(
+  uri: string,
+  consentRetried = false
+): Promise<string> {
   const fileRes = await fetch(uri);
   const buffer = await fileRes.arrayBuffer();
   const token = await getToken();
@@ -140,6 +167,13 @@ export async function uploadFeedbackScreenshot(uri: string): Promise<string> {
   });
   const data = await res.json().catch(() => null);
   if (!res.ok) {
+    if (
+      data?.code === 'AI_CONSENT_REQUIRED' &&
+      !consentRetried &&
+      (await requestAIConsent())
+    ) {
+      return uploadFeedbackScreenshot(uri, true);
+    }
     throw new ApiError(
       res.status,
       data?.error ?? 'Screenshot upload failed',

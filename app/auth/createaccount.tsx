@@ -2,10 +2,12 @@ import ScalableImage from '@/components/scalable-image';
 import { type Palette } from '@/constants/theme';
 import { useAuth } from '@/context/authContext';
 import { usePalette } from '@/hooks/use-palette';
+import { API_URL } from '@/lib/api';
 import { tapMedium } from '@/lib/haptics';
+import * as WebBrowser from 'expo-web-browser';
 import { useRouter } from 'expo-router';
 import React, { useMemo, useState } from 'react';
-import { ActivityIndicator, KeyboardAvoidingView, Platform, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 
 export default function CreateAccount() {
   const { c } = usePalette();
@@ -14,6 +16,7 @@ export default function CreateAccount() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirm, setConfirm] = useState('');
+  const [aiConsent, setAIConsent] = useState<boolean | null>(null);
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState<string | null>(null);
 
@@ -25,11 +28,12 @@ export default function CreateAccount() {
     if (!email.trim()) return setErr('Email is required.');
     if (password.length < 6) return setErr('Password must be at least 6 characters.');
     if (password !== confirm) return setErr('Passwords do not match.');
+    if (aiConsent === null) return setErr('Choose how forum may use OpenAI before continuing.');
 
     try {
       tapMedium();
       setLoading(true);
-      await signUp(name.trim(), email.trim(), password);
+      await signUp(name.trim(), email.trim(), password, aiConsent);
       // root layout redirects to the feed once the session is set
     } catch (e: any) {
       setErr(e?.message ?? 'Something went wrong.');
@@ -42,11 +46,16 @@ export default function CreateAccount() {
 
   return (
     <KeyboardAvoidingView behavior="padding" style={{ flex: 1 }}>
-    <View style={styles.container}>
+    <ScrollView
+      style={styles.scroll}
+      contentContainerStyle={styles.container}
+      keyboardShouldPersistTaps="handled"
+      showsVerticalScrollIndicator={false}
+    >
       <ScalableImage 
         source={require('@/assets/images/forumlogo.png')}
         type='width' 
-        dimension={200} 
+        dimension={112}
         style={styles.image}
       />
       <Text style={styles.title}>Create account</Text>
@@ -92,6 +101,58 @@ export default function CreateAccount() {
         editable={!loading}
       />
 
+      <View style={styles.consentCard}>
+        <Text style={styles.consentEyebrow}>YOUR DATA, YOUR CHOICE</Text>
+        <Text style={styles.consentTitle}>OpenAI processing</Text>
+        <Text style={styles.consentBody}>
+          forum uses OpenAI to check usernames, profile text, posts, comments,
+          direct messages, and uploaded images for safety. forumAI sends your
+          questions and relevant context to OpenAI to generate answers.
+        </Text>
+        <Text style={styles.consentBody}>
+          Only content needed for these features is shared. You can withdraw
+          permission in Settings.
+        </Text>
+        <TouchableOpacity
+          disabled={loading}
+          onPress={() => WebBrowser.openBrowserAsync(`${API_URL}/legal/privacy`)}
+        >
+          <Text style={styles.privacyLink}>Read the Privacy Policy</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          disabled={loading}
+          onPress={() => setAIConsent(true)}
+          accessibilityRole="radio"
+          accessibilityState={{ checked: aiConsent === true }}
+          style={[styles.consentOption, aiConsent === true && styles.consentOptionSelected]}
+        >
+          <View style={[styles.radio, aiConsent === true && styles.radioSelected]}>
+            {aiConsent === true && <View style={styles.radioDot} />}
+          </View>
+          <View style={styles.consentOptionCopy}>
+            <Text style={styles.consentOptionTitle}>Allow OpenAI processing</Text>
+            <Text style={styles.consentOptionHint}>Enable safety checks and forumAI features.</Text>
+          </View>
+        </TouchableOpacity>
+        <TouchableOpacity
+          disabled={loading}
+          onPress={() => setAIConsent(false)}
+          accessibilityRole="radio"
+          accessibilityState={{ checked: aiConsent === false }}
+          style={[styles.consentOption, aiConsent === false && styles.consentOptionSelected]}
+        >
+          <View style={[styles.radio, aiConsent === false && styles.radioSelected]}>
+            {aiConsent === false && <View style={styles.radioDot} />}
+          </View>
+          <View style={styles.consentOptionCopy}>
+            <Text style={styles.consentOptionTitle}>Not now</Text>
+            <Text style={styles.consentOptionHint}>
+              Browsing, voting, saving, and following remain available.
+            </Text>
+          </View>
+        </TouchableOpacity>
+      </View>
+
       <TouchableOpacity
         onPress={handleSignUp}
         disabled={loading}
@@ -110,13 +171,14 @@ export default function CreateAccount() {
           <Text style={styles.link}>Sign in</Text>
         </TouchableOpacity>
       </View>
-    </View>
+    </ScrollView>
     </KeyboardAvoidingView>
   );
 }
 
 const makeStyles = (c: Palette) => StyleSheet.create({
-  container: { flex: 1, width: '100%', maxWidth: Platform.OS === 'web' ? 500 : undefined, alignSelf: 'center', padding: Platform.OS === 'web' ? 40 : 24, gap: 12, backgroundColor: c.background, justifyContent: 'center' },
+  scroll: { flex: 1, backgroundColor: c.background },
+  container: { flexGrow: 1, width: '100%', maxWidth: Platform.OS === 'web' ? 500 : undefined, alignSelf: 'center', padding: Platform.OS === 'web' ? 40 : 24, paddingVertical: 24, gap: 12, backgroundColor: c.background, justifyContent: 'flex-start' },
   title: { 
     fontSize: 28, 
     fontWeight: '800', 
@@ -151,6 +213,72 @@ const makeStyles = (c: Palette) => StyleSheet.create({
   buttonDisabled: { opacity: 0.6 },
   buttonText: { color: c.onPrimary, fontWeight: '600' },
   error: { color: c.danger, marginBottom: 4 },
+  consentCard: {
+    marginTop: 4,
+    padding: 14,
+    gap: 9,
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: c.cardBorder,
+    backgroundColor: c.card,
+  },
+  consentEyebrow: {
+    color: c.primary,
+    fontSize: 11,
+    fontWeight: '800',
+    letterSpacing: 0.6,
+  },
+  consentTitle: {
+    color: c.text,
+    fontSize: 18,
+    fontWeight: '800',
+  },
+  consentBody: {
+    color: c.subtle,
+    fontSize: 13,
+    lineHeight: 18,
+  },
+  privacyLink: {
+    color: c.primary,
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  consentOption: {
+    minHeight: 54,
+    padding: 10,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: c.border,
+    backgroundColor: c.surfaceRaised,
+  },
+  consentOptionSelected: {
+    borderColor: c.primary,
+    backgroundColor: c.accentSoftBg,
+  },
+  radio: {
+    width: 20,
+    height: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 10,
+    borderWidth: 2,
+    borderColor: c.muted,
+  },
+  radioSelected: {
+    borderColor: c.primary,
+  },
+  radioDot: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    backgroundColor: c.primary,
+  },
+  consentOptionCopy: { flex: 1, gap: 2 },
+  consentOptionTitle: { color: c.text, fontSize: 14, fontWeight: '700' },
+  consentOptionHint: { color: c.muted, fontSize: 12, lineHeight: 16 },
   footer: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 12 },
   footerText: { color: c.subtle },
   link: { color: c.primary, fontWeight: '600' },

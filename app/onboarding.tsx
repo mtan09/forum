@@ -9,7 +9,7 @@ import { notifySuccess, selectTick, tapLight, tapMedium } from '@/lib/haptics';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useRouter } from 'expo-router';
 import { useEffect, useMemo, useState } from 'react';
-import { Image, Pressable, ScrollView, StyleSheet } from 'react-native';
+import { ActivityIndicator, Image, Pressable, ScrollView, StyleSheet } from 'react-native';
 
 // First-run welcome: pick interests (stored for personalization) and follow
 // a few active accounts so the Following tab and feed aren't empty on day 1.
@@ -36,13 +36,15 @@ export default function Onboarding() {
   const { c } = usePalette();
   const styles = useMemo(() => makeStyles(c), [c]);
   const router = useRouter();
-  const { completeOnboarding } = useAuth();
+  const { completeOnboarding, refreshUser, user } = useAuth();
 
-  const [step, setStep] = useState<1 | 2>(1);
+  const [step, setStep] = useState<1 | 2 | 3>(1);
   const [interests, setInterests] = useState<string[]>(BASE_INTERESTS);
   const [picked, setPicked] = useState<Set<string>>(new Set());
   const [suggested, setSuggested] = useState<SuggestedUser[]>([]);
   const [followed, setFollowed] = useState<Set<string>>(new Set());
+  const [verificationBusy, setVerificationBusy] = useState(false);
+  const [verificationMessage, setVerificationMessage] = useState<string | null>(null);
 
   useEffect(() => {
     api<HotTopic[]>('/topics/hot')
@@ -95,10 +97,49 @@ export default function Onboarding() {
     router.replace('/');
   };
 
+  const resendVerification = async () => {
+    tapLight();
+    setVerificationBusy(true);
+    setVerificationMessage(null);
+    try {
+      const result = await api<{ already_verified?: boolean }>('/auth/resend-verification', {
+        body: {},
+      });
+      if (result.already_verified) {
+        await refreshUser();
+        setVerificationMessage('Your email is already verified.');
+      } else {
+        setVerificationMessage('A new link is on its way. Check your inbox and spam folder.');
+      }
+    } catch (error: any) {
+      setVerificationMessage(error?.message ?? 'Could not send another link. Please try again.');
+    } finally {
+      setVerificationBusy(false);
+    }
+  };
+
+  const confirmVerification = async () => {
+    tapMedium();
+    setVerificationBusy(true);
+    setVerificationMessage(null);
+    try {
+      const refreshed = await refreshUser();
+      if (refreshed.email_verified) {
+        await finish();
+      } else {
+        setVerificationMessage('Not verified yet. Open the link in your email, then try again.');
+      }
+    } catch (error: any) {
+      setVerificationMessage(error?.message ?? 'Could not check your email status. Please try again.');
+    } finally {
+      setVerificationBusy(false);
+    }
+  };
+
   return (
     <ThemedView style={styles.screen}>
       <ScrollView contentContainerStyle={styles.container}>
-        <ThemedText style={styles.step}>Step {step} of 2</ThemedText>
+        <ThemedText style={styles.step}>Step {step} of 3</ThemedText>
 
         {step === 1 ? (
           <>
@@ -123,7 +164,7 @@ export default function Onboarding() {
               })}
             </ThemedView>
           </>
-        ) : (
+        ) : step === 2 ? (
           <>
             <ThemedText type="title" style={styles.title}>Follow some voices</ThemedText>
             <ThemedText style={styles.subtitle}>
@@ -155,19 +196,68 @@ export default function Onboarding() {
               );
             })}
           </>
+        ) : (
+          <>
+            <ThemedView style={styles.mailIcon}>
+              <IconSymbol name="envelope.fill" size={30} color={c.primary} />
+            </ThemedView>
+            <ThemedText type="title" style={styles.title}>
+              {user?.email_verified ? 'Email verified' : 'Verify your email'}
+            </ThemedText>
+            <ThemedText style={styles.subtitle}>
+              {user?.email_verified
+                ? 'Your email is ready for account recovery and the email notifications you choose.'
+                : `We sent a verification link to ${user?.email ?? 'your email'}. Open it, then come back here so we can check.`}
+            </ThemedText>
+            {!user?.email_verified && (
+              <Pressable
+                disabled={verificationBusy}
+                onPress={resendVerification}
+                style={({ pressed }) => [styles.resendButton, pressed && styles.pressed]}
+              >
+                <ThemedText style={styles.resendText}>Send another link</ThemedText>
+              </Pressable>
+            )}
+            {!!verificationMessage && (
+              <ThemedText style={styles.verificationMessage}>{verificationMessage}</ThemedText>
+            )}
+            {!user?.email_verified && (
+              <ThemedText style={styles.verificationNote}>
+                You can continue without verifying. Browsing and posting still work, but email notifications
+                stay off until your address is verified.
+              </ThemedText>
+            )}
+          </>
         )}
       </ScrollView>
 
       <ThemedView style={styles.footer}>
         <Pressable
-          onPress={() => (step === 1 ? setStep(2) : finish())}
-          style={styles.nextBtn}
+          disabled={verificationBusy}
+          onPress={() => {
+            if (step === 1) setStep(2);
+            else if (step === 2) setStep(3);
+            else if (user?.email_verified) void finish();
+            else void confirmVerification();
+          }}
+          style={[styles.nextBtn, verificationBusy && styles.disabled]}
         >
-          <ThemedText style={styles.nextText}>
-            {step === 1 ? 'Next' : followed.size > 0 ? "Let's go" : 'Skip for now'}
-          </ThemedText>
-          <IconSymbol name="chevron.right" size={18} color={c.onPrimary} />
+          {verificationBusy ? (
+            <ActivityIndicator color={c.onPrimary} />
+          ) : (
+            <>
+              <ThemedText style={styles.nextText}>
+                {step < 3 ? 'Next' : user?.email_verified ? 'Continue to forum' : "I've verified my email"}
+              </ThemedText>
+              <IconSymbol name="chevron.right" size={18} color={c.onPrimary} />
+            </>
+          )}
         </Pressable>
+        {step === 3 && !user?.email_verified && (
+          <Pressable disabled={verificationBusy} onPress={finish} style={styles.skipButton}>
+            <ThemedText style={styles.skipText}>Continue for now</ThemedText>
+          </Pressable>
+        )}
       </ThemedView>
     </ThemedView>
   );
@@ -175,10 +265,19 @@ export default function Onboarding() {
 
 const makeStyles = (c: Palette) => StyleSheet.create({
   screen: { flex: 1 },
-  container: { padding: 24, paddingTop: 80, paddingBottom: 120, gap: 8 },
+  container: { padding: 24, paddingTop: 80, paddingBottom: 170, gap: 8 },
   step: { color: c.muted, fontWeight: '700', fontSize: 13, textTransform: 'uppercase', letterSpacing: 0.5 },
   title: { color: c.primary, marginBottom: 4 },
   subtitle: { color: c.subtle, lineHeight: 21, marginBottom: 16 },
+  mailIcon: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: c.accentFaint,
+    marginBottom: 8,
+  },
   chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
   chip: {
     borderRadius: 18,
@@ -211,6 +310,7 @@ const makeStyles = (c: Palette) => StyleSheet.create({
     padding: 24,
     paddingBottom: 40,
     backgroundColor: 'transparent',
+    gap: 6,
   },
   nextBtn: {
     flexDirection: 'row',
@@ -222,4 +322,19 @@ const makeStyles = (c: Palette) => StyleSheet.create({
     paddingVertical: 15,
   },
   nextText: { color: c.onPrimary, fontWeight: '800', fontSize: 16 },
+  resendButton: {
+    alignSelf: 'flex-start',
+    borderRadius: 12,
+    borderWidth: 1.5,
+    borderColor: c.primary,
+    paddingHorizontal: 14,
+    paddingVertical: 9,
+  },
+  resendText: { color: c.primary, fontWeight: '800' },
+  verificationMessage: { color: c.primary, lineHeight: 20, fontWeight: '600' },
+  verificationNote: { color: c.muted, fontSize: 13, lineHeight: 19, marginTop: 8 },
+  skipButton: { alignItems: 'center', paddingVertical: 8 },
+  skipText: { color: c.subtle, fontWeight: '700' },
+  pressed: { opacity: 0.6 },
+  disabled: { opacity: 0.6 },
 });

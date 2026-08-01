@@ -3,6 +3,7 @@ import { ThemedView } from '@/components/themed-view';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { type Palette } from '@/constants/theme';
 import { useAuth } from '@/context/authContext';
+import { useAIConsent } from '@/context/aiConsentContext';
 import { type FeedContentPreference, useFeedPreference } from '@/context/feedPreferenceContext';
 import { useThemeMode, type ThemePreference } from '@/context/themeContext';
 import { usePalette } from '@/hooks/use-palette';
@@ -12,6 +13,7 @@ import {
   disableFloorReminder,
   enableFloorReminder,
   pushPermissionGranted,
+  pushRegistrationReady,
   registerForPush,
 } from '@/lib/notifications';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -199,6 +201,7 @@ function FeedContentRow() {
 export default function Settings() {
   const router = useRouter();
   const { user, signOut, refreshUser } = useAuth();
+  const { current: aiConsentCurrent, requestConsent, revokeConsent } = useAIConsent();
 
   const [prefs, setPrefs] = useState<Prefs>(DEFAULT_PREFS);
   const [devicePushReady, setDevicePushReady] = useState(false);
@@ -207,8 +210,9 @@ export default function Settings() {
     AsyncStorage.getItem(PREFS_KEY)
       .then((raw) => { if (raw) setPrefs({ ...DEFAULT_PREFS, ...JSON.parse(raw) }); })
       .catch(() => {});
-    // Server is the source of truth for push delivery — sync it in
-    pushPermissionGranted().then(setDevicePushReady).catch(() => {});
+    // Permission and registration are separate. The local token is written
+    // only after the API confirms this device is registered.
+    pushRegistrationReady().then(setDevicePushReady).catch(() => {});
     api<{
       push_enabled: boolean;
       email_enabled: boolean;
@@ -236,6 +240,18 @@ export default function Settings() {
           emailFollows: server.email_follows,
           privateAccount: !!user?.is_private,
         }));
+        // Repair a stale/missing server registration only when iOS permission
+        // already exists. This never opens the system permission prompt.
+        if (server.push_enabled) {
+          pushPermissionGranted()
+            .then((granted) =>
+              granted
+                ? registerForPush({ requestPermission: false })
+                : false
+            )
+            .then(setDevicePushReady)
+            .catch(() => setDevicePushReady(false));
+        }
       })
       .catch(() => {});
   }, [user?.is_private]);
@@ -352,6 +368,31 @@ export default function Settings() {
     );
   };
 
+  const manageAIConsent = () => {
+    if (!aiConsentCurrent) {
+      void requestConsent();
+      return;
+    }
+    Alert.alert(
+      'Withdraw OpenAI permission?',
+      'forum will stop sending new content to OpenAI. You can still browse, vote, save, and follow, but posting, messaging, image uploads, profile text edits, and forumAI will ask for permission again.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Withdraw',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await revokeConsent();
+            } catch (e: any) {
+              Alert.alert('Could not update permission', e?.message ?? 'Please try again.');
+            }
+          },
+        },
+      ]
+    );
+  };
+
   const { styles } = useStyles();
 
   return (
@@ -427,6 +468,12 @@ export default function Settings() {
           <Row label="Follow requests" chevron onPress={() => router.push('/follow-requests')} />
         )}
         <Row label="Blocked accounts" chevron onPress={() => router.push('/blocked')} />
+        <Row
+          label="OpenAI processing"
+          value={aiConsentCurrent ? 'Allowed' : 'Not allowed'}
+          chevron
+          onPress={manageAIConsent}
+        />
       </Card>
 
       <SectionHeader title="Content" />

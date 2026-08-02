@@ -393,6 +393,29 @@ export default function Settings() {
     );
   };
 
+  const resetFeedPersonalization = () => {
+    Alert.alert(
+      'Reset feed personalization?',
+      'This clears your selected interests, viewing signals, and every “Not interested” choice. Your posts, votes, follows, and saved items are not deleted.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Reset',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await api('/feed/personalization', { method: 'DELETE' });
+              await AsyncStorage.removeItem('forum.interests').catch(() => {});
+              Alert.alert('Feed reset', 'Pull to refresh Home to start with a fresh, balanced feed.');
+            } catch (e: any) {
+              Alert.alert('Could not reset feed', e?.message ?? 'Please try again.');
+            }
+          },
+        },
+      ]
+    );
+  };
+
   const { styles } = useStyles();
 
   return (
@@ -479,6 +502,7 @@ export default function Settings() {
       <SectionHeader title="Content" />
       <Card>
         <FeedContentRow />
+        <Row label="Reset feed personalization" onPress={resetFeedPersonalization} />
       </Card>
 
       {user?.is_admin && (

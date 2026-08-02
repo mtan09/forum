@@ -1,4 +1,5 @@
 import AppTextInput from '@/components/app-text-input';
+import ContentActions from '@/components/contentActions';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import UserAvatar from '@/components/user-avatar';
@@ -7,7 +8,7 @@ import { useAuth } from '@/context/authContext';
 import { usePalette } from '@/hooks/use-palette';
 import { api } from '@/lib/api';
 import { tapMedium } from '@/lib/haptics';
-import { Stack, useLocalSearchParams } from 'expo-router';
+import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { FlatList, KeyboardAvoidingView, Platform, StyleSheet } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -29,6 +30,7 @@ export default function DmThread() {
   const { c } = usePalette();
   const styles = useMemo(() => makeStyles(c), [c]);
   const { userId } = useLocalSearchParams();
+  const router = useRouter();
   const otherId = Array.isArray(userId) ? userId[0] : userId;
   const { user: me } = useAuth();
   const insets = useSafeAreaInsets();
@@ -138,6 +140,18 @@ export default function DmThread() {
                 <ThemedView style={[styles.bubble, mine ? styles.mine : styles.theirs]}>
                   <ThemedText style={mine ? styles.mineText : styles.theirsText}>{item.content}</ThemedText>
                 </ThemedView>
+                {!mine && otherId ? (
+                  <ThemedView style={styles.messageAction}>
+                    <ContentActions
+                      targetKind="message"
+                      targetId={item.id}
+                      authorId={otherId}
+                      authorName={otherName}
+                      color={c.muted}
+                      onBlocked={() => router.back()}
+                    />
+                  </ThemedView>
+                ) : null}
               </ThemedView>
             );
           }}
@@ -188,9 +202,10 @@ const makeStyles = (c: Palette) => StyleSheet.create({
   },
   messageRowMine: { justifyContent: 'flex-end' },
   messageAvatar: { alignSelf: 'flex-end', marginBottom: 2 },
+  messageAction: { alignSelf: 'flex-end', marginBottom: 2, backgroundColor: 'transparent' },
   pending: { opacity: 0.6 },
   bubble: {
-    maxWidth: '80%',
+    maxWidth: Platform.OS === 'web' ? '72%' : '66%',
     borderRadius: 16,
     paddingHorizontal: 14,
     paddingVertical: 9,

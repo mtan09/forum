@@ -5,6 +5,7 @@ import { type Palette } from '@/constants/theme';
 import { usePalette } from '@/hooks/use-palette';
 import { useRelativeTime } from '@/hooks/useRelativeTime';
 import { api } from '@/lib/api';
+import type { RecommendationContext } from '@/lib/feed-events';
 import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
 import { memo, useEffect, useMemo, useState } from 'react';
@@ -46,9 +47,10 @@ export type UserType = {
 type Props = {
   post: PostType;
   variant?: 'feed' | 'detail';
+  recommendationContext?: RecommendationContext;
 }
 
-function Post({ post, variant = 'feed' }: Props) {
+function Post({ post, variant = 'feed', recommendationContext }: Props) {
 
   const router = useRouter();
   const { c } = usePalette();
@@ -103,13 +105,17 @@ function Post({ post, variant = 'feed' }: Props) {
                 </ThemedView>
               </ThemedView>
             </Pressable>
-            <ContentActions
-              targetKind="post"
-              targetId={post.id}
-              authorId={post.user}
-              authorName={user.username}
-              onBlocked={() => setHidden(true)}
-            />
+            <ThemedView style={styles.menuSlot}>
+              <ContentActions
+                targetKind="post"
+                targetId={post.id}
+                authorId={post.user}
+                authorName={user.username}
+                onBlocked={() => setHidden(true)}
+                onNotInterested={() => setHidden(true)}
+                recommendationContext={recommendationContext}
+              />
+            </ThemedView>
           </ThemedView>
 
             <ThemedView
@@ -239,6 +245,13 @@ const makeStyles = (c: Palette) => StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'flex-start',
     justifyContent: 'space-between',
+  },
+  menuSlot: {
+    width: 28,
+    minHeight: 32,
+    paddingTop: 1,
+    alignItems: 'flex-end',
+    backgroundColor: 'transparent',
   },
   header: {
     flexDirection: 'row',

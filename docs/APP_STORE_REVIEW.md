@@ -43,6 +43,12 @@ comments, DMs, profiles, images, and other user submissions as one moderation
 surface. The production reviewer account must be able to exercise reporting and
 blocking.
 
+Implemented release behavior: post, article, comment, profile, and received-DM
+actions use the same report queue. A DM report is accepted only from the
+message recipient; the admin can hide that message, ban its sender, or dismiss
+the report. Blocking removes interaction in both directions. The hosted support
+page provides the moderation contact path.
+
 ### 1.5 — Developer information
 
 The app and Support URL must contain accurate, working contact information.
@@ -123,9 +129,27 @@ forum's implemented OpenAI posture is:
 - Permission evidence stores user id, disclosure version, decision status, and
   timestamp. No rejected raw content is stored in the moderation audit.
 
+Feed personalization is first-party processing. forum records feed impressions,
+opens, approximate dwell time, outbound publisher opens, selected interests, and
+"Not interested" choices. Semantic recommendation vectors are generated locally
+from forum's existing content and are not an additional OpenAI purpose. Settings
+offers a feed-personalization reset, and the hosted privacy policy discloses the
+collection and ranking use. This behavior does not use advertising identifiers
+or track users across other companies' apps and websites.
+
 Keep the consent copy, hosted policy, App Privacy answers, age rating, and
 Review Notes aligned. If the provider, purposes, or data categories materially
 change, bump the version and require a new decision.
+
+The release build declares Photo Library access because users can select an
+existing image. It does not declare camera, microphone, or Face ID access; none
+of those capabilities is used. Sentry disables default PII and removes account
+identifiers, authorization/cookie headers, URL query strings, and network
+request/response bodies before events leave the app.
+
+The product Terms currently set a 17-year minimum. Signup requires a separate
+age-and-Terms acknowledgment. This is a product/legal alignment choice, not an
+Apple rule that every political discussion app must impose exactly that age.
 
 ### 5.2 — Intellectual property and third-party services
 
@@ -244,7 +268,8 @@ screenshots, not as a mandatory publisher-image proxy.
   Connect. The review account uses a controlled real inbox and remains
   available for the lifetime of the reviewed build; the separate owner account
   is never supplied to Apple.
-- UGC filtering, report, block, admin response, and contact paths work.
+- UGC filtering, report (including received DMs), block, admin response, and
+  contact paths work.
 - App Privacy and age-rating answers match the build.
 - Screenshots show the real app using controlled demo accounts/content.
 - Publisher cards attribute the source and open the complete publisher page.

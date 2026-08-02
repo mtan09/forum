@@ -19,7 +19,7 @@ A political discussion social media app built with Expo / React Native. The feed
   - Content tabs: Posts, Comments, Upvoted, and Saved (real bookmarks)
   - Settings live behind a gear button (not a tab)
 - **Follows + Following feed** — follow anyone from their profile; Home stays focused on `For You / Random / Against You`, while a dedicated Following feed lives on your profile alongside follower counts
-- **Direct messages** — a full DM inbox (envelope on your profile) with per-thread unread badges, optimistic sends, and block-aware delivery
+- **Direct messages** — a full DM inbox (envelope on your profile) with per-thread unread badges, optimistic sends, block-aware delivery, and report/block actions on received messages
 - **Shareable cards** — export a branded image of your lean or a debate stance to the native share sheet; post shares link to web share pages with rich previews and an open-in-app button
 - **Moderation and OpenAI permission** — forum's deterministic hard stops run first. Before any username, profile text, post, comment, DM, forumAI prompt, or uploaded image is sent to OpenAI for safety processing, the user receives a clear versioned allow/decline choice. Declining preserves browsing, voting, saving, and following; Settings allows later permission or withdrawal. Report/block tools remain available and admins get separate report and pre-publication review queues
 - **Onboarding** — new accounts pick interests and follow suggested active users before landing in the feed
@@ -87,7 +87,7 @@ lib/article-media.ts  direct-image cache behavior and narrow media URL validatio
 lib/notifications.ts  native push registration/routing + Floor reminders
 lib/notifications.web.ts  web-safe notification no-ops
 lib/perspective-colors.ts  shared Left / Center / Right presentation mapping
-lib/sentry.ts     env-gated crash reporting (no-op without a DSN)
+lib/sentry.ts     env-gated crash reporting with PII and network-payload redaction
 lib/token-storage.*  SecureStore on native; browser storage on web
 ```
 

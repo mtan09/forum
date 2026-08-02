@@ -5,6 +5,7 @@ import { type Palette } from '@/constants/theme';
 import { useAuth } from '@/context/authContext';
 import { usePalette } from '@/hooks/use-palette';
 import { api } from '@/lib/api';
+import type { RecommendationContext } from '@/lib/feed-events';
 import { useMemo, useState } from 'react';
 import { Alert, Modal, Platform, Pressable, StyleSheet } from 'react-native';
 
@@ -12,7 +13,7 @@ import { Alert, Modal, Platform, Pressable, StyleSheet } from 'react-native';
 // any target; Block appears only when an author is known and it isn't the
 // caller. Both are the launch-blocking moderation primitives every UGC app
 // needs — backed by POST /reports and POST/DELETE /users/:id/block.
-export type ReportKind = 'post' | 'article' | 'comment' | 'user';
+export type ReportKind = 'post' | 'article' | 'comment' | 'user' | 'message';
 
 type ReportReason = 'spam' | 'harassment' | 'misinformation' | 'hate' | 'other';
 
@@ -31,6 +32,8 @@ type Props = {
   authorName?: string;
   color?: string;
   onBlocked?: () => void;
+  onNotInterested?: () => void;
+  recommendationContext?: RecommendationContext;
 };
 
 export default function ContentActions({
@@ -40,6 +43,8 @@ export default function ContentActions({
   authorName,
   color,
   onBlocked,
+  onNotInterested,
+  recommendationContext,
 }: Props) {
   const { c } = usePalette();
   const styles = useMemo(() => makeStyles(c), [c]);
@@ -47,6 +52,24 @@ export default function ContentActions({
   const [menuOpen, setMenuOpen] = useState(false);
   const [reasonOpen, setReasonOpen] = useState(false);
   const canBlock = !!authorId && authorId !== user?.id;
+  const canHideRecommendation = targetKind === 'post' || targetKind === 'article';
+
+  const markNotInterested = async () => {
+    setMenuOpen(false);
+    try {
+      await api('/feed/not-interested', {
+        body: {
+          item_type: targetKind,
+          item_id: targetId,
+          session_id: recommendationContext?.sessionId,
+          feed_mode: recommendationContext?.feedMode,
+        },
+      });
+      onNotInterested?.();
+    } catch (err: any) {
+      Alert.alert('Could not update your feed', err?.message ?? 'Please try again.');
+    }
+  };
 
   const submitReport = async (reason: ReportReason) => {
     setReasonOpen(false);
@@ -62,7 +85,7 @@ export default function ContentActions({
     setMenuOpen(false);
     Alert.alert(
       `Block ${authorName ?? 'this user'}?`,
-      `You won't see posts or comments from ${authorName ?? 'them'} anywhere on the forum.`,
+      `You won't see or receive content from ${authorName ?? 'them'} anywhere on forum.`,
       [
         { text: 'Cancel', style: 'cancel' },
         {
@@ -99,6 +122,15 @@ export default function ContentActions({
           <Pressable style={styles.backdrop} onPress={() => setMenuOpen(false)}>
             <Pressable style={styles.sheet} onPress={(e) => e.stopPropagation()}>
               <ThemedView style={styles.handle} />
+              {canHideRecommendation && (
+                <Pressable
+                  style={({ pressed }) => [styles.action, pressed && styles.actionPressed]}
+                  onPress={markNotInterested}
+                >
+                  <IconSymbol name="eye.slash" size={20} color={c.text} />
+                  <ThemedText style={styles.actionText}>Not interested</ThemedText>
+                </Pressable>
+              )}
               <Pressable
                 style={({ pressed }) => [styles.action, pressed && styles.actionPressed]}
                 onPress={() => { setMenuOpen(false); setReasonOpen(true); }}

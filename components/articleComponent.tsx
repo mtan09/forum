@@ -6,6 +6,7 @@ import { type Palette } from '@/constants/theme';
 import { usePalette } from '@/hooks/use-palette';
 import { useRelativeTime } from '@/hooks/useRelativeTime';
 import { getArticleImageCachePolicy, getDisplayableArticleMedia } from '@/lib/article-media';
+import type { RecommendationContext } from '@/lib/feed-events';
 import { getPerspectiveToneForPosition } from '@/lib/perspective-colors';
 import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -13,6 +14,7 @@ import { useRouter } from 'expo-router';
 import { memo, useEffect, useMemo, useState } from 'react';
 import { Platform, Pressable, StyleSheet, useWindowDimensions } from 'react-native';
 import ArticleActions from './article-actions';
+import ContentActions from './contentActions';
 import ScorerReceipts from './scorerReceipts';
 
 export type ArticleType = {
@@ -65,9 +67,10 @@ function logoUrl(articleUrl: string): string | null {
 type Props = {
   article: ArticleType;
   variant?: 'feed' | 'detail';
+  recommendationContext?: RecommendationContext;
 }
 
-function Article({ article, variant = 'feed' }: Props) {
+function Article({ article, variant = 'feed', recommendationContext }: Props) {
 
   const { c } = usePalette();
   const styles = useMemo(() => makeStyles(c), [c]);
@@ -85,6 +88,7 @@ function Article({ article, variant = 'feed' }: Props) {
   const [logoFailed, setLogoFailed] = useState(false);
   const [mediaFailed, setMediaFailed] = useState(false);
   const [receiptsOpen, setReceiptsOpen] = useState(false);
+  const [hidden, setHidden] = useState(false);
   const logo = logoUrl(article.url);
   const detail = variant === 'detail';
   const preferredMedia = detail
@@ -101,6 +105,8 @@ function Article({ article, variant = 'feed' }: Props) {
   useEffect(() => {
     setLogoFailed(false);
   }, [logo]);
+
+  if (hidden) return null;
 
   return (
     <ThemedView style={[styles.post, detail && styles.postDetailWeb]}>
@@ -134,9 +140,15 @@ function Article({ article, variant = 'feed' }: Props) {
                 </ThemedView>
               )}
             </Pressable>
-            <ThemedView style={{flex: 1}}>
+            <ThemedView style={styles.sourceMeta}>
               <ThemedView style={styles.sourceRow}>
-                <ThemedText type="defaultSemiBold" style={{fontWeight: 800, fontSize: 18}}>{article.source}</ThemedText>
+                <ThemedText
+                  type="defaultSemiBold"
+                  style={styles.sourceName}
+                  numberOfLines={1}
+                >
+                  {article.source}
+                </ThemedText>
                 {leanTag && (
                   <Pressable
                     onPress={() => receiptPosition != null && setReceiptsOpen(true)}
@@ -149,6 +161,14 @@ function Article({ article, variant = 'feed' }: Props) {
                 )}
               </ThemedView>
               <ThemedText style={{color: c.muted, fontSize: 14}}>{timeAgo}</ThemedText>
+            </ThemedView>
+            <ThemedView style={styles.menuSlot}>
+              <ContentActions
+                targetKind="article"
+                targetId={article.id}
+                onNotInterested={() => setHidden(true)}
+                recommendationContext={recommendationContext}
+              />
             </ThemedView>
           </ThemedView>
           
@@ -289,13 +309,31 @@ const makeStyles = (c: Palette) => StyleSheet.create({
   },
   header: {
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     gap: 12,
+  },
+  sourceMeta: {
+    flex: 1,
+    minWidth: 0,
+    justifyContent: 'center',
+    minHeight: 50,
   },
   sourceRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
+  },
+  sourceName: {
+    flexShrink: 1,
+    fontWeight: '800',
+    fontSize: 18,
+  },
+  menuSlot: {
+    width: 28,
+    minHeight: 32,
+    paddingTop: 1,
+    alignItems: 'flex-end',
+    backgroundColor: 'transparent',
   },
   leanTag: {
     borderRadius: 9,

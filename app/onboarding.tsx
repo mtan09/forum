@@ -22,15 +22,26 @@ type SuggestedUser = {
   post_count: number;
 };
 
-type HotTopic = { id: string; title: string; keywords: string[] };
+type Interest = { key: string; label: string; description: string };
 
 const INTERESTS_KEY = 'forum.interests';
 
-// Stable starting set; live hot-topic keywords get merged in on load
-const BASE_INTERESTS = [
-  'economy', 'immigration', 'healthcare', 'climate', 'foreign_policy',
-  'elections', 'supreme_court', 'tech_policy', 'education', 'guns',
-  'abortion', 'labor',
+// Stable fallback catalog. Live events belong in the feed, not in the
+// permanent preference questions shown to a brand-new user.
+const BASE_INTERESTS: Interest[] = [
+  { key: 'economy', label: 'Economy & jobs', description: 'Inflation, taxes, trade, jobs, and growth' },
+  { key: 'immigration', label: 'Immigration', description: 'Borders, asylum, visas, and migration policy' },
+  { key: 'healthcare', label: 'Health care', description: 'Coverage, public health, medicine, and costs' },
+  { key: 'climate', label: 'Climate & energy', description: 'Climate, conservation, energy, and the environment' },
+  { key: 'foreign_policy', label: 'Foreign policy', description: 'Diplomacy, security, conflict, and world affairs' },
+  { key: 'elections', label: 'Elections & democracy', description: 'Campaigns, voting, Congress, and government' },
+  { key: 'courts_rights', label: 'Courts & civil rights', description: 'Courts, policing, speech, equality, and liberty' },
+  { key: 'tech_policy', label: 'Technology', description: 'AI, privacy, platforms, cybersecurity, and innovation' },
+  { key: 'education', label: 'Education', description: 'Schools, universities, curriculum, and student policy' },
+  { key: 'guns', label: 'Gun policy', description: 'Gun rights, regulation, and public safety' },
+  { key: 'abortion', label: 'Abortion policy', description: 'Reproductive rights, restrictions, and access' },
+  { key: 'labor', label: 'Labor & unions', description: 'Workers, wages, unions, and workplace policy' },
+  { key: 'housing', label: 'Housing', description: 'Rent, mortgages, affordability, and development' },
 ];
 
 export default function Onboarding() {
@@ -40,7 +51,7 @@ export default function Onboarding() {
   const { completeOnboarding, refreshUser, user } = useAuth();
 
   const [step, setStep] = useState<1 | 2 | 3>(1);
-  const [interests, setInterests] = useState<string[]>(BASE_INTERESTS);
+  const [interests, setInterests] = useState<Interest[]>(BASE_INTERESTS);
   const [picked, setPicked] = useState<Set<string>>(new Set());
   const [suggested, setSuggested] = useState<SuggestedUser[]>([]);
   const [followed, setFollowed] = useState<Set<string>>(new Set());
@@ -48,11 +59,8 @@ export default function Onboarding() {
   const [verificationMessage, setVerificationMessage] = useState<string | null>(null);
 
   useEffect(() => {
-    api<HotTopic[]>('/topics/hot')
-      .then((topics) => {
-        const live = topics.flatMap((t) => t.keywords ?? []).slice(0, 8);
-        setInterests((prev) => [...new Set([...live, ...prev])].slice(0, 18));
-      })
+    api<Interest[]>('/feed/interests/catalog')
+      .then((catalog) => { if (catalog.length > 0) setInterests(catalog); })
       .catch(() => {});
     api<SuggestedUser[]>('/users/me/suggested')
       .then(setSuggested)
@@ -92,7 +100,12 @@ export default function Onboarding() {
 
   const finish = async () => {
     tapMedium();
-    await AsyncStorage.setItem(INTERESTS_KEY, JSON.stringify([...picked])).catch(() => {});
+    const selected = [...picked];
+    await Promise.all([
+      api('/feed/interests', { method: 'PUT', body: { interests: selected } })
+        .catch((error: any) => console.log('Could not sync onboarding interests:', error?.message)),
+      AsyncStorage.setItem(INTERESTS_KEY, JSON.stringify(selected)).catch(() => {}),
+    ]);
     notifySuccess();
     completeOnboarding();
     router.replace('/');
@@ -149,16 +162,16 @@ export default function Onboarding() {
               Pick a few topics — they help shape what you see first.
             </ThemedText>
             <ThemedView style={styles.chips}>
-              {interests.map((tag) => {
-                const on = picked.has(tag);
+              {interests.map((interest) => {
+                const on = picked.has(interest.key);
                 return (
                   <Pressable
-                    key={tag}
-                    onPress={() => togglePick(tag)}
+                    key={interest.key}
+                    onPress={() => togglePick(interest.key)}
                     style={[styles.chip, on && styles.chipOn]}
                   >
                     <ThemedText style={[styles.chipText, on && styles.chipTextOn]}>
-                      #{tag.replace(/_/g, '')}
+                      {interest.label}
                     </ThemedText>
                   </Pressable>
                 );

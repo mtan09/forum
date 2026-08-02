@@ -25,7 +25,14 @@ const getClock = () => clock;
 
 function formatRelativeTime(timestamp: string, now: number): string {
   const date = new Date(timestamp);
-  const seconds = Math.floor((now - date.getTime()) / 1000);
+  const time = date.getTime();
+  if (!Number.isFinite(time)) return 'date unavailable';
+
+  const seconds = Math.floor((now - time) / 1000);
+
+  // Allow ordinary device/server clock skew, but never label malformed
+  // far-future content as "just now" indefinitely.
+  if (seconds < -300) return 'date unavailable';
 
   if (seconds >= 86_400) {
     return date.toLocaleDateString('en-US', {

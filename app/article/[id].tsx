@@ -8,6 +8,7 @@ import WebPageFrame from '@/components/web-page-frame';
 import { type Palette } from '@/constants/theme';
 import { usePalette } from '@/hooks/use-palette';
 import { api } from '@/lib/api';
+import { queueFeedEvent, type FeedMode } from '@/lib/feed-events';
 import { tapMedium } from '@/lib/haptics';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import * as WebBrowser from 'expo-web-browser';
@@ -18,7 +19,7 @@ export default function ArticleScreen() {
   const router = useRouter();
   const { c } = usePalette();
   const styles = useMemo(() => makeStyles(c), [c]);
-  const { id } = useLocalSearchParams();
+  const { id, feed_session, feed_algorithm, feed_mode, feed_position } = useLocalSearchParams();
   const articleId = useMemo(() => (Array.isArray(id) ? id[0] : id) as string | undefined, [id]);
 
   const [article, setArticle] = useState<ArticleType | null>(null);
@@ -130,6 +131,23 @@ export default function ArticleScreen() {
 
           <Pressable
             onPress={async () => {
+              const sessionId = Array.isArray(feed_session) ? feed_session[0] : feed_session;
+              const algorithmVersion = Array.isArray(feed_algorithm) ? feed_algorithm[0] : feed_algorithm;
+              const mode = Array.isArray(feed_mode) ? feed_mode[0] : feed_mode;
+              if (
+                sessionId && algorithmVersion &&
+                (mode === 'for_you' || mode === 'random' || mode === 'against')
+              ) {
+                queueFeedEvent({
+                  sessionId,
+                  algorithmVersion,
+                  feedMode: mode as FeedMode,
+                  position: Number(Array.isArray(feed_position) ? feed_position[0] : feed_position) || 0,
+                  itemType: 'article',
+                  itemId: article.id,
+                  eventType: 'outbound_open',
+                });
+              }
               try { await WebBrowser.openBrowserAsync(article.url); } catch {}
             }}
             style={({ pressed }) => [styles.readButton, { opacity: pressed ? 0.7 : 1 }]}

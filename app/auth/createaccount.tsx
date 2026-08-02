@@ -18,6 +18,7 @@ export default function CreateAccount() {
   const [password, setPassword] = useState('');
   const [confirm, setConfirm] = useState('');
   const [aiConsent, setAIConsent] = useState<boolean | null>(null);
+  const [acceptedTerms, setAcceptedTerms] = useState(false);
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState<string | null>(null);
 
@@ -30,6 +31,7 @@ export default function CreateAccount() {
     if (password.length < 6) return setErr('Password must be at least 6 characters.');
     if (password !== confirm) return setErr('Passwords do not match.');
     if (aiConsent === null) return setErr('Choose how forum may use OpenAI before continuing.');
+    if (!acceptedTerms) return setErr('Confirm your age and agree to the Terms and Privacy Policy.');
 
     try {
       tapMedium();
@@ -146,6 +148,36 @@ export default function CreateAccount() {
         </TouchableOpacity>
       </View>
 
+      <View style={styles.termsRow}>
+        <TouchableOpacity
+          disabled={loading}
+          onPress={() => setAcceptedTerms((current) => !current)}
+          accessibilityRole="checkbox"
+          accessibilityState={{ checked: acceptedTerms }}
+          accessibilityLabel="I am at least 17 and agree to the Terms and Privacy Policy"
+          style={[styles.checkbox, acceptedTerms && styles.checkboxSelected]}
+        >
+          {acceptedTerms ? <Text style={styles.checkmark}>✓</Text> : null}
+        </TouchableOpacity>
+        <Text style={styles.termsText}>
+          I am at least 17 and agree to the{' '}
+          <Text
+            style={styles.termsLink}
+            onPress={() => WebBrowser.openBrowserAsync(`${API_URL}/legal/terms`)}
+          >
+            Terms
+          </Text>{' '}
+          and{' '}
+          <Text
+            style={styles.termsLink}
+            onPress={() => WebBrowser.openBrowserAsync(`${API_URL}/legal/privacy`)}
+          >
+            Privacy Policy
+          </Text>
+          .
+        </Text>
+      </View>
+
       <TouchableOpacity
         onPress={handleSignUp}
         disabled={loading}
@@ -226,6 +258,43 @@ const makeStyles = (c: Palette) => StyleSheet.create({
     color: c.primary,
     fontSize: 13,
     fontWeight: '700',
+  },
+  termsRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 10,
+    paddingHorizontal: 2,
+    paddingVertical: 4,
+  },
+  checkbox: {
+    width: 22,
+    height: 22,
+    marginTop: 1,
+    borderRadius: 7,
+    borderWidth: 2,
+    borderColor: c.muted,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  checkboxSelected: {
+    borderColor: c.primary,
+    backgroundColor: c.primary,
+  },
+  checkmark: {
+    color: c.onPrimary,
+    fontSize: 14,
+    lineHeight: 16,
+    fontWeight: '900',
+  },
+  termsText: {
+    flex: 1,
+    color: c.subtle,
+    fontSize: 13,
+    lineHeight: 19,
+  },
+  termsLink: {
+    color: c.primary,
+    fontWeight: '800',
   },
   consentOption: {
     minHeight: 54,

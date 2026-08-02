@@ -6,12 +6,18 @@ import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { type Palette } from '@/constants/theme';
-import { useAuth } from '@/context/authContext';
 import { useFeedPreference } from '@/context/feedPreferenceContext';
-import { usePosts } from '@/context/postContext';
+import { mapPost, reusePostSnapshot, usePosts } from '@/context/postContext';
 import { usePalette } from '@/hooks/use-palette';
 import { api } from '@/lib/api';
 import { getDisplayableArticleMedia } from '@/lib/article-media';
+import {
+  createFeedSessionId,
+  flushFeedEvents,
+  queueFeedEvent,
+  type FeedMode,
+  type RecommendationContext,
+} from '@/lib/feed-events';
 import { selectTick, tapLight } from '@/lib/haptics';
 import { onTabRefresh } from '@/lib/tabRefresh';
 import { Image as ExpoImage } from 'expo-image';
@@ -30,50 +36,6 @@ import {
   useWindowDimensions,
 } from 'react-native';
 
-// An article's side comes from its scored lean, falling back to its
-// outlet's lean (always present for ingested articles)
-const articleLean = (a: ArticleType): number | null =>
-  a.political_lean ?? a.source_lean ?? null;
-
-const sameSignals = (left?: string[], right?: string[]): boolean => {
-  if (left === right) return true;
-  if (!left || !right || left.length !== right.length) return false;
-  return left.every((value, index) => value === right[index]);
-};
-
-const reuseArticleSnapshot = (current: ArticleType | undefined, next: ArticleType): ArticleType => {
-  if (!current) return next;
-  const unchanged =
-    current.id === next.id &&
-    current.url === next.url &&
-    current.title === next.title &&
-    current.source === next.source &&
-    current.description === next.description &&
-    current.media === next.media &&
-    current.media_thumbnail_url === next.media_thumbnail_url &&
-    current.media_large_url === next.media_large_url &&
-    current.media_width === next.media_width &&
-    current.media_height === next.media_height &&
-    current.media_status === next.media_status &&
-    current.image_mode === next.image_mode &&
-    current.text_mode === next.text_mode &&
-    current.ai_mode === next.ai_mode &&
-    current.political_lean === next.political_lean &&
-    current.content_type === next.content_type &&
-    current.lean_confidence === next.lean_confidence &&
-    current.scorer_version === next.scorer_version &&
-    current.source_lean === next.source_lean &&
-    current.general_topic_id === next.general_topic_id &&
-    current.published_at === next.published_at &&
-    current.upvotes === next.upvotes &&
-    current.downvotes === next.downvotes &&
-    current.commentcount === next.commentcount &&
-    current.my_vote === next.my_vote &&
-    current.my_bookmark === next.my_bookmark &&
-    sameSignals(current.lean_signals, next.lean_signals);
-  return unchanged ? current : next;
-};
-
 // Auto-clustered hot topics from /topics/hot
 type HotTopic = {
   id: string;
@@ -85,8 +47,8 @@ type HotTopic = {
 };
 
 type FeedItem =
-  | { kind: 'post'; id: string; data: PostType }
-  | { kind: 'article'; id: string; data: ArticleType };
+  | { kind: 'post'; id: string; data: PostType; recommendationContext: RecommendationContext; reason: string }
+  | { kind: 'article'; id: string; data: ArticleType; recommendationContext: RecommendationContext; reason: string };
 
 const feedItemKey = (item: FeedItem) => item.id;
 const FEED_VIEWABILITY_CONFIG = { itemVisiblePercentThreshold: 50 };
@@ -96,27 +58,68 @@ const FeedRow = memo(function FeedRow({ item }: { item: FeedItem }) {
   if (item.kind === 'post') {
     return (
       <Pressable
-        onPress={() => router.push(`/post/${item.data.id}`)}
+        onPress={() => {
+          queueFeedEvent({
+            ...item.recommendationContext,
+            itemType: 'post',
+            itemId: item.data.id,
+            eventType: 'open',
+          });
+          router.push(`/post/${item.data.id}`);
+        }}
         style={({ pressed }) => ({ opacity: pressed ? 0.6 : 1.0 })}
       >
-        <Post post={item.data} />
+        <Post post={item.data} recommendationContext={item.recommendationContext} />
       </Pressable>
     );
   }
   return (
     <Pressable
-      onPress={() => router.push(`/article/${item.data.id}`)}
+      onPress={() => {
+        queueFeedEvent({
+          ...item.recommendationContext,
+          itemType: 'article',
+          itemId: item.data.id,
+          eventType: 'open',
+        });
+        const params = new URLSearchParams({
+          feed_session: item.recommendationContext.sessionId,
+          feed_algorithm: item.recommendationContext.algorithmVersion,
+          feed_mode: item.recommendationContext.feedMode,
+          feed_position: String(item.recommendationContext.position ?? 0),
+        });
+        router.push(`/article/${item.data.id}?${params.toString()}`);
+      }}
       style={({ pressed }) => ({ opacity: pressed ? 0.6 : 1.0 })}
     >
-      <Article article={item.data} />
+      <Article article={item.data} recommendationContext={item.recommendationContext} />
     </Pressable>
   );
-}, (previous, next) => previous.item.id === next.item.id && previous.item.data === next.item.data);
+}, (previous, next) =>
+  previous.item.id === next.item.id &&
+  previous.item.data === next.item.data &&
+  previous.item.recommendationContext.sessionId === next.item.recommendationContext.sessionId
+);
 
 const renderFeedItem = ({ item }: ListRenderItemInfo<FeedItem>) => <FeedRow item={item} />;
 
-// Articles per page for infinite scroll
-const FEED_ARTICLE_LIMIT = 15;
+const FEED_PAGE_SIZE = 20;
+type FeedTab = 'For You' | 'Random' | 'Against You';
+type FeedApiResponse = {
+  algorithm_version: string;
+  session_id: string;
+  items: { kind: 'post' | 'article'; data: any; recommendation_reason: string }[];
+  next_cursor: string | null;
+};
+type TabFeedState = {
+  items: FeedItem[];
+  cursor: string | null;
+  loaded: boolean;
+  loadingMore: boolean;
+};
+const emptyTabState = (): TabFeedState => ({ items: [], cursor: null, loaded: false, loadingMore: false });
+const tabMode = (tab: FeedTab): FeedMode =>
+  tab === 'For You' ? 'for_you' : tab === 'Against You' ? 'against' : 'random';
 
 export default function Feed() {
 
@@ -131,20 +134,11 @@ export default function Feed() {
   const [feedWidth, setFeedWidth] = useState(0);
 
   const { preference: feedContentPreference } = useFeedPreference();
-  const showsPosts = feedContentPreference !== 'articles';
-  const showsArticles = feedContentPreference !== 'posts';
-  const {
-    feedPosts: posts,
-    refresh,
-    loadMorePosts,
-    hasMorePosts,
-    postsEpoch,
-    isLoading: postsLoading,
-  } = usePosts();
+  const { posts, setPosts } = usePosts();
 
   const scrollY = useRef(new Animated.Value(0)).current;
 
-  const [activeTab, setActiveTab] = useState<'For You' | 'Random' | 'Against You'>('Random');
+  const [activeTab, setActiveTab] = useState<FeedTab>('Random');
 
   // Each feed tab remembers its own scroll position; the listener keeps
   // the active tab's offset current on every scroll event.
@@ -174,90 +168,108 @@ export default function Feed() {
     fetchHotTopics();
   }, [fetchHotTopics]);
 
-  // The user's single computed position (from their posts and votes) —
-  // used only to sort content into For You / Against You
-  const { user: me } = useAuth();
-  const [userPosition, setUserPosition] = useState(0.5);
-  useEffect(() => {
-    api<{ position: number }>('/users/me/spectrum')
-      .then((data) => setUserPosition(data.position ?? 0.5))
-      .catch((err: any) => console.log('Error fetching user spectrum:', err?.message));
-  }, []);
+  const [tabFeeds, setTabFeeds] = useState<Record<FeedTab, TabFeedState>>({
+    'For You': emptyTabState(),
+    Random: emptyTabState(),
+    'Against You': emptyTabState(),
+  });
+  const tabFeedsRef = useRef(tabFeeds);
+  useEffect(() => { tabFeedsRef.current = tabFeeds; }, [tabFeeds]);
+  const sessions = useRef<Record<FeedTab, string>>({
+    'For You': createFeedSessionId(),
+    Random: createFeedSessionId(),
+    'Against You': createFeedSessionId(),
+  });
+  const loadingTabs = useRef(new Map<FeedTab, number>());
+  const feedGeneration = useRef(0);
 
-  // One feed; the tabs slice BOTH posts and articles by spectrum side.
-  // A narrow center band is its own side so neutral content isn't
-  // arbitrarily called left or right: For You = your side plus neutral,
-  // Against You = strictly the other side, Random = everything.
-  const tabAllows = useCallback((value: number | null | undefined): boolean => {
-    if (activeTab === 'Random') return true;
-    if (value == null) return false; // unscored content has no side
-    const side = Math.abs(value - 0.5) <= 0.05 ? 'center' : value < 0.5 ? 'left' : 'right';
-    const userSide = userPosition < 0.5 ? 'left' : 'right';
-    if (activeTab === 'For You') return side === 'center' || side === userSide;
-    return side !== 'center' && side !== userSide;
-  }, [activeTab, userPosition]);
-
-  const filteredPosts = useMemo(() => {
-    if (!showsPosts) return [];
-    // Your own posts never appear in the feed — they live on your profile
-    const others = posts.filter((p) => p.user !== me?.id);
-    if (activeTab === 'Random') return others;
-    return others.filter((p) => tabAllows(p.position));
-  }, [posts, activeTab, me?.id, showsPosts, tabAllows]);
-
-  // Articles accumulate page by page for infinite scroll
-  const [ articles, setArticles ] = useState<ArticleType[]>([]);
-  const articlesRef = useRef<ArticleType[]>([]);
-  useEffect(() => { articlesRef.current = articles; }, [articles]);
-  const [hasMoreArticles, setHasMoreArticles] = useState(true);
-  const [articlesLoaded, setArticlesLoaded] = useState(false);
-  const [loadingMore, setLoadingMore] = useState(false);
-
-  // ONE master order for all three tabs: shuffled only when the data is
-  // refreshed (mount / pull-to-refresh), never on tab switches or votes.
-  // Each tab renders the master order filtered to its members, so the
-  // sequence is stable and consistent — like any other social feed.
-  const [masterOrder, setMasterOrder] = useState<{ kind: 'post' | 'article'; id: string }[]>([]);
-  const [orderEpoch, setOrderEpoch] = useState(0);
-
-  const shuffle = <T,>(arr: T[]): T[] => {
-    const out = [...arr];
-    for (let i = out.length - 1; i > 0; i--) {
-      const j = Math.floor(Math.random() * (i + 1));
-      [out[i], out[j]] = [out[j], out[i]];
-    }
-    return out;
-  };
-
-  const fetchArticles = useCallback(async (reset: boolean, bumpEpoch = true): Promise<ArticleType[]> => {
+  const loadFeed = useCallback(async (tab: FeedTab, reset: boolean) => {
+    const generation = feedGeneration.current;
+    if (loadingTabs.current.get(tab) === generation) return;
+    const current = tabFeedsRef.current[tab];
+    if (!reset && !current.cursor) return;
+    loadingTabs.current.set(tab, generation);
+    if (reset) sessions.current[tab] = createFeedSessionId();
+    setTabFeeds((state) => ({
+      ...state,
+      [tab]: { ...state[tab], loadingMore: !reset },
+    }));
     try {
-      const offset = reset ? 0 : articlesRef.current.length;
-      const rows = await api<ArticleType[]>(`/articles?limit=${FEED_ARTICLE_LIMIT}&offset=${offset}`);
-      setHasMoreArticles(rows.length === FEED_ARTICLE_LIMIT);
-      if (reset) {
-        setArticles((current) => {
-          const currentById = new Map(current.map((article) => [article.id, article]));
-          return rows.map((article) => reuseArticleSnapshot(currentById.get(article.id), article));
-        });
-        if (bumpEpoch) setOrderEpoch((e) => e + 1); // fresh page 1 = rebuild the feed order
-      } else {
-        setArticles((prev) => {
-          const seen = new Set(prev.map((a) => a.id));
-          return [...prev, ...rows.filter((r) => !seen.has(r.id))];
+      const cursor = reset ? null : current.cursor;
+      const params = new URLSearchParams({
+        mode: tabMode(tab),
+        content: feedContentPreference,
+        limit: String(FEED_PAGE_SIZE),
+        session_id: sessions.current[tab],
+      });
+      if (cursor) params.set('cursor', cursor);
+      const response = await api<FeedApiResponse>(`/feed?${params.toString()}`);
+      if (generation !== feedGeneration.current) return;
+      sessions.current[tab] = response.session_id;
+      const start = reset ? 0 : current.items.length;
+      const mappedPosts: PostType[] = [];
+      const nextItems = response.items.map((entry, index): FeedItem => {
+        const recommendationContext: RecommendationContext = {
+          sessionId: response.session_id,
+          algorithmVersion: response.algorithm_version,
+          feedMode: tabMode(tab),
+          position: start + index,
+        };
+        if (entry.kind === 'post') {
+          const data = mapPost(entry.data);
+          mappedPosts.push(data);
+          return {
+            kind: 'post',
+            id: `p-${data.id}`,
+            data,
+            recommendationContext,
+            reason: entry.recommendation_reason,
+          };
+        }
+        const data = entry.data as ArticleType;
+        return {
+          kind: 'article',
+          id: `a-${data.id}`,
+          data,
+          recommendationContext,
+          reason: entry.recommendation_reason,
+        };
+      });
+      if (mappedPosts.length > 0) {
+        setPosts((existing) => {
+          const byId = new Map(existing.map((post) => [post.id, post]));
+          mappedPosts.forEach((post) => byId.set(post.id, reusePostSnapshot(byId.get(post.id), post)));
+          return Array.from(byId.values());
         });
       }
-      return rows;
+      setTabFeeds((state) => {
+        const previous = reset ? [] : state[tab].items;
+        const seen = new Set(previous.map((item) => item.id));
+        return {
+          ...state,
+          [tab]: {
+            items: [...previous, ...nextItems.filter((item) => !seen.has(item.id))],
+            cursor: response.next_cursor,
+            loaded: true,
+            loadingMore: false,
+          },
+        };
+      });
     } catch (err: any) {
-      console.log('Error fetching articles:', err?.message);
-      return reset ? articlesRef.current : [];
+      if (generation !== feedGeneration.current) return;
+      console.log('Error loading personalized feed:', err?.message);
+      setTabFeeds((state) => ({
+        ...state,
+        [tab]: { ...state[tab], loaded: true, loadingMore: false },
+      }));
     } finally {
-      setArticlesLoaded(true);
+      if (loadingTabs.current.get(tab) === generation) loadingTabs.current.delete(tab);
     }
-  }, []);
+  }, [feedContentPreference, setPosts]);
 
   useEffect(() => {
-    fetchArticles(true);
-  }, [fetchArticles])
+    if (!tabFeeds[activeTab].loaded) void loadFeed(activeTab, true);
+  }, [activeTab, loadFeed, tabFeeds]);
 
   // Pull-to-refresh reloads everything the feed shows (guarded so a long
   // pull can't queue up repeat refreshes)
@@ -269,22 +281,15 @@ export default function Feed() {
     refreshInflight.current = true;
     setRefreshing(true);
     try {
-      const [freshPosts, freshArticles] = await Promise.all([
-        // Suppress the two independent order epochs: after both datasets
-        // arrive, rebuild the shuffled feed once from the same snapshot.
-        refresh({ bumpEpoch: false }),
-        fetchArticles(true, false),
+      await Promise.all([
+        loadFeed(activeTab, true),
         fetchHotTopics(),
       ]);
-      setMasterOrder(shuffle([
-        ...freshPosts.map((post) => ({ kind: 'post' as const, id: post.id })),
-        ...freshArticles.map((article) => ({ kind: 'article' as const, id: article.id })),
-      ]));
     } finally {
       setRefreshing(false);
       refreshInflight.current = false;
     }
-  }, [refresh, fetchArticles, fetchHotTopics]);
+  }, [activeTab, fetchHotTopics, loadFeed]);
 
   const onPullRefresh = useCallback(async () => {
     // A fast request can finish while the list is still held past the
@@ -295,118 +300,57 @@ export default function Feed() {
     await refreshFeed();
   }, [refreshFeed]);
 
-  // Infinite scroll: page in more articles AND posts when the bottom nears
-  const onEndReached = useCallback(async () => {
-    const canLoadArticles = showsArticles && hasMoreArticles;
-    const canLoadPosts = showsPosts && hasMorePosts;
-    if (loadingMore || refreshing || (!canLoadArticles && !canLoadPosts)) return;
-    setLoadingMore(true);
-    try {
-      const [addedArticles, addedPosts] = await Promise.all([
-        canLoadArticles ? fetchArticles(false) : Promise.resolve([] as ArticleType[]),
-        canLoadPosts ? loadMorePosts() : Promise.resolve([]),
-      ]);
-      // Appended pages join the END of the master order (shuffled among
-      // themselves); every tab sees them below what it already showed.
-      setMasterOrder((prev) => {
-        const seen = new Set(prev.map((o) => o.id));
-        const fresh = [
-          ...addedArticles.filter((a) => !seen.has(a.id)).map((a) => ({ kind: 'article' as const, id: a.id })),
-          ...addedPosts.filter((p) => !seen.has(p.id)).map((p) => ({ kind: 'post' as const, id: p.id })),
-        ];
-        return [...prev, ...shuffle(fresh)];
-      });
-    } finally {
-      setLoadingMore(false);
-    }
-  }, [
-    loadingMore,
-    refreshing,
-    showsArticles,
-    showsPosts,
-    hasMoreArticles,
-    hasMorePosts,
-    fetchArticles,
-    loadMorePosts,
-  ]);
+  const onEndReached = useCallback(() => {
+    if (!refreshing) void loadFeed(activeTab, false);
+  }, [activeTab, loadFeed, refreshing]);
 
-  // Rebuild the master shuffle only on data RESETS (pull-to-refresh, new
-  // post created) — never on appended pages or tab switches, so the
-  // sequence users already scrolled through stays put.
-  const postsForOrderRef = useRef(posts);
-  useEffect(() => { postsForOrderRef.current = posts; }, [posts]);
-  useEffect(() => {
-    const postEntries = postsForOrderRef.current.map((p) => ({ kind: 'post' as const, id: p.id }));
-    const articleEntries = articlesRef.current.map((a) => ({ kind: 'article' as const, id: a.id }));
-    setMasterOrder(shuffle([...postEntries, ...articleEntries]));
-  }, [postsEpoch, orderEpoch]);
-
-  // Async post/article resets can finish in separate renders. Keep the
-  // stable order synchronized with the data that actually exists so an
-  // early empty reset can never strand the feed with no rows. Existing
-  // entries keep their order; newly paged content joins at the end.
-  useEffect(() => {
-    setMasterOrder((current) => {
-      const available = [
-        ...posts.map((post) => ({ kind: 'post' as const, id: post.id })),
-        ...articles.map((article) => ({ kind: 'article' as const, id: article.id })),
-      ];
-      const availableKeys = new Set(available.map((item) => `${item.kind}:${item.id}`));
-      const kept = current.filter((item) => availableKeys.has(`${item.kind}:${item.id}`));
-      const keptKeys = new Set(kept.map((item) => `${item.kind}:${item.id}`));
-      const missing = available.filter((item) => !keptKeys.has(`${item.kind}:${item.id}`));
-
-      if (missing.length === 0 && kept.length === current.length) return current;
-      return [...kept, ...shuffle(missing)];
-    });
-  }, [articles, posts]);
-
-  // Resolve the stable master order into fresh data on every render,
-  // keeping only what the active tab allows — the sequence itself never
-  // changes, each tab just sees its slice of it.
+  const currentFeed = tabFeeds[activeTab];
   const postsById = useMemo(() => new Map(posts.map((p) => [p.id, p])), [posts]);
-  const articlesById = useMemo(() => new Map(articles.map((a) => [a.id, a])), [articles]);
-  const visiblePostIds = useMemo(
-    () => new Set(filteredPosts.map((p) => p.id)),
-    [filteredPosts]
-  );
-  const feedItems = useMemo<FeedItem[]>(() => {
-    const items: FeedItem[] = [];
-    const renderOrder = masterOrder.length > 0
-      ? masterOrder
-      : [
-          ...posts.map((post) => ({ kind: 'post' as const, id: post.id })),
-          ...articles.map((article) => ({ kind: 'article' as const, id: article.id })),
-        ];
-    for (const o of renderOrder) {
-      if (o.kind === 'post') {
-        if (!showsPosts) continue;
-        const data = postsById.get(o.id);
-        if (data && visiblePostIds.has(o.id)) items.push({ kind: 'post', id: `p-${o.id}`, data });
-      } else {
-        if (!showsArticles) continue;
-        const data = articlesById.get(o.id);
-        if (data && tabAllows(articleLean(data))) items.push({ kind: 'article', id: `a-${o.id}`, data });
-      }
-    }
-    return items;
-  }, [
-    masterOrder,
-    posts,
-    articles,
-    postsById,
-    articlesById,
-    visiblePostIds,
-    tabAllows,
-    showsPosts,
-    showsArticles,
-  ]);
+  const feedItems = useMemo<FeedItem[]>(() => currentFeed.items.map((item) =>
+    item.kind === 'post'
+      ? { ...item, data: postsById.get(item.data.id) ?? item.data }
+      : item
+  ), [currentFeed.items, postsById]);
   const feedItemsRef = useRef(feedItems);
   useEffect(() => { feedItemsRef.current = feedItems; }, [feedItems]);
 
-  // Warm only the next few images after the visible window. This mirrors
-  // timeline prefetching without downloading the whole paginated feed.
+  const visibleStarted = useRef(new Map<string, { startedAt: number; item: FeedItem }>());
+  const impressed = useRef(new Set<string>());
   const onViewableItemsChanged = useRef(({ viewableItems }: { viewableItems: ViewToken<FeedItem>[] }) => {
+    const now = Date.now();
+    const visibleKeys = new Set(viewableItems.map((token) => token.item.id));
+    for (const [key, visible] of visibleStarted.current) {
+      if (!visibleKeys.has(key)) {
+        const dwellMs = now - visible.startedAt;
+        if (dwellMs >= 750) {
+          queueFeedEvent({
+            ...visible.item.recommendationContext,
+            itemType: visible.item.kind,
+            itemId: visible.item.data.id,
+            eventType: 'dwell',
+            dwellMs,
+          });
+        }
+        visibleStarted.current.delete(key);
+      }
+    }
+    for (const token of viewableItems) {
+      const item = token.item;
+      const impressionKey = `${item.recommendationContext.sessionId}:${item.id}`;
+      if (!visibleStarted.current.has(item.id)) {
+        visibleStarted.current.set(item.id, { startedAt: now, item });
+      }
+      if (!impressed.current.has(impressionKey)) {
+        impressed.current.add(impressionKey);
+        queueFeedEvent({
+          ...item.recommendationContext,
+          position: token.index ?? item.recommendationContext.position,
+          itemType: item.kind,
+          itemId: item.data.id,
+          eventType: 'impression',
+        });
+      }
+    }
     const lastVisibleIndex = viewableItems.reduce(
       (highest, token) => Math.max(highest, token.index ?? -1),
       -1
@@ -425,12 +369,36 @@ export default function Feed() {
     if (urls.length > 0) ExpoImage.prefetch(urls, 'memory-disk').catch(() => {});
   }).current;
 
+  useEffect(() => () => {
+    const now = Date.now();
+    for (const visible of visibleStarted.current.values()) {
+      const dwellMs = now - visible.startedAt;
+      if (dwellMs >= 750) {
+        queueFeedEvent({
+          ...visible.item.recommendationContext,
+          itemType: visible.item.kind,
+          itemId: visible.item.data.id,
+          eventType: 'dwell',
+          dwellMs,
+        });
+      }
+    }
+    visibleStarted.current.clear();
+    void flushFeedEvents();
+  }, []);
+
   const listRef = useRef<FlatList<FeedItem>>(null);
 
   // A content-type change creates a different timeline. Reset every tab's
   // saved offset so returning from Settings cannot land beyond the new list.
   useEffect(() => {
+    feedGeneration.current += 1;
     scrollOffsets.current = {};
+    setTabFeeds({
+      'For You': emptyTabState(),
+      Random: emptyTabState(),
+      'Against You': emptyTabState(),
+    });
     listRef.current?.scrollToOffset({ offset: 0, animated: false });
   }, [feedContentPreference]);
 
@@ -498,18 +466,15 @@ export default function Feed() {
           onEndReached={onEndReached}
           onEndReachedThreshold={0.4}
           ListFooterComponent={
-            loadingMore ? (
+            currentFeed.loadingMore ? (
               <ActivityIndicator style={{ paddingVertical: 24 }} />
-            ) : (!showsArticles || !hasMoreArticles) &&
-              (!showsPosts || !hasMorePosts) &&
-              feedItems.length > 0 ? (
+            ) : currentFeed.loaded && !currentFeed.cursor && feedItems.length > 0 ? (
               <ThemedText style={styles.feedEnd}>You&apos;re all caught up</ThemedText>
             ) : null
           }
           ListEmptyComponent={
             <ThemedView style={styles.emptyFeed}>
-              {(showsPosts && postsLoading && posts.length === 0) ||
-              (showsArticles && !articlesLoaded && articles.length === 0) ? (
+              {!currentFeed.loaded ? (
                 <>
                   <ActivityIndicator color={c.muted} />
                   <ThemedText style={styles.emptyFeedText}>Loading the conversation…</ThemedText>

@@ -2,6 +2,32 @@ import Constants from 'expo-constants';
 
 let sentry: typeof import('@sentry/react-native') | null = null;
 
+function withoutQueryOrFragment(value: unknown): unknown {
+  if (typeof value !== 'string') return value;
+  return value.split(/[?#]/, 1)[0];
+}
+
+function redactNetworkBreadcrumb<T extends { data?: Record<string, unknown> }>(breadcrumb: T): T {
+  if (!breadcrumb.data) return breadcrumb;
+  const data = { ...breadcrumb.data };
+  for (const key of ['url', 'from', 'to']) {
+    if (key in data) data[key] = withoutQueryOrFragment(data[key]);
+  }
+  for (const key of [
+    'body',
+    'requestBody',
+    'request_body',
+    'responseBody',
+    'response_body',
+    'query',
+    'queryString',
+    'query_string',
+  ]) {
+    delete data[key];
+  }
+  return { ...breadcrumb, data };
+}
+
 export function initSentry(): void {
   const dsn = process.env.EXPO_PUBLIC_SENTRY_DSN;
   if (!dsn) return;
@@ -16,6 +42,9 @@ export function initSentry(): void {
       tracesSampleRate: 0.1,
       enableNativeCrashHandling: true,
       sendDefaultPii: false,
+      beforeBreadcrumb(breadcrumb) {
+        return redactNetworkBreadcrumb(breadcrumb);
+      },
       beforeSend(event) {
         if (event.user) {
           delete event.user.email;
@@ -27,6 +56,15 @@ export function initSentry(): void {
           delete event.request.headers.Authorization;
           delete event.request.headers.cookie;
           delete event.request.headers.Cookie;
+        }
+        if (event.request) {
+          event.request.url = withoutQueryOrFragment(event.request.url) as string | undefined;
+          delete event.request.query_string;
+          delete event.request.data;
+          delete event.request.cookies;
+        }
+        if (event.breadcrumbs) {
+          event.breadcrumbs = event.breadcrumbs.map(redactNetworkBreadcrumb);
         }
         return event;
       },

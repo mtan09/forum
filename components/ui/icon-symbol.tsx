@@ -43,6 +43,7 @@ const MAPPING = {
   xmark: 'close',
   plus: 'plus',
   ellipsis: 'dots-horizontal',
+  'eye.slash': 'eye-off-outline',
 
   // Content / profile
   'checkmark.circle.fill': 'check-circle',

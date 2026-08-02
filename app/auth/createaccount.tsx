@@ -31,7 +31,7 @@ export default function CreateAccount() {
     if (password.length < 6) return setErr('Password must be at least 6 characters.');
     if (password !== confirm) return setErr('Passwords do not match.');
     if (aiConsent === null) return setErr('Choose how forum may use OpenAI before continuing.');
-    if (!acceptedTerms) return setErr('Confirm your age and agree to the Terms and Privacy Policy.');
+    if (!acceptedTerms) return setErr('Agree to the Terms and Privacy Policy before continuing.');
 
     try {
       tapMedium();
@@ -154,13 +154,13 @@ export default function CreateAccount() {
           onPress={() => setAcceptedTerms((current) => !current)}
           accessibilityRole="checkbox"
           accessibilityState={{ checked: acceptedTerms }}
-          accessibilityLabel="I am at least 17 and agree to the Terms and Privacy Policy"
+          accessibilityLabel="I agree to the Terms and Privacy Policy"
           style={[styles.checkbox, acceptedTerms && styles.checkboxSelected]}
         >
           {acceptedTerms ? <Text style={styles.checkmark}>✓</Text> : null}
         </TouchableOpacity>
         <Text style={styles.termsText}>
-          I am at least 17 and agree to the{' '}
+          I agree to the{' '}
           <Text
             style={styles.termsLink}
             onPress={() => WebBrowser.openBrowserAsync(`${API_URL}/legal/terms`)}

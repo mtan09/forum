@@ -313,6 +313,12 @@ August 2, 2026, the following are already configured:
 - manual release after approval; and
 - an internal TestFlight group.
 
+The 16+/legacy 17+ value is Apple's content-suitability rating, not a fixed
+minimum account age. Signup must not claim that Apple requires all users to be
+17. Keep the questionnaire answers truthful for a political news and social app,
+and keep the Terms aligned with applicable law, required parent or guardian
+consent, and App Store or device age restrictions.
+
 Before `Add for Review`, complete every remaining item:
 
 1. Wait for build 6 to finish, inspect the signed IPA, submit it to App Store

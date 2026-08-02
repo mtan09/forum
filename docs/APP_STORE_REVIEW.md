@@ -141,6 +141,15 @@ Keep the consent copy, hosted policy, App Privacy answers, age rating, and
 Review Notes aligned. If the provider, purposes, or data categories materially
 change, bump the version and require a new decision.
 
+The App Store content rating is not itself a contractual minimum account age.
+As of August 2, 2026, App Store Connect calculates forum as 16+ under Apple's
+current rating system and 17+ on operating systems earlier than version 26,
+principally because political news regularly includes mature real-world themes
+such as war and political strife. Do not describe this result as an Apple
+requirement that every account holder be at least 17. Signup accepts the Terms
+and Privacy Policy; the Terms instead require compliance with applicable law,
+any required parent or guardian consent, and device or App Store age controls.
+
 The release build declares Photo Library access because users can select an
 existing image. It does not declare camera, microphone, or Face ID access; none
 of those capabilities is used. Sentry disables default PII and removes account

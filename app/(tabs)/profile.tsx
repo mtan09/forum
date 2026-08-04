@@ -1,4 +1,6 @@
 import Article, { ArticleType } from '@/components/articleComponent';
+import AvatarVisual from '@/components/avatar-visual';
+import DisplayName from '@/components/display-name';
 import Post, { PostType } from '@/components/postComponent';
 import ScalableImage from '@/components/scalable-image';
 import ShareCardModal from '@/components/shareCardModal';
@@ -19,7 +21,7 @@ import * as ImagePicker from 'expo-image-picker';
 import { onTabRefresh } from '@/lib/tabRefresh';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, Alert, Image, Platform, Pressable, ScrollView, StyleSheet, useWindowDimensions } from 'react-native';
+import { ActivityIndicator, Alert, Platform, Pressable, ScrollView, StyleSheet, useWindowDimensions } from 'react-native';
 
 // The single computed placement — see the API's /users/me/spectrum:
 // scored posts weigh 3× their position, upvotes weigh 1× the content's
@@ -335,17 +337,16 @@ export default function Profile() {
 
       <ThemedView style={styles.container}>
         <ThemedView style={styles.avatarContainer}>
-          <Image
-            source={
-              profile?.avatar_url
-                ? { uri: profile.avatar_url }
-                : require('@/assets/images/Default_pfp.jpg')
-            }
+          <AvatarVisual
+            userId={profile?.id ?? 'me'}
+            avatarUrl={profile?.avatar_url}
+            isDemo={profile?.is_demo}
+            size={108}
             style={styles.avatar}
           />
         </ThemedView>
 
-        <ThemedText type="defaultSemiBold" style={styles.username}>{profile?.username}</ThemedText>
+        <DisplayName username={profile?.username} isDemo={profile?.is_demo} nameStyle={styles.username} />
         {followCounts && profile?.id ? (
           <ThemedView style={styles.followCountsRow}>
             <Pressable

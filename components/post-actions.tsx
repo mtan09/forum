@@ -61,7 +61,7 @@ export default function PostActions({ post, user }: PostActionsProps) {
     try {
       notifySuccess();
       await Share.share({
-        message: `${user.username} on forum: "${post.text.slice(0, 120)}"`,
+        message: `${user.username}${post.isDemo ? ' (Fictional demo account)' : ''} on forum: "${post.text.slice(0, 120)}"`,
         // Lands on the API's share page: OG preview + open-in-app link
         url: `${API_URL}/p/${post.id}`,
         title: 'Share Post',

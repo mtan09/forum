@@ -375,7 +375,7 @@ export default function Settings() {
     }
     Alert.alert(
       'Withdraw OpenAI permission?',
-      'forum will stop sending new content to OpenAI. You can still browse, vote, save, and follow, but posting, messaging, image uploads, profile text edits, and forumAI will ask for permission again.',
+      'forum will stop sending new content to OpenAI. Text posts, comments, messages, and profile edits will continue using forum\'s own safety rules. Image uploads and forumAI will ask for permission again.',
       [
         { text: 'Cancel', style: 'cancel' },
         {

@@ -100,13 +100,14 @@ export default function CreateAccount() {
         <Text style={styles.consentEyebrow}>YOUR DATA, YOUR CHOICE</Text>
         <Text style={styles.consentTitle}>OpenAI processing</Text>
         <Text style={styles.consentBody}>
-          forum uses OpenAI to check usernames, profile text, posts, comments,
-          direct messages, and uploaded images for safety. forumAI sends your
-          questions and relevant context to OpenAI to generate answers.
+          If you allow it, forum sends text and uploaded images to OpenAI for an
+          additional safety check. forumAI sends your questions and relevant
+          context to OpenAI to generate answers.
         </Text>
         <Text style={styles.consentBody}>
-          Only content needed for these features is shared. You can withdraw
-          permission in Settings.
+          Without permission, text-based social features still work using forum&apos;s
+          own safety rules. Image uploads and forumAI require OpenAI. You can
+          withdraw permission in Settings.
         </Text>
         <TouchableOpacity
           disabled={loading}
@@ -126,7 +127,7 @@ export default function CreateAccount() {
           </View>
           <View style={styles.consentOptionCopy}>
             <Text style={styles.consentOptionTitle}>Allow OpenAI processing</Text>
-            <Text style={styles.consentOptionHint}>Enable safety checks and forumAI features.</Text>
+            <Text style={styles.consentOptionHint}>Enable additional safety checks, image uploads, and forumAI.</Text>
           </View>
         </TouchableOpacity>
         <TouchableOpacity
@@ -142,7 +143,7 @@ export default function CreateAccount() {
           <View style={styles.consentOptionCopy}>
             <Text style={styles.consentOptionTitle}>Not now</Text>
             <Text style={styles.consentOptionHint}>
-              Browsing, voting, saving, and following remain available.
+              Browsing and text-based social features remain available.
             </Text>
           </View>
         </TouchableOpacity>

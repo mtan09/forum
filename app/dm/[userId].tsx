@@ -37,6 +37,7 @@ export default function DmThread() {
 
   const [otherName, setOtherName] = useState('Chat');
   const [otherAvatar, setOtherAvatar] = useState<string | null>(null);
+  const [otherIsDemo, setOtherIsDemo] = useState(false);
   const [messages, setMessages] = useState<Message[]>([]);
   const [text, setText] = useState('');
   const [sending, setSending] = useState(false);
@@ -45,10 +46,11 @@ export default function DmThread() {
 
   useEffect(() => {
     if (!otherId) return;
-    api<{ username: string; avatar_url?: string | null }>(`/users/${otherId}`)
+    api<{ username: string; avatar_url?: string | null; is_demo?: boolean }>(`/users/${otherId}`)
       .then((u) => {
         setOtherName(u.username);
         setOtherAvatar(u.avatar_url ?? null);
+        setOtherIsDemo(!!u.is_demo);
       })
       .catch(() => {});
   }, [otherId]);
@@ -116,6 +118,8 @@ export default function DmThread() {
       style={styles.keyboard}
       keyboardVerticalOffset={100}
     >
+      {/* Keep the compact native navigation title usable. The fictional-account
+          disclosure remains visible in the inbox row and on the user's profile. */}
       <Stack.Screen options={{ title: otherName }} />
       <ThemedView style={styles.screen}>
         <FlatList
@@ -132,6 +136,7 @@ export default function DmThread() {
                   <UserAvatar
                     userId={otherId}
                     avatarUrl={otherAvatar}
+                    isDemo={otherIsDemo}
                     size={30}
                     accessibilityLabel={`Open ${otherName} profile`}
                     containerStyle={styles.messageAvatar}

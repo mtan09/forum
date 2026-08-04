@@ -133,14 +133,16 @@ export function AIConsentProvider({ children }: { children: ReactNode }) {
             <Text style={styles.eyebrow}>YOUR DATA, YOUR CHOICE</Text>
             <Text style={styles.title}>Allow OpenAI processing?</Text>
             <Text style={styles.body}>
-              forum uses OpenAI to check usernames, profile text, posts, comments,
-              direct messages, and uploaded images for safety. Your forumAI
-              questions and relevant conversation or news context are also sent
-              to OpenAI to generate answers.
+              If you allow it, forum sends text and uploaded images to OpenAI for
+              an additional safety check. Your forumAI questions and relevant
+              conversation or news context are also sent to OpenAI to generate
+              answers.
             </Text>
             <Text style={styles.body}>
-              Only content needed for these features is shared. forum does not
-              use it for advertising. You can withdraw permission in Settings.
+              Without permission, text posts, comments, messages, and profile
+              edits still work using forum&apos;s own safety rules. Image uploads and
+              forumAI require OpenAI. forum does not use your data for advertising,
+              and you can withdraw permission in Settings.
             </Text>
             <Pressable
               onPress={() => WebBrowser.openBrowserAsync(`${API_URL}/legal/privacy`)}
@@ -174,8 +176,8 @@ export function AIConsentProvider({ children }: { children: ReactNode }) {
               <Text style={styles.secondaryButtonText}>Not now</Text>
             </Pressable>
             <Text style={styles.footnote}>
-              Without permission, you can still browse, vote, save, and follow.
-              Content-sharing and forumAI features will ask again when needed.
+              Not now keeps browsing and text-based social features available.
+              Image uploads and forumAI will ask again when needed.
             </Text>
           </View>
         </View>

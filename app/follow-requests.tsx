@@ -1,6 +1,7 @@
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import UserAvatar from '@/components/user-avatar';
+import DisplayName from '@/components/display-name';
 import { type Palette } from '@/constants/theme';
 import { usePalette } from '@/hooks/use-palette';
 import { api } from '@/lib/api';
@@ -12,6 +13,7 @@ type FollowRequest = {
   id: string;
   username: string;
   avatar_url?: string | null;
+  is_demo?: boolean;
   bio?: string | null;
   requested_at: string;
 };
@@ -53,9 +55,9 @@ export default function FollowRequestsScreen() {
       ) : (
         requests.map((request) => (
           <ThemedView key={request.id} style={styles.row}>
-            <UserAvatar userId={request.id} avatarUrl={request.avatar_url} size={46} />
+            <UserAvatar userId={request.id} avatarUrl={request.avatar_url} isDemo={request.is_demo} size={46} />
             <ThemedView style={styles.copy}>
-              <ThemedText style={styles.name}>{request.username}</ThemedText>
+              <DisplayName username={request.username} isDemo={request.is_demo} nameStyle={styles.name} />
               {request.bio ? <ThemedText numberOfLines={1} style={styles.bio}>{request.bio}</ThemedText> : null}
             </ThemedView>
             <Pressable onPress={() => respond(request, 'decline')} style={styles.decline}>

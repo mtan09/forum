@@ -13,6 +13,7 @@ export type AuthUser = {
   email_verified?: boolean
   is_admin?: boolean
   is_private?: boolean
+  is_demo?: boolean
   ai_consent_status?: 'accepted' | 'declined' | 'revoked' | 'not_asked'
   ai_consent_current?: boolean
   ai_consent_version?: string | null

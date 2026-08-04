@@ -190,6 +190,15 @@ The authenticated web client is exported as a single-page app because post, arti
 
 CI (GitHub Actions) runs typecheck + lint on every push. See **[LAUNCH.md](LAUNCH.md)** for the App Store launch checklist — deployment, EAS builds, and the account setup (Apple/Resend/Sentry/Railway) each feature is env-gated behind.
 
+The initial App Review database can include a temporary fictional community so
+reviewers can navigate populated feeds and Floor rooms before public launch.
+Every such account is visibly marked `(Fictional demo account)`, uses a
+forum-owned colored logo avatar, and has its own bio and viewpoint. The backend
+schedules disclosed fixture activity only when explicitly enabled. See
+**[App Review notes](docs/APP_REVIEW_NOTES_DRAFT.md)** and the backend's
+`docs/DEMO_COMMUNITY.md`; disable and remove the fixtures before manually
+releasing the approved build.
+
 Backend (`../forum-api`):
 
 ```bash

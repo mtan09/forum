@@ -1,4 +1,6 @@
 import ScalableImage from '@/components/scalable-image';
+import AvatarVisual from '@/components/avatar-visual';
+import DisplayName from '@/components/display-name';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { type Palette } from '@/constants/theme';
@@ -34,6 +36,7 @@ export type PostType = {
   // author info joined in by the API
   username?: string;
   avatarUrl?: string;
+  isDemo?: boolean;
   myVote?: 'up' | 'down' | null;
   myBookmark?: boolean;
 }
@@ -42,6 +45,7 @@ export type UserType = {
   id: string;
   username: string;
   avatar_url?: string;
+  is_demo?: boolean;
 }
 
 type Props = {
@@ -66,9 +70,9 @@ function Post({ post, variant = 'feed', recommendationContext }: Props) {
   const [fetchedUser, setFetchedUser] = useState<UserType | null>(null);
   const user = useMemo<UserType>(() => (
     post.username
-      ? { id: post.user, username: post.username, avatar_url: post.avatarUrl }
-      : fetchedUser ?? { id: post.user, username: '', avatar_url: post.avatarUrl }
-  ), [fetchedUser, post.avatarUrl, post.user, post.username]);
+      ? { id: post.user, username: post.username, avatar_url: post.avatarUrl, is_demo: post.isDemo }
+      : fetchedUser ?? { id: post.user, username: '', avatar_url: post.avatarUrl, is_demo: post.isDemo }
+  ), [fetchedUser, post.avatarUrl, post.isDemo, post.user, post.username]);
 
   useEffect(() => {
     // Author usually arrives joined onto the post; fetch only if missing
@@ -93,14 +97,18 @@ function Post({ post, variant = 'feed', recommendationContext }: Props) {
               style={({ pressed }) => ({ opacity: pressed ? 0.6 : 1.0, flex: 1 })}
             >
               <ThemedView style={styles.header}>
-                <Image
-                  source={user.avatar_url ? { uri: user.avatar_url } : require('@/assets/images/Default_pfp.jpg')}
-                  style={styles.avatar}
-                  cachePolicy="memory-disk"
-                  recyclingKey={user.avatar_url ?? `avatar:${post.user}`}
+                <AvatarVisual
+                  userId={post.user}
+                  avatarUrl={user.avatar_url}
+                  isDemo={user.is_demo}
+                  size={50}
                 />
-                <ThemedView>
-                  <ThemedText type="defaultSemiBold" style={{fontWeight: 800, fontSize: 18}}>{user.username}</ThemedText>
+                <ThemedView style={{ flex: 1, minWidth: 0 }}>
+                  <DisplayName
+                    username={user.username}
+                    isDemo={user.is_demo}
+                    nameStyle={{ fontWeight: '800', fontSize: 18 }}
+                  />
                   <ThemedText style={{color: c.muted, fontSize: 14}}>{timeAgo}</ThemedText>
                 </ThemedView>
               </ThemedView>
@@ -220,11 +228,6 @@ const makeStyles = (c: Palette) => StyleSheet.create({
           marginBottom: 0,
         }
       : {}),
-  },
-  avatar: {
-    width: 50,
-    aspectRatio: 1,
-    borderRadius: 25,
   },
   content: {
     width: '100%',

@@ -1,6 +1,7 @@
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import UserAvatar from '@/components/user-avatar';
+import DisplayName from '@/components/display-name';
 import { type Palette } from '@/constants/theme';
 import { usePalette } from '@/hooks/use-palette';
 import { api } from '@/lib/api';
@@ -13,6 +14,7 @@ type BlockedUser = {
   id: string;
   username: string;
   avatar_url: string | null;
+  is_demo?: boolean;
   bio: string | null;
   blocked_at: string;
 };
@@ -70,13 +72,13 @@ export default function BlockedAccounts() {
       ) : (
         users.map((u) => (
           <ThemedView key={u.id} style={styles.row}>
-            <UserAvatar userId={u.id} avatarUrl={u.avatar_url} />
+            <UserAvatar userId={u.id} avatarUrl={u.avatar_url} isDemo={u.is_demo} />
             <Pressable
               style={({ pressed }) => [styles.identity, { opacity: pressed ? 0.6 : 1 }]}
               onPress={() => router.push(`/user/${u.id}`)}
             >
               <ThemedView style={{ flexShrink: 1 }}>
-                <ThemedText type="defaultSemiBold" style={styles.username}>{u.username}</ThemedText>
+                <DisplayName username={u.username} isDemo={u.is_demo} nameStyle={styles.username} />
                 {u.bio ? <ThemedText style={styles.bio} numberOfLines={1}>{u.bio}</ThemedText> : null}
               </ThemedView>
             </Pressable>

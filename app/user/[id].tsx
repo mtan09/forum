@@ -1,4 +1,6 @@
 import ContentActions from '@/components/contentActions';
+import AvatarVisual from '@/components/avatar-visual';
+import DisplayName from '@/components/display-name';
 import Post, { PostType } from '@/components/postComponent';
 import ScalableImage from '@/components/scalable-image';
 import Spectrum from '@/components/spectrum';
@@ -14,7 +16,7 @@ import { api } from '@/lib/api';
 import { notifyWarning, tapLight } from '@/lib/haptics';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useMemo, useState } from 'react';
-import { Alert, Image, Platform, Pressable, ScrollView, StyleSheet, useWindowDimensions } from 'react-native';
+import { Alert, Platform, Pressable, ScrollView, StyleSheet, useWindowDimensions } from 'react-native';
 
 type PublicUser = {
   id: string;
@@ -27,6 +29,7 @@ type PublicUser = {
   followed_by_me?: boolean;
   follow_status?: 'pending' | 'accepted' | null;
   is_private?: boolean;
+  is_demo?: boolean;
   can_view_history?: boolean;
   follower_count?: number;
   following_count?: number;
@@ -190,18 +193,17 @@ export default function PublicProfile() {
       />
       <ThemedView style={styles.container}>
         <ThemedView style={styles.avatarContainer}>
-          <Image
-            source={
-              user.avatar_url
-                ? { uri: user.avatar_url }
-                : require('@/assets/images/Default_pfp.jpg')
-            }
+          <AvatarVisual
+            userId={user.id}
+            avatarUrl={user.avatar_url}
+            isDemo={user.is_demo}
+            size={88}
             style={styles.avatar}
           />
         </ThemedView>
 
         <ThemedView style={styles.usernameRow}>
-          <ThemedText type="defaultSemiBold" style={styles.username}>{user.username}</ThemedText>
+          <DisplayName username={user.username} isDemo={user.is_demo} nameStyle={styles.username} />
           {!isSelf && (
             blocked ? (
               <Pressable onPress={toggleBlock} style={styles.unblockBtn}>

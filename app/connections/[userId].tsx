@@ -2,6 +2,7 @@ import AppRefreshControl from '@/components/appRefreshControl';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import UserAvatar from '@/components/user-avatar';
+import DisplayName from '@/components/display-name';
 import { type Palette } from '@/constants/theme';
 import { usePalette } from '@/hooks/use-palette';
 import { api } from '@/lib/api';
@@ -16,6 +17,7 @@ type Connection = {
   id: string;
   username: string;
   avatar_url?: string | null;
+  is_demo?: boolean;
   bio?: string | null;
 };
 
@@ -93,13 +95,14 @@ export default function ConnectionsScreen() {
               <UserAvatar
                 userId={item.id}
                 avatarUrl={item.avatar_url}
+                isDemo={item.is_demo}
                 accessibilityLabel={`Open ${item.username}'s profile`}
               />
               <Pressable
                 onPress={() => router.push(`/user/${item.id}`)}
                 style={({ pressed }) => [styles.rowCopy, pressed && styles.pressed]}
               >
-                <ThemedText style={styles.username}>{item.username}</ThemedText>
+                <DisplayName username={item.username} isDemo={item.is_demo} nameStyle={styles.username} />
                 {item.bio ? (
                   <ThemedText style={styles.bio} numberOfLines={2}>{item.bio}</ThemedText>
                 ) : null}

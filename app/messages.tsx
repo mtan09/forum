@@ -2,6 +2,7 @@ import AppRefreshControl from '@/components/appRefreshControl';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import UserAvatar from '@/components/user-avatar';
+import DisplayName from '@/components/display-name';
 import { type Palette } from '@/constants/theme';
 import { usePalette } from '@/hooks/use-palette';
 import { useRelativeTime } from '@/hooks/useRelativeTime';
@@ -15,6 +16,7 @@ type Conversation = {
   user_id: string;
   username: string;
   avatar_url: string | null;
+  is_demo?: boolean;
   last_message_at: string;
   last_message: string | null;
   last_sender_id: string | null;
@@ -31,6 +33,7 @@ function ConversationRow({ conv }: { conv: Conversation }) {
       <UserAvatar
         userId={conv.user_id}
         avatarUrl={conv.avatar_url}
+        isDemo={conv.is_demo}
         size={50}
         accessibilityLabel={`Open ${conv.username} profile`}
       />
@@ -39,7 +42,7 @@ function ConversationRow({ conv }: { conv: Conversation }) {
         style={({ pressed }) => [styles.rowBody, pressed && styles.rowBodyPressed]}
       >
         <ThemedView style={styles.rowTop}>
-          <ThemedText type="defaultSemiBold" style={styles.name} numberOfLines={1}>{conv.username}</ThemedText>
+          <DisplayName username={conv.username} isDemo={conv.is_demo} nameStyle={styles.name} numberOfLines={1} />
           <ThemedText style={styles.time}>{timeAgo}</ThemedText>
         </ThemedView>
         <ThemedView style={styles.rowBottom}>

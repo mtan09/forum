@@ -161,25 +161,40 @@ export type Palette = { [K in keyof typeof Colors.light]: string };
 
 export const Fonts = Platform.select({
   ios: {
-    /** iOS `UIFontDescriptorSystemDesignDefault` */
-    sans: 'system-ui',
-    /** iOS `UIFontDescriptorSystemDesignSerif` */
-    serif: 'ui-serif',
-    /** iOS `UIFontDescriptorSystemDesignRounded` */
-    rounded: 'ui-rounded',
-    /** iOS `UIFontDescriptorSystemDesignMonospaced` */
-    mono: 'ui-monospace',
+    // Leaving text on the native System family renders San Francisco on iOS.
+    sans: 'System',
+    serif: 'System',
+    rounded: 'System',
+    mono: 'Menlo',
+  },
+  macos: {
+    sans: 'System',
+    serif: 'System',
+    rounded: 'System',
+    mono: 'Menlo',
+  },
+  android: {
+    sans: 'Roboto',
+    serif: 'Roboto',
+    rounded: 'Roboto',
+    mono: 'monospace',
+  },
+  windows: {
+    sans: 'Segoe UI',
+    serif: 'Segoe UI',
+    rounded: 'Segoe UI',
+    mono: 'Consolas',
   },
   default: {
-    sans: 'normal',
-    serif: 'serif',
-    rounded: 'normal',
+    sans: 'sans-serif',
+    serif: 'sans-serif',
+    rounded: 'sans-serif',
     mono: 'monospace',
   },
   web: {
-    sans: "system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
-    serif: "Georgia, 'Times New Roman', serif",
-    rounded: "'SF Pro Rounded', 'Hiragino Maru Gothic ProN', Meiryo, 'MS PGothic', sans-serif",
+    sans: "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
+    serif: "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
+    rounded: "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
     mono: "SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace",
   },
 });

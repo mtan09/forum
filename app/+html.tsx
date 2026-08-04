@@ -27,6 +27,13 @@ export default function Root({ children }: PropsWithChildren) {
 
               body {
                 margin: 0;
+                font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+                -webkit-font-smoothing: antialiased;
+                -moz-osx-font-smoothing: grayscale;
+              }
+
+              button, input, textarea, select {
+                font: inherit;
               }
 
               html::-webkit-scrollbar,

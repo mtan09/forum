@@ -1,11 +1,11 @@
 import { useRouter } from 'expo-router';
-import { Image } from 'expo-image';
-import { useMemo } from 'react';
 import { Pressable, StyleSheet, type StyleProp, type ViewStyle } from 'react-native';
+import AvatarVisual from './avatar-visual';
 
 type UserAvatarProps = {
   userId: string;
   avatarUrl?: string | null;
+  isDemo?: boolean;
   size?: number;
   accessibilityLabel?: string;
   containerStyle?: StyleProp<ViewStyle>;
@@ -18,16 +18,12 @@ type UserAvatarProps = {
 export default function UserAvatar({
   userId,
   avatarUrl,
+  isDemo = false,
   size = 44,
   accessibilityLabel = 'Open profile',
   containerStyle,
 }: UserAvatarProps) {
   const router = useRouter();
-  const imageStyle = useMemo(
-    () => ({ width: size, height: size, borderRadius: size / 2 }),
-    [size],
-  );
-
   return (
     <Pressable
       accessibilityRole="button"
@@ -36,12 +32,7 @@ export default function UserAvatar({
       onPress={() => router.push(`/user/${userId}` as never)}
       style={({ pressed }) => [containerStyle, pressed && styles.pressed]}
     >
-      <Image
-        source={avatarUrl ? { uri: avatarUrl } : require('@/assets/images/Default_pfp.jpg')}
-        style={imageStyle}
-        contentFit="cover"
-        recyclingKey={avatarUrl ?? `avatar:${userId}`}
-      />
+      <AvatarVisual userId={userId} avatarUrl={avatarUrl} isDemo={isDemo} size={size} />
     </Pressable>
   );
 }

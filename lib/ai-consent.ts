@@ -1,4 +1,4 @@
-export const AI_CONSENT_VERSION = '2026-07-30';
+export const AI_CONSENT_VERSION = '2026-08-02';
 
 type ConsentRequestHandler = () => Promise<boolean>;
 

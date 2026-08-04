@@ -1,6 +1,6 @@
 # App Store Review strategy
 
-Last official-policy review: 2026-07-30
+Last official-policy review: 2026-08-02
 
 This is the durable release-policy record for forum. It exists so future work
 does not rely on conversational memory or repeatedly collapse Apple policy,
@@ -28,6 +28,8 @@ implementation is possible. Do not misrepresent the app to App Review.
   https://developer.apple.com/documentation/appstoreconnectapi/app-store-review-attachments
 - App privacy:
   https://developer.apple.com/help/app-store-connect/manage-app-information/manage-app-privacy
+- Apple design fonts and license terms:
+  https://developer.apple.com/fonts/
 
 Apple changes its rules. Re-check official Apple sources before the initial App
 Store submission, after a relevant rejection, and whenever this review is more
@@ -73,6 +75,38 @@ features from review. Use forum-owned or controlled demo imagery in permanent
 App Store marketing assets where practical; Apple separately requires rights
 for screenshot and preview materials.
 
+### Temporary fictional review community
+
+The initial review database may contain a controlled fictional community so a
+reviewer can exercise social feeds, threaded discussion, recommendation
+variety, profiles, and The Floor before forum has public users. This is a data
+fixture, not a hidden review-only feature:
+
+- Every fictional account is visibly marked `(Fictional demo account)` on its
+  profile and account-bearing social surfaces and uses a forum-owned logo
+  avatar. Compact native navigation titles may use the name alone so controls
+  remain visible on small iPhones.
+- Each account has a distinct fictional role, bio, political lean, interests,
+  and writing voice. Do not present a demo persona as a real person.
+- A backend worker may schedule posts, comments, reactions, and Floor pins at
+  staggered intervals. Generated text is grounded only in current topic titles
+  and attributed publisher headlines, is screened by the same safety system,
+  and is stored as auditable demo-generated content.
+- The worker may interact with fictional accounts, their content, publisher
+  articles, and Floor rooms. Its presence and temporary purpose must be stated
+  in App Review Notes; never imply that the activity came from real users.
+- The worker requires the explicit `DEMO_ACTIVITY_ENABLED=yes` production
+  setting. Its durable jobs are idempotent across retries and visible through
+  the admin status API.
+- Choose manual release. After approval, disable the worker, run the guarded
+  demo cleanup, smoke-test the approved build against the empty/clean state,
+  and only then release. Deleting fixture rows does not change the reviewed
+  binary or core product behavior. Keep the non-admin reviewer account active.
+
+Screenshots may include these controlled fictional accounts because their
+identities and avatar artwork are owned by forum and visibly disclosed. Do not
+use the former third-party portrait URLs.
+
 ### 4.2 — Minimum functionality
 
 Apple says apps should not primarily be web clippings, content aggregators, or
@@ -110,7 +144,7 @@ before sharing. It does not require forum to use third-party AI.
 
 forum's implemented OpenAI posture is:
 
-- Current consent version: `2026-07-30`.
+- Current consent version: `2026-08-02`.
 - Signup presents separate Allow and Not now choices before the username can be
   sent to OpenAI. Not now still creates an account; deterministic on-server
   username rules run without OpenAI.
@@ -119,10 +153,14 @@ forum's implemented OpenAI posture is:
   forumAI purposes, the Privacy Policy, the effect of declining, and withdrawal.
 - The backend enforces current consent before OpenAI moderation or forumAI, so
   old clients cannot bypass the UI.
-- Declining or withdrawing preserves browsing, voting, saving, and following.
-  Posting, commenting, DMs, moderated profile edits, image uploads, feedback
-  screenshots, and forumAI ask again because they use OpenAI safety or
-  generation.
+- Deterministic on-server rules hard-stop narrow categories for every user.
+  When a user has accepted the current disclosure, text submissions also
+  receive OpenAI's broader moderation check.
+- Declining or withdrawing preserves browsing, text posts, comments, DMs,
+  profile editing, voting, saving, following, reporting, and blocking. No
+  declined text is sent to OpenAI. Image uploads, feedback screenshots, and
+  forumAI ask again because those features inherently use OpenAI image-safety
+  or generation.
 - Settings → Privacy → OpenAI processing shows current status and allows
   withdrawal. Withdrawal stops future sharing and never claims to reverse
   processing that already occurred.
@@ -155,10 +193,6 @@ existing image. It does not declare camera, microphone, or Face ID access; none
 of those capabilities is used. Sentry disables default PII and removes account
 identifiers, authorization/cookie headers, URL query strings, and network
 request/response bodies before events leave the app.
-
-The product Terms currently set a 17-year minimum. Signup requires a separate
-age-and-Terms acknowledgment. This is a product/legal alignment choice, not an
-Apple rule that every political discussion app must impose exactly that age.
 
 ### 5.2 — Intellectual property and third-party services
 
@@ -254,6 +288,20 @@ image URLs remain eligible. A failed publisher image falls back to forum-owned
 purple artwork. R2 remains in use for user uploads and private beta-feedback
 screenshots, not as a mandatory publisher-image proxy.
 
+## Typography strategy
+
+Do not bundle or redistribute Apple's downloadable San Francisco font files.
+Apple devices use their native system font, which renders San Francisco without
+shipping a font asset. The web app uses the operating-system stack: San
+Francisco on Apple devices, Segoe UI on Windows, Roboto on Android, followed by
+Helvetica, Arial, and generic sans-serif fallbacks. Native Android and Windows
+use Roboto and Segoe UI respectively.
+
+This preserves the intended cross-platform appearance while respecting Apple's
+separate license restriction on the downloadable SF font files. It is a font
+license and distribution decision, not an App Review requirement to use any
+particular typeface.
+
 ## Store positioning
 
 - Primary category: News
@@ -280,7 +328,10 @@ screenshots, not as a mandatory publisher-image proxy.
 - UGC filtering, report (including received DMs), block, admin response, and
   contact paths work.
 - App Privacy and age-rating answers match the build.
-- Screenshots show the real app using controlled demo accounts/content.
+- Screenshots show the real app using controlled, visibly labeled fictional
+  demo accounts/content.
+- Review notes disclose that the fictional community's staggered activity is
+  automated and temporary prelaunch fixture data.
 - Publisher cards attribute the source and open the complete publisher page.
 - Review notes explain the social and multi-perspective functionality, article
   flow, moderation, account deletion, and any non-obvious permissions.

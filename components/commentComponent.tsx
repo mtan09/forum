@@ -4,6 +4,7 @@ import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import UserAvatar from '@/components/user-avatar';
+import DisplayName from '@/components/display-name';
 import { type Palette } from '@/constants/theme';
 import { usePalette } from '@/hooks/use-palette';
 import { tapLight, tapMedium } from '@/lib/haptics';
@@ -25,6 +26,7 @@ export type Comment = {
 	// joined in by the API
 	username: string;
 	avatar_url?: string | null;
+	is_demo?: boolean;
 	my_vote?: 'up' | 'down' | null;
 	reply_count: number;
 };
@@ -210,13 +212,18 @@ function CommentItem({ comment }: { comment: Comment }) {
 				<UserAvatar
 					userId={comment.user_id}
 					avatarUrl={comment.avatar_url}
+					isDemo={comment.is_demo}
 					size={28}
 					accessibilityLabel={`Open ${comment.username ?? 'user'} profile`}
 				/>
-				<ThemedText type="defaultSemiBold" style={styles.username} numberOfLines={1}>
-					{comment.username ?? 'Anonymous'}
-					<ThemedText style={styles.timestamp}>{'   ·   '}{timeAgo}</ThemedText>
-				</ThemedText>
+				<ThemedView style={styles.commentIdentity}>
+					<DisplayName
+						username={comment.username}
+						isDemo={comment.is_demo}
+						nameStyle={styles.username}
+					/>
+					<ThemedText style={styles.timestamp}>· {timeAgo}</ThemedText>
+				</ThemedView>
 				<ContentActions
 					targetKind="comment"
 					targetId={comment.id}
@@ -316,8 +323,14 @@ const makeStyles = (c: Palette) => StyleSheet.create({
 		alignItems: 'center',
 		gap: 8,
 	},
-	username: {
+	commentIdentity: {
 		flex: 1,
+		flexDirection: 'row',
+		alignItems: 'baseline',
+		flexWrap: 'wrap',
+		columnGap: 6,
+	},
+	username: {
 		fontSize: 14,
 		fontWeight: '700',
 	},

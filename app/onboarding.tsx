@@ -1,4 +1,5 @@
 import UserAvatar from '@/components/user-avatar';
+import DisplayName from '@/components/display-name';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { IconSymbol } from '@/components/ui/icon-symbol';
@@ -18,6 +19,7 @@ type SuggestedUser = {
   id: string;
   username: string;
   avatar_url: string | null;
+  is_demo?: boolean;
   bio: string | null;
   post_count: number;
 };
@@ -188,9 +190,9 @@ export default function Onboarding() {
               const on = followed.has(u.id);
               return (
                 <ThemedView key={u.id} style={styles.userRow}>
-                  <UserAvatar userId={u.id} avatarUrl={u.avatar_url} size={46} />
+                  <UserAvatar userId={u.id} avatarUrl={u.avatar_url} isDemo={u.is_demo} size={46} />
                   <ThemedView style={{ flex: 1 }}>
-                    <ThemedText type="defaultSemiBold" style={styles.userName}>{u.username}</ThemedText>
+                    <DisplayName username={u.username} isDemo={u.is_demo} nameStyle={styles.userName} />
                     <ThemedText style={styles.userMeta} numberOfLines={1}>
                       {u.bio || `${u.post_count} posts`}
                     </ThemedText>

@@ -46,6 +46,7 @@ export const mapPost = (row: any): PostType => ({
   scorerVersion: row.scorer_version ?? undefined,
   username: row.username,
   avatarUrl: row.avatar_url ?? undefined,
+  isDemo: !!row.is_demo,
   myVote: row.my_vote ?? null,
   myBookmark: row.my_bookmark ?? false,
 });
@@ -75,6 +76,7 @@ export const reusePostSnapshot = (current: PostType | undefined, next: PostType)
     current.scorerVersion === next.scorerVersion &&
     current.username === next.username &&
     current.avatarUrl === next.avatarUrl &&
+    current.isDemo === next.isDemo &&
     current.myVote === next.myVote &&
     current.myBookmark === next.myBookmark &&
     sameArray(current.hashtags, next.hashtags) &&

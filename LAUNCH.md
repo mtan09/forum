@@ -4,11 +4,11 @@ This is the ordered release checklist for the iPhone-only forum beta. Code and
 safe defaults live in git; credentials, reviewer passwords, Apple keys, Sentry
 tokens, and every `.env` file do not.
 
-The permanent domain and account-email infrastructure are configured. The
-current production release candidate is mobile commit `0f265f3`, backend
-commit `103c8ba`, and EAS iOS build 6. External testing and App Review remain
-blocked by the validation and App Store Connect items below. Internal
-TestFlight can continue while they are completed.
+The permanent domain and account-email infrastructure are configured. EAS iOS
+build 6 remains the latest uploaded binary, but it predates the current
+release-hardening worktree and must not be selected for App Store review. Do
+not create the next iOS build until the local, production, simulator, and
+metadata gates below are complete.
 
 ## 1. Local release gate
 
@@ -41,24 +41,41 @@ the production export to pass.
 ## 2. Production database and identities
 
 1. Back up the production database.
-2. Apply numbered migrations through 019 once, in order:
+2. Apply numbered migrations through 020 once, in order:
 
    ```bash
    railway run --service forum-api npm run migrate:release
    railway run --service forum-api npm run migrate:017
    railway run --service forum-api npm run migrate:018
    railway run --service forum-api npm run migrate:019
+   railway run --service forum-api npm run migrate:020
    ```
 
-3. Confirm the seeded `john@example.dev` persona remains usable with the shared
-   development password and its admin flag is false.
-4. Audit the mock corpus without deleting flagged content:
+3. Verify the separate release identities:
+   - `michael.chinyuan@gmail.com` is the verified owner-only admin account;
+   - `appreview@forumeveryside.com` is verified, public, active, and non-admin;
+   - neither account is marked as fictional demo data; and
+   - only the reviewer credential is supplied to Apple.
+4. Convert the seeded `@example.dev` fixtures into locked fictional demo
+   accounts. Dry-run first, confirm the exact scope, then apply:
+
+   ```bash
+   railway run --service forum-api npm run harden:demo
+   DEMO_ACCOUNT_APPLY=yes railway run --service forum-api npm run harden:demo
+   ```
+
+   Verify every targeted account has `is_demo = true`, no admin flag, no
+   external avatar/banner, no delivery token, a persona bio, and an
+   unrecoverable unique password. The former shared development password must
+   no longer work in production.
+5. Audit the mock corpus without deleting flagged content:
 
    ```bash
    railway run --service forum-api npm run audit:moderation
    ```
 
-5. Create two new identities with `npm run account:release`:
+6. Create or repair release identities with `npm run account:release` when
+   needed:
    - an owner-only admin account;
    - a non-admin App Review account.
 
@@ -84,22 +101,29 @@ IDs until their delivery receipts are checked.
 
 Migration 018 adds first-party recommendation events, preference records, and
 local semantic vectors. Migration 019 adds DM-report support and an
-admin-hidden message flag. Migration 019 must be applied before deploying API
-code that queries `messages.hidden`.
+admin-hidden message flag. Migration 020 adds the fictional-demo marker,
+personas, and durable activity queue. All four must be applied before deploying
+code that queries their fields.
 
 ## 3. Railway services
 
-The production project has two services from the same repository:
+The production project has three services from the same repository:
 
 | Service | Start command | Schedule/restart |
 |---|---|---|
 | `forum-api` | `npm start` | always on; health check `/health`, 30 s timeout |
 | `forum-ingest` | `npm run ingest` | cron `0 * * * *`; restart policy `Never` |
+| `forum-demo-activity` | `npm run demo:activity` | cron `*/10 * * * *`; restart policy `Never`; temporary through initial review |
 
 Both use the production `DATABASE_URL`. The ingest service performs database
 warm-up retries, takes a Postgres advisory lock, retries sources independently,
 persists `ingest_runs`, and clusters after successful ingestion. Do not restore
 `INGEST_INTERVAL_MINUTES`; ingestion must not run inside the API process.
+
+The demo worker additionally requires `DEMO_ACTIVITY_ENABLED=yes`,
+`DEMO_ACTIVITY_MODEL`, and `DEMO_ACTIVITY_BATCH_SIZE`. It must remain a
+separate cron, and it must be disabled before the approved build is manually
+released. Its fictional nature is disclosed in App Review Notes.
 
 Required production variables:
 
@@ -321,9 +345,10 @@ consent, and App Store or device age restrictions.
 
 Before `Add for Review`, complete every remaining item:
 
-1. Wait for build 6 to finish, inspect the signed IPA, submit it to App Store
-   Connect, complete processing/export compliance, and select build 6 on the
-   1.0 version page. Do not leave build 5 selected.
+1. Keep build 6 for historical/internal testing only. After every gate in this
+   runbook passes, create the next release candidate, inspect its signed IPA,
+   submit it to App Store Connect, complete processing/export compliance, and
+   select that exact build on the 1.0 version page.
 2. Upload six accurate 6.5-inch iPhone screenshots. The first three should be
    Feed, multi-perspective story Summary, and The Floor; follow with forumAI,
    Discover, and a community thread/profile view. Use controlled content and
@@ -331,9 +356,9 @@ Before `Add for Review`, complete every remaining item:
 3. Enter the legal copyright holder and year. Do not guess whether the holder
    should be Michael Tan, John Tan, or Zhiqiang Tan; the account owner must make
    that legal-ownership decision.
-4. Create and verify `appreview@forumeveryside.com` as a public, non-admin
-   account with a stable password, then enter the email and password only in
-   App Store Connect. Create a second disposable account for deletion testing.
+4. Enter the verified `appreview@forumeveryside.com` non-admin credential only
+   in App Store Connect. Never supply the owner account. Create a separate
+   disposable account for the final deletion test.
 5. Add Review Notes that explain the three feed modes, summary comparison, The
    Floor, optional OpenAI permission, report/block controls (including received
    DMs), account deletion, and the publisher-link article flow.
@@ -354,5 +379,5 @@ Before `Add for Review`, complete every remaining item:
    blanket publisher permission that has not been established.
 10. Re-run the official-policy review, full QA, physical-iPhone notification
     delivery, email verification/reset, deletion cleanup, Railway/Sentry/ingest
-    checks, and a 24-hour internal TestFlight soak. Only then select build 6,
-    save all metadata, and use `Add for Review`.
+    checks, and a 24-hour internal TestFlight soak. Only then select the new
+    release-candidate build, save all metadata, and use `Add for Review`.

@@ -35,10 +35,11 @@ function formatRelativeTime(timestamp: string, now: number): string {
   if (seconds < -300) return 'date unavailable';
 
   if (seconds >= 86_400) {
+    const isCurrentYear = date.getFullYear() === new Date(now).getFullYear();
     return date.toLocaleDateString('en-US', {
-      month: '2-digit',
-      day: '2-digit',
-      year: '2-digit',
+      month: 'short',
+      day: 'numeric',
+      ...(isCurrentYear ? {} : { year: 'numeric' as const }),
     });
   }
 

@@ -134,9 +134,10 @@ export function AIConsentProvider({ children }: { children: ReactNode }) {
             <Text style={styles.title}>Allow OpenAI processing?</Text>
             <Text style={styles.body}>
               If you allow it, forum sends text and uploaded images to OpenAI for
-              an additional safety check. Your forumAI questions and relevant
-              conversation or news context are also sent to OpenAI to generate
-              answers.
+              an additional safety check. Your forumAI questions, relevant
+              conversation, eligible publisher headlines, and forum-generated
+              story context are also sent to OpenAI to generate answers. Publisher
+              article bodies are not stored or sent to OpenAI.
             </Text>
             <Text style={styles.body}>
               Without permission, text posts, comments, messages, and profile

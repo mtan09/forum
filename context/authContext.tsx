@@ -4,7 +4,7 @@ import { AI_CONSENT_VERSION } from '../lib/ai-consent'
 import { api, getToken, setToken } from '../lib/api'
 import { unregisterPush } from '../lib/notifications'
 
-const ONBOARDING_KEY = 'forum.needsOnboarding'
+const LEGACY_ONBOARDING_KEY = 'forum.needsOnboarding'
 
 export type AuthUser = {
   id: string
@@ -65,9 +65,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [needsOnboarding, setNeedsOnboarding] = useState(false)
 
   useEffect(() => {
-    AsyncStorage.getItem(ONBOARDING_KEY)
-      .then((v) => setNeedsOnboarding(v === '1'))
-      .catch(() => {})
+    // Onboarding is a one-session welcome flow. Clear the former persisted
+    // flag so an account that previously stopped midway opens the feed on its
+    // next cold launch instead of being forced back into onboarding.
+    AsyncStorage.removeItem(LEGACY_ONBOARDING_KEY).catch(() => {})
   }, [])
 
   useEffect(() => {
@@ -123,21 +124,21 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       },
     })
     await setToken(token)
-    // Brand-new account → run the welcome flow (persisted so an app
-    // restart mid-onboarding comes back to it)
+    // Brand-new account → run the welcome flow for this app session only.
+    // The account and token are already durable, so a cold relaunch opens the
+    // normal signed-in experience even if onboarding was not finished.
     setNeedsOnboarding(true)
-    AsyncStorage.setItem(ONBOARDING_KEY, '1').catch(() => {})
     setUser(me)
   }
 
   const completeOnboarding = () => {
     setNeedsOnboarding(false)
-    AsyncStorage.removeItem(ONBOARDING_KEY).catch(() => {})
   }
 
   const signOut = async () => {
     await unregisterPush().catch(() => {})
     await setToken(null)
+    setNeedsOnboarding(false)
     setUser(null)
   }
 

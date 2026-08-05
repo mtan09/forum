@@ -1,6 +1,6 @@
 # App Store Review strategy
 
-Last official-policy review: 2026-08-02
+Last official-policy review: 2026-08-03
 
 This is the durable release-policy record for forum. It exists so future work
 does not rely on conversational memory or repeatedly collapse Apple policy,
@@ -100,8 +100,10 @@ fixture, not a hidden review-only feature:
   the admin status API.
 - Choose manual release. After approval, disable the worker, run the guarded
   demo cleanup, smoke-test the approved build against the empty/clean state,
-  and only then release. Deleting fixture rows does not change the reviewed
-  binary or core product behavior. Keep the non-admin reviewer account active.
+  and only then release. Cleanup is account-scoped through `is_demo`, cascades
+  the personas' activity, and reconciles cached publisher-article vote/comment
+  counters. Deleting fixture rows does not change the reviewed binary or core
+  product behavior. Keep the non-admin reviewer account active.
 
 Screenshots may include these controlled fictional accounts because their
 identities and avatar artwork are owned by forum and visibly disclosed. Do not
@@ -145,9 +147,9 @@ before sharing. It does not require forum to use third-party AI.
 forum's implemented OpenAI posture is:
 
 - Current consent version: `2026-08-02`.
-- Signup presents separate Allow and Not now choices before the username can be
-  sent to OpenAI. Not now still creates an account; deterministic on-server
-  username rules run without OpenAI.
+- Signup presents separate Allow and Not now choices for later OpenAI-dependent
+  features, but the signup username itself is checked only by deterministic
+  on-server rules and is not sent to OpenAI. Not now still creates an account.
 - Existing users are not grandfathered. Before the next affected action, a
   review-visible sheet identifies OpenAI, the data categories, moderation and
   forumAI purposes, the Privacy Policy, the effect of declining, and withdrawal.
@@ -166,6 +168,11 @@ forum's implemented OpenAI posture is:
   processing that already occurred.
 - Permission evidence stores user id, disclosure version, decision status, and
   timestamp. No rejected raw content is stored in the moderation audit.
+- Settings → Delete Account transactionally removes profile and activity data,
+  including structured feedback text and metadata. A durable outbox job
+  removes the account's public media and private feedback screenshots with
+  retries and a 24-hour deadline; old JWTs fail as soon as the account row is
+  gone.
 
 Feed personalization is first-party processing. forum records feed impressions,
 opens, approximate dwell time, outbound publisher opens, selected interests, and
@@ -174,6 +181,11 @@ from forum's existing content and are not an additional OpenAI purpose. Settings
 offers a feed-personalization reset, and the hosted privacy policy discloses the
 collection and ranking use. This behavior does not use advertising identifiers
 or track users across other companies' apps and websites.
+
+Post spectrum placement is also first-party processing. The versioned scorer
+uses committed framing terms, policy rules, compositional matching, and reviewed
+local prototypes; post text is not sent to OpenAI or another third party for the
+placement. OpenAI moderation remains a separate consent-controlled safety step.
 
 Keep the consent copy, hosted policy, App Privacy answers, age rating, and
 Review Notes aligned. If the provider, purposes, or data categories materially
@@ -214,68 +226,91 @@ posture is:
 Answer the Content Rights field truthfully. Keep a concise review attachment
 ready that explains article flow, attribution, publisher navigation, original
 analysis, remote previews, moderation, and takedown contact. Do not overwhelm
-the initial submission with every source-policy note unless Apple asks.
+the initial submission with every source-policy note unless Apple asks. The
+prepared text is `docs/APP_REVIEW_CONTENT_RIGHTS_DRAFT.md`.
 
 ## Article-content strategy
 
-Apple does not require transient-only analysis or deletion of ingested article
-text. The product has intentionally restored its original functionality-first
-architecture:
+Apple does not specifically require transient-only analysis or deletion of
+ingested article text. forum nevertheless uses transient analysis as a
+rights-conscious product and engineering choice based on the source-policy
+record in `PUBLISHER_CONTENT_RIGHTS.md`; this must not be described as an Apple
+mandate.
 
 1. Fetch recent article text from the publisher feed or page.
-2. Store it in PostgreSQL for deterministic scoring, clustering, search,
-   rescoring, debugging, and forumAI retrieval.
-3. Store the publisher headline, source, canonical URL, date, and direct image
-   URL with the record.
+2. Use that text only in memory during the ingest transaction to derive lean,
+   relevance, confidence, topics, hashtags, search terms, a local recommendation
+   vector, and a one-way weighted clustering profile.
+3. Store those bounded derived values with the publisher headline, source,
+   canonical URL, date, and direct image URL. Do not store the article body.
 4. Do not display article bodies in the feed, article detail, search, profile,
    or summary interfaces.
-5. Do not return the stored body from public article, bookmark, search, source,
-   profile-article, or topic-detail API responses.
+5. Do not expose readable article-body-derived prose through public APIs. Search
+   uses the headline and bounded derived terms; recommendations use the stored
+   local vector; clustering uses one-way term identifiers and weights.
 6. Keep the publisher as the destination for reading the complete article.
 7. Keep public multi-perspective summaries headline-only: one attributed
    publisher headline for each available Left/Center/Right band.
 
-This is a deliberate product and engineering choice, not a claim that storing
-publisher text is affirmatively authorized by Apple. Publisher terms and
-copyright analysis remain separate risks. Do not describe private storage as an
-Apple requirement or tell App Review that the text is discarded.
+Publisher terms and copyright analysis remain separate from Apple review. Do
+not claim that transient processing itself creates permission. Describe the
+implemented behavior truthfully if App Review asks.
 
 ### Implemented architecture
 
 - `@extractus/article-extractor` uses substantial feed text first and falls
-  back to the publisher page.
-- `articles.content` stores the extracted text and feeds the scorer, hot-topic
-  clustering, full-text search, rescoring, and forumAI retrieval.
-- Public article projections omit `articles.content`; the React Native client
-  renders the headline, source, media, metadata, and publisher link.
+  back to the publisher page. The resulting text stays in process memory only
+  long enough to derive the stored fields and is not written to PostgreSQL.
+- `articles.analysis_profile` stores at most 48 readable weighted search/label
+  terms and at most 512 SHA-256-derived weighted term identifiers for clustering.
+  It contains no word order or article prose and is not a substitute for a body.
+- `articles.analysis_text` is a bounded search-term string;
+  `recommendation_embedding` is a local numeric vector. Public article responses
+  include neither internal analysis field.
+- `articles.content` remains temporarily in the schema only for a staged rollout,
+  is nullable, and is protected after the scrub by a validated database check
+  requiring every value to be `NULL`.
 - Story `short_summary` is an original outlet-count coverage note.
 - Story `long_summary` contains only attributed publisher headlines. A
   regression test verifies that article-body sentences never enter it.
-- The bounded `backfill:article-content` job repairs recent rows that were
-  stripped by the retired conservative migration before reclustering them.
+- Rescoring may refetch a page for transient recomputation, but never persists
+  the body. `scrub:article-bodies` derives missing profiles before nulling legacy
+  bodies and verifies clustering agreement before its guarded apply mode runs.
+- A production dry-run on the newest 400 articles retained 100% of feature
+  weight and matched all 79,800 threshold decisions, including all 225 joins.
 
 ## forumAI coverage context
 
-forumAI retrieves a small, clamped set of relevant recent article bodies from
-PostgreSQL. Retrieval is deterministic, balances outlets and perspective bands
-when possible, and supports both topic-specific and broad "today's biggest
-story" prompts.
+forumAI retrieves a small, clamped set of eligible attributed headlines and
+forum-generated story metadata. Retrieval uses the stored bounded profile,
+balances outlets and perspective bands when possible, and supports both
+topic-specific and broad "today's biggest story" prompts. Publisher bodies are
+not stored or sent to OpenAI.
 
-Stored text is private model context. The app does not expose a publisher-body
-reader, and forumAI must synthesize answers in fresh language, attribute
-outlet-specific claims, avoid long source-like passages, and provide publisher
-links. Passing an article or post ID may still pin the conversation to that
-subject.
+Sources with explicit AI, RAG, automated-analysis, or closely related policy
+restrictions are excluded by a machine-enforced allow/deny decision. Unknown
+sources fail closed. The current deny set is The New Republic, HuffPost, Vox,
+The New Yorker, The Atlantic, The Guardian, NBC News, ABC News, CNBC, Sky News,
+New York Post, The Daily Wire, Newsmax, The Blaze, and Breitbart. Inclusion of a
+different publisher's headline is not a claim of a blanket AI license; it is the
+current risk-calibrated operating policy and must be updated with the registry.
+
+Passing an eligible article ID may pin the conversation to its attributed
+headline. A restricted article does not show the forumAI action in the client,
+and the API independently rejects a forged or stale request before consuming
+the user's daily forumAI allowance. User-post context remains subject to the
+user's explicit OpenAI consent.
 
 ## Publisher-image strategy
 
 Do not treat "never use R2" as an Apple requirement. Image delivery is a product,
 performance, privacy, and rights decision.
 
-The implemented app restores direct publisher/feed image delivery. Ingestion
-stores the selected image URL in `articles.media`; the client loads it with the
-normal device cache. It does not require the retired rights-mode fields or an
-R2 transformation before showing the image.
+The implemented app restores direct publisher image delivery. Ingestion checks
+publisher RSS/Atom media first and may fall back to image metadata on the
+publisher page, stores the selected URL in `articles.media`, and lets the client
+load it with the normal device cache. It does not require the retired
+rights-mode fields or an R2 transformation before showing the image.
 
 Do not use a single publisher photograph as if it were forum's own story art.
 Summary image carousels are acceptable product UI: label each item with its
@@ -285,7 +320,7 @@ thumbnail dimensions, and fall back cleanly when unavailable.
 Validation remains narrow and product-driven: malformed article-path metadata
 and explicit audio/video/HLS assets are rejected, while valid extensionless CDN
 image URLs remain eligible. A failed publisher image falls back to forum-owned
-purple artwork. R2 remains in use for user uploads and private beta-feedback
+purple artwork. R2 remains in use for user uploads and private feedback
 screenshots, not as a mandatory publisher-image proxy.
 
 ## Typography strategy
@@ -335,5 +370,7 @@ particular typeface.
 - Publisher cards attribute the source and open the complete publisher page.
 - Review notes explain the social and multi-perspective functionality, article
   flow, moderation, account deletion, and any non-obvious permissions.
+- App availability excludes China mainland unless the account can supply the
+  Internet News Information Permit Apple lists for apps with news content.
 - No hidden review mode, dormant feature, placeholder URL, test credential in
   the repository, or misleading Content Rights statement exists.

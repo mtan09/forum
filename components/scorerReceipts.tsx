@@ -14,8 +14,16 @@ import { Modal, Platform, Pressable, ScrollView, StyleSheet, useWindowDimensions
 //   confidence:0.NN        left:"phrase"×N        subjectivity:0.NN
 //   prior:0.NN             right:"phrase"×N       type:content_type(...)
 //   stance-left/right:"issue · policy position"×N
+//   stance-meta:{ side, issue, position, method, confidence, evidence }
 type Framing = { side: 'left' | 'right' | 'loaded'; phrase: string; count: number };
-type Stance = { side: 'left' | 'right'; issue: string; position: string };
+type Stance = {
+  side: 'left' | 'right';
+  issue: string;
+  position: string;
+  method?: 'pattern' | 'compositional' | 'prototype' | 'context';
+  confidence?: number;
+  evidence?: string;
+};
 
 type Parsed = {
   version?: string;
@@ -34,6 +42,18 @@ const STANCE_RE = /^stance-(left|right):"([^"·]+) · (.+)"×\d+$/;
 function parse(signals: string[]): Parsed {
   const out: Parsed = { framing: [], stances: [] };
   for (const raw of signals) {
+    if (raw.startsWith('stance-meta:')) {
+      try {
+        const value = JSON.parse(raw.slice('stance-meta:'.length)) as Stance;
+        if (
+          (value.side === 'left' || value.side === 'right') &&
+          value.issue && value.position
+        ) out.stances.push(value);
+      } catch {
+        // A malformed optional receipt must never break the explanation sheet.
+      }
+      continue;
+    }
     const stance = STANCE_RE.exec(raw);
     if (stance) {
       out.stances.push({
@@ -57,8 +77,23 @@ function parse(signals: string[]): Parsed {
     else if (key === 'quotes') out.quotes = value;
     else if (key === 'type') out.contentType = value.replace(/\(.*\)$/, '');
   }
+  const merged = new Map<string, Stance>();
+  for (const stance of out.stances) {
+    const key = `${stance.side}:${stance.issue}:${stance.position}`;
+    const current = merged.get(key);
+    if (!current || stance.method) merged.set(key, stance);
+  }
+  out.stances = [...merged.values()];
   return out;
 }
+
+const methodLabel = (method: Stance['method']) => {
+  if (method === 'pattern') return 'Direct policy match';
+  if (method === 'compositional') return 'Policy argument';
+  if (method === 'prototype') return 'Local semantic match';
+  if (method === 'context') return 'Contextual alignment';
+  return null;
+};
 
 function bandLabel(position: number): string {
   if (position < 0.2) return 'Strongly left';
@@ -127,6 +162,17 @@ export default function ScorerReceipts({ visible, onClose, position, signals, ki
                       <View style={styles.stanceCopy}>
                         <ThemedText style={styles.stanceIssue}>{prettyType(stance.issue)}</ThemedText>
                         <ThemedText style={styles.stancePosition}>{prettyType(stance.position)}</ThemedText>
+                        {stance.evidence && (
+                          <ThemedText style={styles.stanceEvidence} numberOfLines={3}>
+                            “{stance.evidence}”
+                          </ThemedText>
+                        )}
+                        {methodLabel(stance.method) && (
+                          <ThemedText style={styles.stanceMethod}>
+                            {methodLabel(stance.method)}
+                            {stance.confidence != null ? ` · ${Math.round(stance.confidence * 100)}% match` : ''}
+                          </ThemedText>
+                        )}
                       </View>
                     </View>
                   ))}
@@ -199,8 +245,8 @@ export default function ScorerReceipts({ visible, onClose, position, signals, ki
             </View>
 
             <ThemedText style={styles.footer}>
-              Scored deterministically by {parsed.version ?? 'the forum scorer'} — no AI, no black box.
-              The same text always produces the same placement.
+              Scored locally and deterministically by {parsed.version ?? 'the forum scorer'}.
+              No post text is sent to third-party AI for this placement, and the same text always produces the same result.
             </ThemedText>
 
             <Pressable style={styles.closeBtn} onPress={onClose}>
@@ -313,6 +359,18 @@ const makeStyles = (c: Palette) => StyleSheet.create({
     color: c.text,
     fontSize: 15,
     fontWeight: '700',
+  },
+  stanceEvidence: {
+    color: c.subtle,
+    fontSize: 13,
+    lineHeight: 18,
+    marginTop: 4,
+  },
+  stanceMethod: {
+    color: c.muted,
+    fontSize: 12,
+    fontWeight: '600',
+    marginTop: 2,
   },
   chip: {
     borderRadius: 10,

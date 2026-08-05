@@ -1,4 +1,4 @@
-import UserAvatar from '@/components/user-avatar';
+import AvatarVisual from '@/components/avatar-visual';
 import DisplayName from '@/components/display-name';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
@@ -9,9 +9,11 @@ import { usePalette } from '@/hooks/use-palette';
 import { api } from '@/lib/api';
 import { notifySuccess, selectTick, tapLight, tapMedium } from '@/lib/haptics';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 // First-run welcome: pick interests (stored for personalization) and follow
 // a few active accounts so the Following tab and feed aren't empty on day 1.
@@ -50,6 +52,7 @@ export default function Onboarding() {
   const { c } = usePalette();
   const styles = useMemo(() => makeStyles(c), [c]);
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const { completeOnboarding, refreshUser, user } = useAuth();
 
   const [step, setStep] = useState<1 | 2 | 3>(1);
@@ -58,7 +61,11 @@ export default function Onboarding() {
   const [suggested, setSuggested] = useState<SuggestedUser[]>([]);
   const [followed, setFollowed] = useState<Set<string>>(new Set());
   const [verificationBusy, setVerificationBusy] = useState(false);
+  const [verificationSent, setVerificationSent] = useState(false);
   const [verificationMessage, setVerificationMessage] = useState<string | null>(null);
+  const [progressBusy, setProgressBusy] = useState(false);
+  const [progressMessage, setProgressMessage] = useState<string | null>(null);
+  const verificationRequested = useRef(false);
 
   useEffect(() => {
     api<Interest[]>('/feed/interests/catalog')
@@ -100,21 +107,35 @@ export default function Onboarding() {
     }
   };
 
+  const saveInterests = async () => {
+    const selected = [...picked];
+    await api('/feed/interests', { method: 'PUT', body: { interests: selected } });
+    await AsyncStorage.setItem(INTERESTS_KEY, JSON.stringify(selected)).catch(() => {});
+  };
+
+  const advanceFromInterests = async () => {
+    tapMedium();
+    setProgressBusy(true);
+    setProgressMessage(null);
+    try {
+      await saveInterests();
+      setStep(2);
+    } catch (error: any) {
+      setProgressMessage(error?.message ?? 'Could not save your topics. Please try again.');
+    } finally {
+      setProgressBusy(false);
+    }
+  };
+
   const finish = async () => {
     tapMedium();
-    const selected = [...picked];
-    await Promise.all([
-      api('/feed/interests', { method: 'PUT', body: { interests: selected } })
-        .catch((error: any) => console.log('Could not sync onboarding interests:', error?.message)),
-      AsyncStorage.setItem(INTERESTS_KEY, JSON.stringify(selected)).catch(() => {}),
-    ]);
     notifySuccess();
     completeOnboarding();
     router.replace('/');
   };
 
-  const resendVerification = async () => {
-    tapLight();
+  const requestVerification = async (isInitialRequest = false) => {
+    if (!isInitialRequest) tapLight();
     setVerificationBusy(true);
     setVerificationMessage(null);
     try {
@@ -125,13 +146,30 @@ export default function Onboarding() {
         await refreshUser();
         setVerificationMessage('Your email is already verified.');
       } else {
-        setVerificationMessage('A new link is on its way. Check your inbox and spam folder.');
+        setVerificationSent(true);
+        setVerificationMessage(
+          isInitialRequest
+            ? 'Verification link sent. Check your inbox and spam folder.'
+            : 'A new link is on its way. Check your inbox and spam folder.'
+        );
       }
     } catch (error: any) {
       setVerificationMessage(error?.message ?? 'Could not send another link. Please try again.');
     } finally {
       setVerificationBusy(false);
     }
+  };
+
+  const openVerificationStep = () => {
+    setStep(3);
+    if (user?.email_verified || verificationRequested.current) return;
+    verificationRequested.current = true;
+    void requestVerification(true);
+  };
+
+  const goBack = () => {
+    tapLight();
+    setStep((current) => (current - 1) as 1 | 2 | 3);
   };
 
   const confirmVerification = async () => {
@@ -154,15 +192,30 @@ export default function Onboarding() {
 
   return (
     <ThemedView style={styles.screen}>
-      <ScrollView contentContainerStyle={styles.container}>
+      <ThemedView style={[styles.topBar, { paddingTop: insets.top + 8 }]}>
+        {step > 1 && (
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Previous onboarding step"
+            onPress={goBack}
+            style={({ pressed }) => [styles.backButton, pressed && styles.pressed]}
+          >
+            <IconSymbol name="chevron.left" size={21} color={c.primary} />
+            <ThemedText style={styles.backText}>Back</ThemedText>
+          </Pressable>
+        )}
         <ThemedText style={styles.step}>Step {step} of 3</ThemedText>
-
+      </ThemedView>
+      <ScrollView contentContainerStyle={styles.container}>
         {step === 1 ? (
           <>
             <ThemedText type="title" style={styles.title}>What do you care about?</ThemedText>
             <ThemedText style={styles.subtitle}>
               Pick a few topics — they help shape what you see first.
             </ThemedText>
+            {!!progressMessage && (
+              <ThemedText style={styles.progressMessage}>{progressMessage}</ThemedText>
+            )}
             <ThemedView style={styles.chips}>
               {interests.map((interest) => {
                 const on = picked.has(interest.key);
@@ -190,7 +243,7 @@ export default function Onboarding() {
               const on = followed.has(u.id);
               return (
                 <ThemedView key={u.id} style={styles.userRow}>
-                  <UserAvatar userId={u.id} avatarUrl={u.avatar_url} isDemo={u.is_demo} size={46} />
+                  <AvatarVisual userId={u.id} avatarUrl={u.avatar_url} isDemo={u.is_demo} size={46} />
                   <ThemedView style={{ flex: 1 }}>
                     <DisplayName username={u.username} isDemo={u.is_demo} nameStyle={styles.userName} />
                     <ThemedText style={styles.userMeta} numberOfLines={1}>
@@ -220,15 +273,21 @@ export default function Onboarding() {
             <ThemedText style={styles.subtitle}>
               {user?.email_verified
                 ? 'Your email is ready for account recovery and the email notifications you choose.'
-                : `We sent a verification link to ${user?.email ?? 'your email'}. Open it, then come back here so we can check.`}
+                : verificationBusy && !verificationSent
+                  ? `Sending a verification link to ${user?.email ?? 'your email'}…`
+                  : verificationSent
+                    ? `We sent a verification link to ${user?.email ?? 'your email'}. Open it, then come back here so we can check.`
+                    : `Send a verification link to ${user?.email ?? 'your email'}, then come back here so we can check.`}
             </ThemedText>
             {!user?.email_verified && (
               <Pressable
                 disabled={verificationBusy}
-                onPress={resendVerification}
+                onPress={() => void requestVerification(false)}
                 style={({ pressed }) => [styles.resendButton, pressed && styles.pressed]}
               >
-                <ThemedText style={styles.resendText}>Send another link</ThemedText>
+                <ThemedText style={styles.resendText}>
+                  {verificationSent ? 'Send another link' : 'Send verification link'}
+                </ThemedText>
               </Pressable>
             )}
             {!!verificationMessage && (
@@ -244,18 +303,26 @@ export default function Onboarding() {
         )}
       </ScrollView>
 
-      <ThemedView style={styles.footer}>
+      <ThemedView style={[styles.footer, step === 2 && styles.footerWithFade]}>
+        {step === 2 && (
+          <LinearGradient
+            colors={[c.backgroundTransparent, c.backgroundFade25, c.backgroundFade60, c.background]}
+            locations={[0, 0.28, 0.58, 0.82]}
+            pointerEvents="none"
+            style={styles.footerFade}
+          />
+        )}
         <Pressable
-          disabled={verificationBusy}
+          disabled={verificationBusy || progressBusy}
           onPress={() => {
-            if (step === 1) setStep(2);
-            else if (step === 2) setStep(3);
+            if (step === 1) void advanceFromInterests();
+            else if (step === 2) openVerificationStep();
             else if (user?.email_verified) void finish();
             else void confirmVerification();
           }}
-          style={[styles.nextBtn, verificationBusy && styles.disabled]}
+          style={[styles.nextBtn, (verificationBusy || progressBusy) && styles.disabled]}
         >
-          {verificationBusy ? (
+          {verificationBusy || progressBusy ? (
             <ActivityIndicator color={c.onPrimary} />
           ) : (
             <>
@@ -278,10 +345,26 @@ export default function Onboarding() {
 
 const makeStyles = (c: Palette) => StyleSheet.create({
   screen: { flex: 1 },
-  container: { padding: 24, paddingTop: 80, paddingBottom: 170, gap: 8 },
-  step: { color: c.muted, fontWeight: '700', fontSize: 13, textTransform: 'uppercase', letterSpacing: 0.5 },
+  topBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 18,
+    paddingBottom: 8,
+    backgroundColor: c.background,
+  },
+  container: { paddingHorizontal: 24, paddingTop: 16, paddingBottom: 170, gap: 8 },
+  backButton: {
+    minHeight: 40,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 2,
+    paddingHorizontal: 6,
+  },
+  backText: { color: c.primary, fontSize: 16, fontWeight: '700' },
+  step: { marginLeft: 'auto', color: c.muted, fontWeight: '700', fontSize: 13, textTransform: 'uppercase', letterSpacing: 0.5 },
   title: { color: c.primary, marginBottom: 4 },
   subtitle: { color: c.subtle, lineHeight: 21, marginBottom: 16 },
+  progressMessage: { color: c.danger, lineHeight: 20, marginBottom: 8, fontWeight: '600' },
   mailIcon: {
     width: 60,
     height: 60,
@@ -323,6 +406,14 @@ const makeStyles = (c: Palette) => StyleSheet.create({
     paddingBottom: 40,
     backgroundColor: 'transparent',
     gap: 6,
+  },
+  footerWithFade: { paddingTop: 34 },
+  footerFade: {
+    position: 'absolute',
+    top: -72,
+    right: 0,
+    bottom: 0,
+    left: 0,
   },
   nextBtn: {
     flexDirection: 'row',

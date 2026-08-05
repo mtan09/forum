@@ -33,15 +33,25 @@ npx expo export --platform ios --output-dir /tmp/forum-ios-export
 
 The native baseline is Expo SDK 57 / React Native 0.86 and iOS 16.4+. The app
 is iPhone-only (`ios.supportsTablet=false`). Expo 57 currently has upstream
-build/lint dependency advisories in its own current toolchain; do not use
-`npm audit fix --force` or downgrade Expo to silence them. Reassess the
-advisories before each release and require Expo Doctor, typecheck, lint, and
-the production export to pass.
+build/lint dependency advisories in its own current toolchain. As reviewed on
+August 5, 2026, npm's 14 moderate findings all trace to `uuid@7.0.3` through
+Expo's `@expo/config-plugins -> xcode` project-generation path. The installed
+`xcode` package calls `uuid.v4()`; CVE-2026-41907 affects caller-provided output
+buffers in `v3()`, `v5()`, and `v6()`. This is not shipped application code.
+Do not use `npm audit fix --force` or downgrade Expo to silence it. Reassess the
+advisory before each release and require Expo Doctor, typecheck, lint, the
+production export, and a native simulator build to pass.
+
+The dependency set validated for the next build is Expo 57.0.10,
+Expo Constants 57.0.9, Expo Image 57.0.2, Expo Linking 57.0.5, Expo Router
+57.0.10, and React Native Gesture Handler 2.32.0. Do not replace the gesture
+handler pin with 3.x without documenting an Expo compatibility override and
+re-running the complete native release gate.
 
 ## 2. Production database and identities
 
 1. Back up the production database.
-2. Apply numbered migrations through 020 once, in order:
+2. Apply numbered migrations through 023 once, in order:
 
    ```bash
    railway run --service forum-api npm run migrate:release
@@ -49,6 +59,9 @@ the production export to pass.
    railway run --service forum-api npm run migrate:018
    railway run --service forum-api npm run migrate:019
    railway run --service forum-api npm run migrate:020
+   railway run --service forum-api npm run migrate:021
+   railway run --service forum-api npm run migrate:022
+   railway run --service forum-api npm run migrate:023
    ```
 
 3. Verify the separate release identities:
@@ -102,8 +115,29 @@ IDs until their delivery receipts are checked.
 Migration 018 adds first-party recommendation events, preference records, and
 local semantic vectors. Migration 019 adds DM-report support and an
 admin-hidden message flag. Migration 020 adds the fictional-demo marker,
-personas, and durable activity queue. All four must be applied before deploying
-code that queries their fields.
+personas, and durable activity queue. Migration 021 adds bounded article
+analysis profiles, derived search terms, and source-level forumAI eligibility.
+Migration 022 lets that disclosed scheduler queue idempotent publisher-article
+votes and headline-grounded fictional comments.
+All migrations must be applied before deploying code that queries their fields.
+
+Migration 021 is intentionally staged. After it is applied, deploy the updated
+`forum-ingest` service first so no new ingest writes bodies. Keep the existing
+API live during this step. Then run the scrub as a dry-run, review its
+feature-retention and clustering-agreement output, and apply its exact guard
+only when those checks pass. Deploy the updated API immediately afterward:
+
+```bash
+railway run --service forum-api npm run scrub:article-bodies
+ARTICLE_BODY_SCRUB=DELETE_STORED_ARTICLE_BODIES railway run --service forum-api npm run scrub:article-bodies
+railway run --service forum-api npm run verify:release
+```
+
+The guarded run derives any missing profile in the same update that nulls each
+legacy body, verifies no active body remains, and validates a database check
+that prevents future non-null writes. PostgreSQL MVCC pages and provider backups
+may retain historical physical bytes until their normal vacuum/retention cycle;
+the application must not claim immediate physical erasure from every backup.
 
 ## 3. Railway services
 
@@ -121,7 +155,8 @@ persists `ingest_runs`, and clusters after successful ingestion. Do not restore
 `INGEST_INTERVAL_MINUTES`; ingestion must not run inside the API process.
 
 The demo worker additionally requires `DEMO_ACTIVITY_ENABLED=yes`,
-`DEMO_ACTIVITY_MODEL`, and `DEMO_ACTIVITY_BATCH_SIZE`. It must remain a
+`DEMO_ACTIVITY_MODEL`, `DEMO_ACTIVITY_VOTE_BATCH_SIZE`, and
+`DEMO_ACTIVITY_CONTENT_BATCH_SIZE`. It must remain a
 separate cron, and it must be disabled before the approved build is manually
 released. Its fictional nature is disclosed in App Review Notes.
 
@@ -154,11 +189,15 @@ railway run --service forum-api npm run storage:feedback
 The media bucket is public; the feedback bucket must stay private. Confirm its
 lifecycle policy and test a five-minute admin-authorized screenshot URL.
 
-Deploy migrations first, then `forum-api`, then `forum-ingest`. Wait for
-Railway `SUCCESS`, call `/health`, inspect deploy/runtime logs, and trigger one
-manual ingest. Confirm one successful `ingest_runs` row before removing any
-legacy API variable. Simulate two concurrent ingests and verify one records
-`skipped_locked`.
+For ordinary changes, deploy migrations first, then `forum-api`, then
+`forum-ingest`. For migration 021 only, use the safer order above: migrate,
+deploy `forum-ingest`, scrub, deploy `forum-api`, verify, then recluster. This
+prevents an old ingest binary from violating the new no-body constraint and
+avoids publishing the updated privacy wording before the scrub is true. Wait
+for Railway `SUCCESS`, call `/health`, inspect deploy/runtime logs, and trigger
+one manual ingest. Confirm one successful `ingest_runs` row and confirm its
+newly inserted articles have a profile and `content IS NULL`. Simulate two
+concurrent ingests and verify one records `skipped_locked`.
 
 ## 4. Observability and delivery
 
@@ -227,7 +266,11 @@ not need to share their hostname.
 
 Production never logs verification links or reset codes when email is missing.
 Email verification gates email delivery only, not ordinary participation.
-New accounts see a third onboarding step with the destination address, resend,
+New accounts see a three-step, one-session welcome flow. The account and secure
+login token are durable as soon as Create Account succeeds; topics save when
+Step 1 advances, follows save immediately, and a cold relaunch opens the signed-in
+home feed instead of forcing onboarding to resume. Reaching Step 3 requests the
+first verification email and presents the destination address, resend,
 status-check, and continue-for-now actions; Settings retains the resend action
 for any account that remains unverified.
 The recovery API returning `{ "ok": true }` is not sufficient verification:
@@ -263,7 +306,14 @@ OpenAI choices, the existing-user just-in-time disclosure, withdrawal and
 re-consent, and confirm no affected request reaches OpenAI before permission.
 Also validate login, verification, reset, moderation allow/reject/outage,
 private profiles, follow requests, notification combinations, feedback
-screenshots, account deletion, push routing, and forumAI.
+screenshots, account deletion, push routing, and forumAI. For current-news
+grounding, ask at least `What are the hottest topics today?`, `What's trending
+in politics right now?`, and one named-policy question. Confirm the response
+uses attributed current headlines, does not claim it lacks current coverage
+when context was supplied, and the production log records a nonzero
+`coverage_items` count without logging the user's question. Open an article from
+the restricted-source set and confirm the client omits its forumAI action and a
+forged request receives the policy error before daily usage is consumed.
 
 Reject the build for render errors, native faults, unhandled promise warnings,
 unexplained server errors, or VirtualizedList regressions.
@@ -367,7 +417,9 @@ Before `Add for Review`, complete every remaining item:
    after the internal soak passes.
 7. Select app availability/territories and confirm the app is Free and Public.
    Keep Apple Silicon Mac and Vision Pro availability off for this iPhone-only
-   release unless they are deliberately tested.
+   release unless they are deliberately tested. Exclude China mainland unless
+   the account can provide the Internet News Information Permit Apple lists for
+   apps with news content.
 8. Complete the account-level EU Digital Services Act trader-status setup in
    App Store Connect Business, including any identity/contact verification
    Apple requests.
@@ -376,8 +428,18 @@ Before `Add for Review`, complete every remaining item:
    `docs/PUBLISHER_CONTENT_RIGHTS.md` records substantial permission gaps.
    Obtain a defensible authorization/legal basis or change the product/source
    scope before certifying; do not use a review note or attachment that implies
-   blanket publisher permission that has not been established.
-10. Re-run the official-policy review, full QA, physical-iPhone notification
+   blanket publisher permission that has not been established. Keep the concise
+   factual response in `docs/APP_REVIEW_CONTENT_RIGHTS_DRAFT.md` ready if Apple
+   asks how the article pipeline works.
+10. Update App Privacy to include the linked outbound-publisher-open signal as
+    Browsing History for Analytics and Product Personalization, without tracking.
+    Confirm every other answer still matches the submitted build and its third
+    parties.
+11. Remove public-production wording that presents the App Store version as a
+    beta. TestFlight may still use its own beta terminology, but the app,
+    description, support page, and privacy policy should use `Feedback` and
+    production product language.
+12. Re-run the official-policy review, full QA, physical-iPhone notification
     delivery, email verification/reset, deletion cleanup, Railway/Sentry/ingest
     checks, and a 24-hour internal TestFlight soak. Only then select the new
     release-candidate build, save all metadata, and use `Add for Review`.

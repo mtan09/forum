@@ -84,9 +84,11 @@ function AppNavigator() {
   const redirectTarget = loading
     ? null
     : session === null && !pathname.startsWith('/auth')
-      ? '/auth/landingpage'
+      ? pathname === '/onboarding' ? '/auth/createaccount' : '/auth/landingpage'
       : session && needsOnboarding && pathname !== '/onboarding'
         ? '/onboarding'
+        : session && !needsOnboarding && pathname === '/onboarding'
+          ? '/'
         : session && pathname.startsWith('/auth')
           ? '/'
           : null;
@@ -152,10 +154,10 @@ function AppNavigator() {
     [c.background, c.primary, c.surface, headerLeft]
   );
 
-  if (loading || redirectTarget) {
+  if (loading) {
     return (
-      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-        <ActivityIndicator size="large" />
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: c.background }}>
+        <ActivityIndicator size="large" color={c.muted} />
       </View>
     );
   }
@@ -276,7 +278,7 @@ function AppNavigator() {
               headerBackTitle: "Back",
             }}
           />
-          <Stack.Screen name="admin-feedback" options={{ title: 'Beta Feedback', headerBackTitle: 'Back' }} />
+          <Stack.Screen name="admin-feedback" options={{ title: 'Feedback', headerBackTitle: 'Back' }} />
           <Stack.Screen name="admin-moderation" options={{ title: 'Moderation Audit', headerBackTitle: 'Back' }} />
           <Stack.Screen name="admin-ingest" options={{ title: 'Ingest Status', headerBackTitle: 'Back' }} />
           <Stack.Screen
@@ -314,7 +316,7 @@ function AppNavigator() {
           />
           <Stack.Screen
             name="feedback"
-            options={{ title: 'Beta Feedback', headerBackTitle: 'Back' }}
+            options={{ title: 'Feedback', headerBackTitle: 'Back' }}
           />
           <Stack.Screen
             name="source/[name]"

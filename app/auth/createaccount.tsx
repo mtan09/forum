@@ -37,7 +37,9 @@ export default function CreateAccount() {
       tapMedium();
       setLoading(true);
       await signUp(name.trim(), email.trim(), password, aiConsent);
-      // root layout redirects to the feed once the session is set
+      // Navigate directly so account creation never flashes the root
+      // navigator's session-redirect placeholder between these screens.
+      router.replace('/onboarding');
     } catch (e: any) {
       setErr(e?.message ?? 'Something went wrong.');
     } finally {

@@ -1,8 +1,8 @@
 import ScalableImage from '@/components/scalable-image';
-import AvatarVisual from '@/components/avatar-visual';
 import DisplayName from '@/components/display-name';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
+import UserAvatar from '@/components/user-avatar';
 import { type Palette } from '@/constants/theme';
 import { usePalette } from '@/hooks/use-palette';
 import { useRelativeTime } from '@/hooks/useRelativeTime';
@@ -92,27 +92,23 @@ function Post({ post, variant = 'feed', recommendationContext }: Props) {
         <ThemedView style={styles.container}>
           {/* Avatar + name open the author's public profile; overflow menu at right */}
           <ThemedView style={styles.headerRow}>
-            <Pressable
-              onPress={() => router.push(`/user/${post.user}`)}
-              style={({ pressed }) => ({ opacity: pressed ? 0.6 : 1.0, flex: 1 })}
-            >
-              <ThemedView style={styles.header}>
-                <AvatarVisual
-                  userId={post.user}
-                  avatarUrl={user.avatar_url}
+            <ThemedView style={styles.header}>
+              <UserAvatar
+                userId={post.user}
+                avatarUrl={user.avatar_url}
+                isDemo={user.is_demo}
+                size={50}
+              />
+              <ThemedView style={styles.authorCopy}>
+                <DisplayName
+                  username={user.username}
                   isDemo={user.is_demo}
-                  size={50}
+                  nameStyle={{ fontWeight: '800', fontSize: 18 }}
+                  onUsernamePress={() => router.push(`/user/${post.user}`)}
                 />
-                <ThemedView style={{ flex: 1, minWidth: 0 }}>
-                  <DisplayName
-                    username={user.username}
-                    isDemo={user.is_demo}
-                    nameStyle={{ fontWeight: '800', fontSize: 18 }}
-                  />
-                  <ThemedText style={{color: c.muted, fontSize: 14}}>{timeAgo}</ThemedText>
-                </ThemedView>
+                <ThemedText style={{color: c.muted, fontSize: 14}}>{timeAgo}</ThemedText>
               </ThemedView>
-            </Pressable>
+            </ThemedView>
             <ThemedView style={styles.menuSlot}>
               <ContentActions
                 targetKind="post"
@@ -257,9 +253,16 @@ const makeStyles = (c: Palette) => StyleSheet.create({
     backgroundColor: 'transparent',
   },
   header: {
+    flex: 1,
+    minWidth: 0,
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
+  },
+  authorCopy: {
+    flex: 1,
+    minWidth: 0,
+    backgroundColor: 'transparent',
   },
   media: {
     borderRadius: 16,

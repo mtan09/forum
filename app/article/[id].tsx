@@ -110,24 +110,26 @@ export default function ArticleScreen() {
 
           {/* Read the original at the source */}
           <ThemedView style={styles.container}>
-          {/* Hand this article to forumAI as the chat subject */}
-          <Pressable
-            onPress={() =>
-              router.push({
-                pathname: '/(tabs)/ai',
-                params: {
-                  subjectKind: 'article',
-                  subjectId: article.id,
-                  subjectTitle: article.title?.slice(0, 80) ?? 'Article',
-                  subjectTs: String(Date.now()),
-                },
-              })
-            }
-            style={({ pressed }) => [styles.aiButton, { opacity: pressed ? 0.7 : 1 }]}
-          >
-            <IconSymbol name="sparkles" size={18} color={c.onPrimary} />
-            <ThemedText style={styles.aiButtonText}>Ask forumAI about this article</ThemedText>
-          </Pressable>
+          {/* Publisher-policy eligibility is enforced again by the API. */}
+          {article.ai_context_allowed && (
+            <Pressable
+              onPress={() =>
+                router.push({
+                  pathname: '/(tabs)/ai',
+                  params: {
+                    subjectKind: 'article',
+                    subjectId: article.id,
+                    subjectTitle: article.title?.slice(0, 80) ?? 'Article',
+                    subjectTs: String(Date.now()),
+                  },
+                })
+              }
+              style={({ pressed }) => [styles.aiButton, { opacity: pressed ? 0.7 : 1 }]}
+            >
+              <IconSymbol name="sparkles" size={18} color={c.onPrimary} />
+              <ThemedText style={styles.aiButtonText}>Ask forumAI about this article</ThemedText>
+            </Pressable>
+          )}
 
           <Pressable
             onPress={async () => {
@@ -152,7 +154,14 @@ export default function ArticleScreen() {
             }}
             style={({ pressed }) => [styles.readButton, { opacity: pressed ? 0.7 : 1 }]}
           >
-            <ThemedText style={styles.readButtonText}>Read full article at {article.source}</ThemedText>
+            <ThemedText
+              style={styles.readButtonText}
+              numberOfLines={2}
+              adjustsFontSizeToFit
+              minimumFontScale={0.86}
+            >
+              Read on {article.source}
+            </ThemedText>
             <IconSymbol name="square.and.arrow.up" size={18} color={c.primary} />
           </Pressable>
 
@@ -216,6 +225,7 @@ const makeStyles = (c: Palette) => StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     gap: 8,
+    paddingHorizontal: 12,
     paddingVertical: 12,
     borderRadius: 16,
     borderWidth: 2,
@@ -223,6 +233,9 @@ const makeStyles = (c: Palette) => StyleSheet.create({
     backgroundColor: c.card,
   },
   readButtonText: {
+    flexShrink: 1,
+    textAlign: 'center',
+    lineHeight: 19,
     fontWeight: '700',
     color: c.primary,
   },

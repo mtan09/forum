@@ -2,6 +2,9 @@
 
 Last reviewed: 2026-08-01
 
+Implementation updated: 2026-08-05. The publisher-policy evidence was not
+re-reviewed on that date; the original review date remains authoritative.
+
 This is the durable source-by-source record for the news publishers currently
 configured in `forum-api/src/ingest/sources.ts`. It supports, but does not
 replace, `APP_STORE_REVIEW.md`. Re-check an entry before relying on it for a
@@ -22,19 +25,20 @@ that every current use is authorized. It deliberately separates:
 As of this review, forum:
 
 1. polls 58 public RSS/Atom endpoints;
-2. stores each publisher's headline, canonical URL, publication date, selected
-   remote image URL, and extracted article text;
-3. uses the text privately for relevance scoring, lean scoring, clustering,
-   search, and forumAI retrieval;
+2. stores each publisher's headline, canonical URL, publication date, and
+   selected remote image URL, but not the extracted article body;
+3. may inspect feed/page text transiently in memory to derive lean/relevance
+   signals, bounded search terms, a local recommendation vector, and a one-way
+   weighted clustering profile;
 4. displays the publisher name, headline, remote image, date, and link, but not
-   the stored article body;
+   an article body;
 5. displays attributed publisher headlines in the Left/Center/Right summary
    cards; and
 6. directs the user to the publisher for the complete article.
 
 The current implementation is documented more fully in
-`docs/APP_STORE_REVIEW.md`. The fact that a body is private analysis input does
-not make publisher terms inapplicable. Likewise, not charging for the app does
+`docs/APP_STORE_REVIEW.md`. Transient analysis does not make publisher terms
+inapplicable or establish permission. Likewise, not charging for the app does
 not automatically make an organizational App Store product "personal" or
 "non-commercial" under a publisher's terms.
 
@@ -159,18 +163,23 @@ publisher photography. Each condition—attribution, direct linking, unchanged
 feed content, non-commercial limits, and no implied endorsement—must be honored
 individually.
 
-### 2. The current full-text/AI pipeline has concrete provider-term conflicts
+### 2. Automated analysis and AI restrictions still require source controls
 
 The Guardian, Condé Nast/The New Yorker, Sky, Daily Wire, and Newsmax have
 particularly clear restrictions involving automated collection, aggregation,
 data analysis, AI use, or RAG. Other publishers broadly prohibit scraping or
 systematic storage without naming AI. This is a publisher-terms issue; Apple did
-not create these restrictions.
+not create these restrictions. Removing body storage reduces retained-copy and
+AI-context exposure, but does not by itself resolve a restriction on fetching or
+automated analysis.
 
-Before certifying App Store Content Rights, obtain written permission, remove
-the affected source from the conflicting processing path, or obtain qualified
-legal advice that identifies another applicable basis. A general fair-use belief
-should not be recorded as publisher permission.
+The implementation blocks explicitly restricted sources from all forumAI news
+context and sends no publisher body to OpenAI for any source. It still performs
+transient local analysis during ingestion. Before certifying App Store Content
+Rights, obtain written permission, remove an affected source from any remaining
+conflicting path, or obtain qualified legal advice that identifies another
+applicable basis. A general fair-use belief should not be recorded as publisher
+permission.
 
 ### 3. Images are the least-supported content type
 
@@ -229,12 +238,19 @@ that public RSS availability alone is authorization.
 
 For a defensible provider program:
 
-1. Add machine-readable per-source policy fields beside `SOURCES`: review date,
-   metadata mode, image mode, analysis mode, policy URL, and contact.
+1. Maintain a machine-readable decision for every configured source. The code
+   now records the common review date, remote-preview image mode, transient local
+   analysis mode, and an explicit AI-context allow or block decision. Allowed
+   and blocked sets are deliberately exhaustive and disjoint; adding a source
+   without a decision fails the synchronization test. The linked evidence,
+   detailed status, policy URL, and contact remain in this registry rather than
+   being duplicated in runtime code.
 2. Seek written headline/thumbnail/analysis permission from priority outlets,
    starting with the feeds that materially improve perspective coverage.
-3. Route sources with explicit AI/automation restrictions away from article-body
-   storage and forumAI until permission or a reviewed legal basis exists.
+3. Keep publisher bodies out of permanent storage and OpenAI context. Route
+   sources with explicit AI/automation restrictions away from forumAI entirely
+   until permission or a reviewed legal basis exists, and separately review
+   whether transient local analysis is permitted.
 4. Prefer licensed or publisher-supplied metadata APIs where available.
 5. Keep a takedown log and remove challenged content promptly without treating
    removal as an admission.

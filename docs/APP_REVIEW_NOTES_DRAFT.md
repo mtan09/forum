@@ -21,6 +21,22 @@ activity and not a hidden review mode. The accounts and fixture activity will
 be removed before public release; the supplied non-admin reviewer account will
 remain available.
 
+The same scheduler gives newly ingested publisher cards a small number of
+persona-shaped votes and occasionally one visibly fictional community comment.
+Those comments are generated from the attributed headline only and do not
+claim to reproduce or summarize the publisher's full article.
+
+News-content flow: forum polls public publisher RSS/Atom feeds and shows the
+publisher name, attributed headline, publication date, canonical article link,
+and a remote preview image when publisher feed or page metadata supplies one.
+The complete article remains at the publisher. During ingestion, feed or page
+text may be processed transiently on forum's server to derive relevance,
+placement, bounded search/recommendation signals, and a one-way clustering
+profile; the article body is then discarded and is neither stored nor displayed.
+Summary perspective cards contain attributed headlines rather than copied body
+text. Publisher preview images are not copied into forum's object storage and
+remain visually connected to their publisher card and original link.
+
 Main areas to review:
 
 1. The Home tab contains For You, Random, and Against You feeds. Random is
@@ -43,13 +59,20 @@ Main areas to review:
    safety rules. Image uploads and forumAI ask again because those features
    require OpenAI image-safety or generation. The choice can be changed under
    Settings → Privacy → OpenAI processing.
+   News grounding contains only eligible attributed publisher headlines and
+   forum-generated story metadata; publisher article bodies are neither stored
+   nor sent to OpenAI. Content from publishers with reviewed AI/automation
+   restrictions is excluded from OpenAI context. Locally derived aggregate
+   clustering signals may still help forum identify a covered topic, after which
+   forumAI receives only eligible attributed headlines for that topic.
 5. UGC safety actions are available on posts, comments, profiles, and received
    direct messages. Reports enter an admin review queue; blocking prevents
    interaction in both directions. Support contact information is available at
    https://api.forumeveryside.com/support.
 6. Account deletion is available in Settings → Account → Delete Account. It
-   immediately removes the account and app data and queues associated stored
-   media for deletion within 24 hours.
+   immediately removes the account, app activity, and structured feedback
+   records, then queues associated stored media and private feedback screenshots
+   for deletion within 24 hours.
 7. Push permission is not requested at login. It is requested contextually
    when the user enables notifications in Settings. The only other declared
    device permission is Photo Library access for selecting an existing image.
@@ -57,6 +80,9 @@ Main areas to review:
 The app has no purchases, subscriptions, advertising, cross-app tracking, or
 social-login provider. Privacy Policy:
 https://api.forumeveryside.com/legal/privacy
+
+Publishers, photographers, and other rights holders can request a correction or
+removal at support@forumeveryside.com or through the public Support URL above.
 
 ## TestFlight “What to Test” draft
 
@@ -73,9 +99,12 @@ perspective labels, layout issues, and notification or email failures.
 1. Keep the version on manual release while Apple reviews it.
 2. Set `DEMO_ACTIVITY_ENABLED=no` on the demo worker.
 3. Run `npm run demo:cleanup` once as a dry run and verify that every target is
-   an `is_demo = true` account.
+   an `is_demo = true` account and that the reported article interactions match
+   the intended removal scope.
 4. Run the guarded apply command with
    `DEMO_ACCOUNT_DELETE=DELETE_FICTIONAL_DEMO_ACCOUNTS`.
+   The transaction also reconciles vote and comment counters on affected
+   publisher articles.
 5. Verify the reviewer account still signs in and remains non-admin.
 6. Smoke-test Home, Search, The Floor, Summary, forumAI, profiles, and their
    empty states in the already-approved build.

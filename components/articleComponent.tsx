@@ -8,6 +8,7 @@ import { useRelativeTime } from '@/hooks/useRelativeTime';
 import { getArticleImageCachePolicy, getDisplayableArticleMedia } from '@/lib/article-media';
 import type { RecommendationContext } from '@/lib/feed-events';
 import { getPerspectiveToneForPosition } from '@/lib/perspective-colors';
+import { PerspectiveTag } from '@/components/perspectiveTag';
 import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
@@ -32,6 +33,7 @@ export type ArticleType = {
   text_mode?: 'headline_only' | 'feed_description' | 'full_text';
   image_mode?: 'none' | 'remote_no_cache' | 'managed_thumbnail' | 'licensed_cache';
   ai_mode?: 'metadata_only' | 'structured_evidence' | 'permitted_text' | 'denied';
+  ai_context_allowed?: boolean;
   political_lean: number | null;
   content_type?: 'news_report' | 'opinion' | 'analysis' | 'factual_report' | null;
   lean_confidence?: number | null;
@@ -154,9 +156,7 @@ function Article({ article, variant = 'feed', recommendationContext }: Props) {
                     onPress={() => receiptPosition != null && setReceiptsOpen(true)}
                     style={({ pressed }) => ({ opacity: pressed ? 0.6 : 1 })}
                   >
-                    <ThemedView style={[styles.leanTag, { backgroundColor: leanTag.background }]}>
-                      <ThemedText style={[styles.leanTagText, { color: leanTag.color }]}>{leanTag.label}</ThemedText>
-                    </ThemedView>
+                    <PerspectiveTag label={leanTag.label} />
                   </Pressable>
                 )}
               </ThemedView>
@@ -334,15 +334,6 @@ const makeStyles = (c: Palette) => StyleSheet.create({
     paddingTop: 1,
     alignItems: 'flex-end',
     backgroundColor: 'transparent',
-  },
-  leanTag: {
-    borderRadius: 9,
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-  },
-  leanTagText: {
-    fontSize: 12,
-    fontWeight: '700',
   },
   media: {
     borderRadius: 16,

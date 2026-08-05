@@ -62,8 +62,10 @@ export const Colors = {
     // brand purple family
     accent: brandPurple,
     accentDeep: '#9A00FF',    // strong purple text on tinted chips
-    card: '#F5F2FF',          // purple-tinted cards
-    cardBorder: '#E4DCFF',
+    // Elevated/grouped forum surfaces need to read clearly against the white
+    // canvas without competing with the stronger purple action treatments.
+    card: '#ECE2F7',          // purple-tinted cards
+    cardBorder: '#D8C7EA',
     accentSoftBg: '#F1E8FB',  // purple chip fill
     accentFaint: '#E9C8FF',   // light purple button fill
     onAccentFaint: '#7A1FD0', // text on accentFaint
@@ -142,7 +144,7 @@ export const Colors = {
     blueBg: '#1C2A46',
     amber: '#FBBF24',
     amberBg: '#3A2D12',
-    centerTag: '#56616D',
+    centerTag: '#CBD5E1',
     centerBg: '#272C31',
     green: '#14DD78',
     success: '#35D98A',

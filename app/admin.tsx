@@ -12,7 +12,7 @@ import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet } from 'rea
 
 type Report = {
   id: string;
-  target_kind: 'post' | 'article' | 'comment' | 'user';
+  target_kind: 'post' | 'article' | 'comment' | 'user' | 'message';
   target_id: string;
   reason: string;
   detail: string | null;
@@ -62,7 +62,10 @@ function ReportCard({ report, onResolved }: { report: Report; onResolved: (id: s
     }
   };
 
-  const canHide = report.target_kind === 'post' || report.target_kind === 'comment';
+  const canHide = report.target_kind === 'post'
+    || report.target_kind === 'comment'
+    || report.target_kind === 'message';
+  const canBan = report.target_kind !== 'article';
 
   return (
     <ThemedView style={styles.card}>
@@ -87,9 +90,11 @@ function ReportCard({ report, onResolved }: { report: Report; onResolved: (id: s
             <ThemedText style={styles.hideText}>Hide content</ThemedText>
           </Pressable>
         )}
-        <Pressable onPress={() => act('ban')} disabled={busy} style={[styles.actionBtn, styles.banBtn]}>
-          <ThemedText style={styles.banText}>Ban user</ThemedText>
-        </Pressable>
+        {canBan && (
+          <Pressable onPress={() => act('ban')} disabled={busy} style={[styles.actionBtn, styles.banBtn]}>
+            <ThemedText style={styles.banText}>Ban user</ThemedText>
+          </Pressable>
+        )}
         <Pressable onPress={() => act('dismiss')} disabled={busy} style={[styles.actionBtn, styles.dismissBtn]}>
           <ThemedText style={styles.dismissText}>Dismiss</ThemedText>
         </Pressable>

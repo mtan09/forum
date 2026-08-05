@@ -79,7 +79,7 @@ export default function FeedbackScreen() {
         },
       });
       notifySuccess();
-      Alert.alert('Feedback sent', 'Thank you — this is now in the beta review queue.', [
+      Alert.alert('Feedback sent', 'Thank you — this is now in the review queue.', [
         { text: 'Done', onPress: () => router.back() },
       ]);
     } catch (err: any) {
@@ -96,7 +96,7 @@ export default function FeedbackScreen() {
       keyboardShouldPersistTaps="handled"
       showsVerticalScrollIndicator={false}
     >
-      <ThemedText style={styles.title}>Help shape the beta</ThemedText>
+      <ThemedText style={styles.title}>Help improve forum</ThemedText>
       <ThemedText style={styles.subtitle}>
         Tell us what happened and what you expected. Version and device details are attached automatically.
       </ThemedText>

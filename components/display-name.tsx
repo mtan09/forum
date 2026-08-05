@@ -1,7 +1,7 @@
 import { ThemedText } from '@/components/themed-text';
 import { usePalette } from '@/hooks/use-palette';
 import type { StyleProp, TextStyle, ViewStyle } from 'react-native';
-import { View } from 'react-native';
+import { Pressable, View } from 'react-native';
 
 type Props = {
   username?: string | null;
@@ -10,6 +10,7 @@ type Props = {
   labelStyle?: StyleProp<TextStyle>;
   containerStyle?: StyleProp<ViewStyle>;
   numberOfLines?: number;
+  onUsernamePress?: () => void;
 };
 
 export default function DisplayName({
@@ -19,8 +20,15 @@ export default function DisplayName({
   labelStyle,
   containerStyle,
   numberOfLines,
+  onUsernamePress,
 }: Props) {
   const { c } = usePalette();
+  const name = (
+    <ThemedText type="defaultSemiBold" style={nameStyle} numberOfLines={numberOfLines}>
+      {username || 'Anonymous'}
+    </ThemedText>
+  );
+
   return (
     <View
       style={[
@@ -28,9 +36,16 @@ export default function DisplayName({
         containerStyle,
       ]}
     >
-      <ThemedText type="defaultSemiBold" style={nameStyle} numberOfLines={numberOfLines}>
-        {username || 'Anonymous'}
-      </ThemedText>
+      {onUsernamePress ? (
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={`Open ${username || 'Anonymous'}'s profile`}
+          onPress={onUsernamePress}
+          style={({ pressed }) => ({ opacity: pressed ? 0.6 : 1 })}
+        >
+          {name}
+        </Pressable>
+      ) : name}
       {isDemo && (
         <ThemedText
           accessibilityLabel="Fictional demo account"

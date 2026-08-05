@@ -349,7 +349,7 @@ export default function Settings() {
   const handleDeleteAccount = () => {
     Alert.alert(
       'Delete account?',
-      'This immediately deletes your account and app activity. Associated images and private feedback screenshots are removed from active storage within 24 hours. This cannot be undone.',
+      'This immediately deletes your account, app activity, and feedback. Associated images and private feedback screenshots are removed from active storage within 24 hours. This cannot be undone.',
       [
         { text: 'Cancel', style: 'cancel' },
         {
@@ -510,7 +510,7 @@ export default function Settings() {
           <SectionHeader title="Moderation" />
           <Card>
             <Row label="Review reports" chevron onPress={() => router.push('/admin')} />
-            <Row label="Beta feedback" chevron onPress={() => router.push('/admin-feedback')} />
+            <Row label="Feedback" chevron onPress={() => router.push('/admin-feedback')} />
             <Row label="Moderation audit" chevron onPress={() => router.push('/admin-moderation')} />
             <Row label="Ingest status" chevron onPress={() => router.push('/admin-ingest')} />
           </Card>
@@ -523,7 +523,7 @@ export default function Settings() {
           label="Version"
           value={`${Constants.nativeAppVersion ?? Constants.expoConfig?.version ?? '1.0.0'} (${Constants.nativeBuildVersion ?? 'dev'})`}
         />
-        <Row label="Send Beta Feedback" chevron onPress={() => router.push('/feedback')} />
+        <Row label="Send Feedback" chevron onPress={() => router.push('/feedback')} />
         <Row label="Support" chevron onPress={() => WebBrowser.openBrowserAsync(`${API_URL}/support`)} />
         <Row label="Terms of Service" chevron onPress={() => WebBrowser.openBrowserAsync(`${API_URL}/legal/terms`)} />
         <Row label="Privacy Policy" chevron onPress={() => WebBrowser.openBrowserAsync(`${API_URL}/legal/privacy`)} />

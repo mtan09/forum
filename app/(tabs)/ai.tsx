@@ -8,6 +8,7 @@ import { usePalette } from '@/hooks/use-palette';
 import { requestAIConsent } from '@/lib/ai-consent';
 import { API_URL, getToken } from '@/lib/api';
 import { getPerspectiveTone } from '@/lib/perspective-colors';
+import { PerspectiveTag } from '@/components/perspectiveTag';
 import Markdown from '@ronradtke/react-native-markdown-display';
 import { useLocalSearchParams } from 'expo-router';
 import { fetch as expoFetch } from 'expo/fetch';
@@ -24,6 +25,25 @@ type Message = {
   streaming?: boolean;
   error?: boolean;
 };
+
+const BROAD_PROMPTS = [
+  'Where do major political perspectives agree?',
+  'What context is missing from today’s political coverage?',
+  'Which policy debate matters most right now?',
+  'How do different ideologies approach the economy?',
+  'What are the strongest arguments on each side of a major issue?',
+  'Which political assumptions deserve more scrutiny?',
+  'How do the parties define fairness differently?',
+];
+
+function shuffledPrompts(count = 3): string[] {
+  const prompts = [...BROAD_PROMPTS];
+  for (let index = prompts.length - 1; index > 0; index--) {
+    const swapIndex = Math.floor(Math.random() * (index + 1));
+    [prompts[index], prompts[swapIndex]] = [prompts[swapIndex], prompts[index]];
+  }
+  return prompts.slice(0, count);
+}
 
 const AnimatedLoadingDots = () => {
   const { c } = usePalette();
@@ -82,6 +102,7 @@ export default function AI() {
   const showWebComparison = Platform.OS === 'web' && windowWidth >= 1080;
 
   const [inputText, setInputText] = useState('');
+  const [suggestedPrompts, setSuggestedPrompts] = useState(() => shuffledPrompts());
 
   const framings = [
     "General Audience",
@@ -125,12 +146,14 @@ export default function AI() {
     setActiveLean('Center');
     setSubject(null);
     setMessages([]); // clear chat log
+    setSuggestedPrompts(shuffledPrompts());
     Keyboard.dismiss();
   };
 
   const [messages, setMessages] = useState<Message[]>([]); // start with an empty chat log
   const [isLoading, setIsLoading] = useState(false);
   const scrollRef = useRef<ScrollView>(null);
+  const messageSequenceRef = useRef(0);
 
   useEffect(() => {
     if (!hasStarted) return;
@@ -152,10 +175,11 @@ export default function AI() {
           : { role: 'assistant', left: m.left, center: m.center, right: m.right }
       );
 
-    const aiId = `${Date.now()}-ai`;
+    const userId = `${messageSequenceRef.current++}-user`;
+    const aiId = `${messageSequenceRef.current++}-ai`;
     setMessages(prev => [
       ...prev,
-      { id: Date.now().toString(), sender: 'user', content: userMessage },
+      { id: userId, sender: 'user', content: userMessage },
       { id: aiId, sender: 'ai', content: '', left: '', center: '', right: '', streaming: true },
     ]);
     setIsLoading(true);
@@ -260,12 +284,6 @@ export default function AI() {
     }
   }, [messages]);
 
-  const suggestedPrompts = [
-    'What are both sides missing about housing costs?',
-    'Explain today’s biggest story without the spin.',
-    'Where do the left and right actually agree?',
-  ];
-
   const submit = async (text = inputText) => {
     const trimmed = text.trim();
     if (!trimmed || isLoading) return;
@@ -276,8 +294,8 @@ export default function AI() {
     setHasStarted(true);
   };
 
-  const renderComposer = (compact = false) => (
-    <ThemedView style={[styles.composerArea, compact && styles.composerAreaCompact]}>
+  const renderComposer = () => (
+    <ThemedView style={styles.composerArea}>
       {subject && (
         <ThemedView style={styles.subjectChip}>
           <ThemedText numberOfLines={1} style={styles.subjectChipText}>
@@ -313,7 +331,28 @@ export default function AI() {
         actionDisabled={!canSend}
         onAction={() => void submit()}
       />
-      {!compact && <ThemedText style={styles.disclaimer}>forumAI compares perspectives; verify important claims with primary sources.</ThemedText>}
+      <ThemedText style={styles.disclaimer}>forumAI compares perspectives; verify important claims with primary sources.</ThemedText>
+    </ThemedView>
+  );
+
+  const renderLensTabs = (interactive: boolean) => (
+    <ThemedView style={[styles.lensTabs, !interactive && styles.landingLensTabs]}>
+      {(['Left', 'Center', 'Right'] as const).map((lean) => {
+        const selected = activeLean === lean;
+        return (
+          <Pressable
+            key={lean}
+            disabled={!interactive}
+            onPress={() => setActiveLean(lean)}
+            style={[
+              styles.lensTab,
+              interactive && selected && { backgroundColor: c.background, borderColor: c.cardBorder },
+            ]}
+          >
+            <PerspectiveTag label={lean} variant="solid" style={styles.lensTag} />
+          </Pressable>
+        );
+      })}
     </ThemedView>
   );
 
@@ -321,52 +360,45 @@ export default function AI() {
     <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={styles.keyboardView}>
       <ThemedView style={styles.container}>
         {!hasStarted ? (
-          <ScrollView
-            contentContainerStyle={styles.landingContent}
-            keyboardShouldPersistTaps="handled"
-            keyboardDismissMode="on-drag"
-          >
-            <ThemedView style={styles.landingTitleRow}>
-              <IconSymbol name="brain.fill" size={36} color={c.primary} style={styles.landingBrain} />
-              <ThemedText type="title" style={styles.landingTitle}>forumAI</ThemedText>
-            </ThemedView>
-
-            <ThemedView style={styles.perspectivePreview}>
-              {[
-                getPerspectiveTone('Left', c),
-                getPerspectiveTone('Center', c),
-                getPerspectiveTone('Right', c),
-              ].map((item) => (
-                <ThemedView key={item.label} style={[styles.perspectiveCard, { backgroundColor: item.background, borderLeftColor: item.color }]}>
-                  <ThemedView style={[styles.perspectiveTag, { backgroundColor: item.color }]}>
-                    <ThemedText style={styles.perspectiveLabel}>{item.label}</ThemedText>
-                  </ThemedView>
-                </ThemedView>
-              ))}
-            </ThemedView>
-
-            {renderComposer()}
-
-            <ThemedView style={styles.suggestionsSection}>
-              <ThemedView style={styles.sectionHeadingRow}>
-                <ThemedText style={styles.sectionHeading}>Try a sharper question</ThemedText>
-                <ThemedText style={styles.sectionHint}>Tap to use</ThemedText>
+          <>
+            <ScrollView
+              contentContainerStyle={styles.landingContent}
+              keyboardShouldPersistTaps="handled"
+              keyboardDismissMode="on-drag"
+            >
+              <ThemedView style={styles.landingTitleRow}>
+                <IconSymbol name="brain.fill" size={36} color={c.primary} style={styles.landingBrain} />
+                <ThemedText type="title" style={styles.landingTitle}>forumAI</ThemedText>
               </ThemedView>
-              {suggestedPrompts.map((prompt, index) => (
-                <Pressable
-                  key={prompt}
-                  onPress={() => setInputText(prompt)}
-                  style={({ pressed }) => [styles.suggestion, { opacity: pressed ? 0.65 : 1 }]}
-                >
-                  <ThemedView style={styles.suggestionNumber}>
-                    <ThemedText style={styles.suggestionNumberText}>0{index + 1}</ThemedText>
-                  </ThemedView>
-                  <ThemedText style={styles.suggestionText}>{prompt}</ThemedText>
-                  <IconSymbol name="chevron.right" size={17} color={c.faint} />
-                </Pressable>
-              ))}
-            </ThemedView>
-          </ScrollView>
+
+              {renderLensTabs(false)}
+
+              <ThemedView style={styles.suggestionsSection}>
+                <ThemedView style={styles.sectionHeadingRow}>
+                  <ThemedText style={styles.sectionHeading}>Questions to explore</ThemedText>
+                  <Pressable
+                    onPress={() => setSuggestedPrompts(shuffledPrompts())}
+                    hitSlop={8}
+                    accessibilityRole="button"
+                    accessibilityLabel="Show different questions"
+                  >
+                    <ThemedText style={styles.sectionHint}>Shuffle</ThemedText>
+                  </Pressable>
+                </ThemedView>
+                {suggestedPrompts.map((prompt) => (
+                  <Pressable
+                    key={prompt}
+                    onPress={() => setInputText(prompt)}
+                    style={({ pressed }) => [styles.suggestion, pressed && styles.suggestionPressed]}
+                  >
+                    <ThemedText style={styles.suggestionText}>{prompt}</ThemedText>
+                    <IconSymbol name="arrow.up.left" size={13} color={c.faint} />
+                  </Pressable>
+                ))}
+              </ThemedView>
+            </ScrollView>
+            {renderComposer()}
+          </>
         ) : (
           <>
             <ThemedView style={styles.header}>
@@ -376,9 +408,14 @@ export default function AI() {
                   <ThemedText style={styles.headerSubtitle}>Three perspectives · one question</ThemedText>
                 </ThemedView>
               </ThemedView>
-              <Pressable onPress={handleEndChat} style={styles.newChatButton} accessibilityRole="button" accessibilityLabel="End chat and start over">
-                <IconSymbol name="plus" size={18} color={c.primary} />
-                <ThemedText style={styles.newChatText}>New</ThemedText>
+              <Pressable
+                onPress={handleEndChat}
+                hitSlop={8}
+                style={styles.closeChatButton}
+                accessibilityRole="button"
+                accessibilityLabel="Close conversation"
+              >
+                <IconSymbol name="xmark" size={17} color={c.primary} />
               </Pressable>
             </ThemedView>
 
@@ -419,8 +456,7 @@ export default function AI() {
                           return (
                             <ThemedView key={lean} style={styles.comparisonColumn}>
                               <ThemedView style={[styles.comparisonHeading, { borderTopColor: tone.color }]}>
-                                <ThemedView style={[styles.lensDot, { backgroundColor: tone.color }]} />
-                                <ThemedText style={styles.comparisonLabel}>{lean}</ThemedText>
+                                <PerspectiveTag label={lean} variant="solid" />
                               </ThemedView>
                               <ThemedView style={styles.comparisonBody}>
                                 {copy ? (
@@ -438,22 +474,7 @@ export default function AI() {
                       </ThemedView>
                     ) : (
                       <>
-                        <ThemedView style={styles.lensTabs}>
-                          {(['Left', 'Center', 'Right'] as const).map((lean) => {
-                            const selected = activeLean === lean;
-                            const leanColor = getPerspectiveTone(lean, c).color;
-                            return (
-                              <Pressable
-                                key={lean}
-                                onPress={() => setActiveLean(lean)}
-                                style={[styles.lensTab, selected && { backgroundColor: c.background, borderColor: c.cardBorder }]}
-                              >
-                                <ThemedView style={[styles.lensDot, { backgroundColor: leanColor }]} />
-                                <ThemedText style={[styles.lensTabText, selected && { color: c.text }]}>{lean}</ThemedText>
-                              </Pressable>
-                            );
-                          })}
-                        </ThemedView>
+                        {renderLensTabs(true)}
 
                         <ThemedView style={styles.answerBody}>
                           {(activeLean === 'Left' ? message.left : activeLean === 'Center' ? message.center : message.right) ? (
@@ -478,7 +499,7 @@ export default function AI() {
                 )
               )}
             </ScrollView>
-            {renderComposer(true)}
+            {renderComposer()}
           </>
         )}
       </ThemedView>
@@ -489,42 +510,21 @@ export default function AI() {
 const makeStyles = (c: Palette) => StyleSheet.create({
   keyboardView: { flex: 1 },
   container: { flex: 1 },
-  landingContent: { paddingTop: Platform.OS === 'web' ? 36 : 82, paddingHorizontal: Platform.OS === 'web' ? 28 : 16, paddingBottom: 44 },
+  landingContent: { paddingTop: Platform.OS === 'web' ? 36 : 82, paddingHorizontal: Platform.OS === 'web' ? 28 : 16, paddingBottom: 24 },
   landingTitleRow: { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: 'transparent' },
   landingBrain: { transform: [{ translateY: -2 }] },
   landingTitle: { color: c.primary },
-  perspectivePreview: { flexDirection: 'row', gap: 8, marginTop: 20, backgroundColor: 'transparent' },
-  perspectiveCard: { flex: 1, minHeight: Platform.OS === 'web' ? 68 : 50, borderRadius: 12, borderLeftWidth: 4, paddingHorizontal: Platform.OS === 'web' ? 14 : 8, justifyContent: 'center' },
-  perspectiveTag: { alignSelf: 'flex-start', borderRadius: 9, paddingHorizontal: 8, paddingVertical: 2 },
-  perspectiveLabel: { color: c.onPrimary, fontSize: 12, lineHeight: 16, fontWeight: '800' },
   composerArea: {
-    marginTop: 22,
-    borderRadius: 20,
-    borderWidth: 1,
-    borderColor: c.cardBorder,
-    backgroundColor: c.card,
-    padding: 12,
-    gap: 9,
-    ...(Platform.OS === 'web'
-      ? { boxShadow: `0 5px 14px ${c.shadow}14` }
-      : {
-          shadowColor: c.shadow,
-          shadowOffset: { width: 0, height: 5 },
-          shadowOpacity: 0.08,
-          shadowRadius: 14,
-        }),
-    elevation: 3,
-  },
-  composerAreaCompact: {
     marginTop: 0,
     borderRadius: 0,
     borderWidth: 0,
     borderTopWidth: 1,
     borderTopColor: c.border,
+    backgroundColor: c.card,
     paddingHorizontal: 12,
     paddingTop: 10,
     paddingBottom: Platform.OS === 'ios' ? 16 : 10,
-    ...(Platform.OS === 'web' ? { boxShadow: 'none' } : { shadowOpacity: 0 }),
+    gap: 9,
   },
   subjectChip: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: c.accentSoftBg, borderRadius: 10, paddingHorizontal: 10, paddingVertical: 6 },
   subjectChipText: { flex: 1, color: c.onAccentFaint, fontWeight: '700', fontSize: 12, lineHeight: 16 },
@@ -532,21 +532,19 @@ const makeStyles = (c: Palette) => StyleSheet.create({
   framingLabel: { flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: 'transparent' },
   framingLabelText: { color: c.muted, fontSize: 12, fontWeight: '700' },
   disclaimer: { color: c.muted, fontSize: 10, lineHeight: 14, textAlign: 'center' },
-  suggestionsSection: { marginTop: 26, backgroundColor: 'transparent' },
+  suggestionsSection: { marginTop: 28, backgroundColor: 'transparent' },
   sectionHeadingRow: { flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between', marginBottom: 8, backgroundColor: 'transparent' },
-  sectionHeading: { fontWeight: '900', fontSize: 15 },
-  sectionHint: { color: c.muted, fontSize: 11 },
-  suggestion: { minHeight: 58, borderBottomWidth: 1, borderBottomColor: c.border, flexDirection: 'row', alignItems: 'center', gap: 11, backgroundColor: 'transparent' },
-  suggestionNumber: { width: 30, height: 30, borderRadius: 9, backgroundColor: c.accentSoftBg, alignItems: 'center', justifyContent: 'center' },
-  suggestionNumberText: { color: c.accentDeep, fontSize: 10, fontWeight: '900' },
-  suggestionText: { flex: 1, fontSize: 13, lineHeight: 18, fontWeight: '700' },
+  sectionHeading: { color: c.subtle, fontWeight: '800', fontSize: 13 },
+  sectionHint: { color: c.primary, fontSize: 11, fontWeight: '700' },
+  suggestion: { minHeight: 44, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: c.border, flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 2, backgroundColor: 'transparent' },
+  suggestionPressed: { opacity: 0.55 },
+  suggestionText: { flex: 1, color: c.subtle, fontSize: 12, lineHeight: 17, fontWeight: '600' },
   header: { minHeight: Platform.OS === 'web' ? 76 : 116, paddingTop: Platform.OS === 'web' ? 18 : 62, paddingHorizontal: Platform.OS === 'web' ? 24 : 16, paddingBottom: 12, borderBottomWidth: 1, borderBottomColor: c.border, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   headerBrand: { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: 'transparent' },
   headerCopy: { backgroundColor: 'transparent' },
-  headerTitle: { fontSize: 17, lineHeight: 20, fontWeight: '900' },
+  headerTitle: { color: c.primary, fontSize: 17, lineHeight: 20, fontWeight: '900' },
   headerSubtitle: { color: c.muted, fontSize: 10, lineHeight: 13 },
-  newChatButton: { flexDirection: 'row', alignItems: 'center', gap: 3, borderWidth: 1, borderColor: c.cardBorder, backgroundColor: c.card, borderRadius: 10, paddingHorizontal: 9, paddingVertical: 7 },
-  newChatText: { color: c.primary, fontSize: 12, fontWeight: '800' },
+  closeChatButton: { width: 36, height: 36, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: c.cardBorder, backgroundColor: c.card, borderRadius: 12 },
   chatContainer: { flex: 1 },
   chatContent: { gap: 14, paddingHorizontal: Platform.OS === 'web' ? 20 : 12, paddingTop: 16, paddingBottom: 20 },
   userMessage: { alignSelf: 'flex-end', maxWidth: '86%', backgroundColor: c.primary, borderRadius: 18, borderTopRightRadius: 5, paddingHorizontal: 14, paddingVertical: 10 },
@@ -559,14 +557,13 @@ const makeStyles = (c: Palette) => StyleSheet.create({
   answerHeading: { fontSize: 15, lineHeight: 19, fontWeight: '900', marginTop: 2 },
   streamingLabel: { color: c.primary, fontSize: 8, fontWeight: '900', letterSpacing: 0.8 },
   lensTabs: { flexDirection: 'row', marginHorizontal: 12, borderRadius: 12, backgroundColor: c.inputBg, padding: 3 },
+  landingLensTabs: { marginHorizontal: 0, marginTop: 20 },
   lensTab: { flex: 1, minHeight: 34, borderRadius: 9, borderWidth: 1, borderColor: 'transparent', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6 },
-  lensDot: { width: 6, height: 6, borderRadius: 3 },
-  lensTabText: { color: c.muted, fontSize: 12, fontWeight: '800' },
+  lensTag: { alignSelf: 'center' },
   answerBody: { minHeight: 116, paddingHorizontal: 15, paddingTop: 16, paddingBottom: 8, backgroundColor: 'transparent' },
   comparisonGrid: { flexDirection: 'row', gap: 1, borderTopWidth: 1, borderTopColor: c.border, backgroundColor: c.border },
   comparisonColumn: { flex: 1, minWidth: 0, backgroundColor: c.background },
   comparisonHeading: { minHeight: 44, borderTopWidth: 4, paddingHorizontal: 13, flexDirection: 'row', alignItems: 'center', gap: 7, backgroundColor: c.surface },
-  comparisonLabel: { fontSize: 13, lineHeight: 17, fontWeight: '900' },
   comparisonBody: { flex: 1, minHeight: 190, paddingHorizontal: 14, paddingTop: 15, paddingBottom: 8, backgroundColor: c.background },
   aiErrorText: { color: c.danger, fontWeight: '700' },
   loadingState: { minHeight: 90, alignItems: 'center', justifyContent: 'center', backgroundColor: 'transparent' },

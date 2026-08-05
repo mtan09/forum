@@ -9,6 +9,7 @@ import { usePalette } from '@/hooks/use-palette';
 import { api } from '@/lib/api';
 import { getArticleImageCachePolicy, getDisplayableArticleMedia } from '@/lib/article-media';
 import { getPerspectiveTone, type PerspectiveName } from '@/lib/perspective-colors';
+import { PerspectiveTag } from '@/components/perspectiveTag';
 import { Image } from 'expo-image';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -18,6 +19,9 @@ import { Platform, Pressable, ScrollView, StyleSheet, useWindowDimensions } from
 const MAX_IMAGES = 6;
 const MAX_ARTICLES = 12;
 const MAX_PERSPECTIVE_CHARS = 180;
+// Keep the computed field and Spectrum implementation available, but do not
+// present it as public opinion until the product has a representative sample.
+const SHOW_PUBLIC_OPINION = false;
 
 type Summary = {
   id: string;
@@ -29,7 +33,7 @@ type Summary = {
 }
 
 // The generated long_summary contains one attributed publisher headline per
-// perspective. Stored article bodies are analysis input and never render here.
+// perspective. Publisher article bodies are never stored or rendered here.
 type Perspective = { lean: 'left' | 'center' | 'right'; source: string; coverage: string };
 
 function readableExcerpt(text: string): string {
@@ -39,6 +43,16 @@ function readableExcerpt(text: string): string {
   const lastSpace = slice.lastIndexOf(' ');
   const cut = lastSpace >= MAX_PERSPECTIVE_CHARS * 0.6 ? slice.slice(0, lastSpace) : slice;
   return `${cut.trimEnd()}…`;
+}
+
+function comparableHeadline(text: string): string {
+  return text
+    .replace(/…$/, '')
+    .replace(/[‘’]/g, "'")
+    .replace(/[“”]/g, '"')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .toLowerCase();
 }
 
 function parsePerspectives(text: string): Perspective[] | null {
@@ -210,34 +224,67 @@ export default function SummaryScreen() {
           )}
         </ThemedView>
 
-        {/* Coverage by perspective — one voice per side of the spectrum */}
+        {/* Coverage by perspective — a single grouped comparison surface keeps
+            the data colors subordinate to forum's purple visual system. */}
         {perspectives ? (
           <ThemedView style={styles.section}>
             <ThemedView style={[styles.sectionHeading, !isWideWeb && styles.sectionHeadingStack]}>
               <ThemedText style={styles.sectionTitle}>Three perspectives</ThemedText>
               <ThemedText style={styles.sectionCaption}>How coverage frames the same story</ThemedText>
             </ThemedView>
-            <ThemedView style={[styles.perspectives, !isWideWeb && styles.perspectivesStack]}>
-              {perspectives.map((p) => {
+            <ThemedView style={styles.perspectivePanel}>
+              {perspectives.map((p, index) => {
                 const label = `${p.lean.charAt(0).toUpperCase()}${p.lean.slice(1)}` as PerspectiveName;
                 const tone = getPerspectiveTone(label, c);
+                const sourceArticles = articles.filter(
+                  (article) => article.source.trim().toLowerCase() === p.source.trim().toLowerCase()
+                );
+                const perspectiveHeadline = comparableHeadline(p.coverage);
+                const perspectiveArticle = sourceArticles.find((article) => {
+                  const articleHeadline = comparableHeadline(article.title);
+                  return articleHeadline === perspectiveHeadline
+                    || articleHeadline.startsWith(perspectiveHeadline)
+                    || perspectiveHeadline.startsWith(articleHeadline);
+                }) ?? sourceArticles[0];
                 return (
-                  <ThemedView
+                  <Pressable
                     key={p.lean}
-                    style={[
-                      styles.perspectiveCard,
-                      isWideWeb && styles.perspectiveCardWide,
-                      { backgroundColor: tone.background, borderLeftColor: tone.color },
-                    ]}
+                    accessibilityRole={perspectiveArticle ? 'link' : undefined}
+                    accessibilityLabel={perspectiveArticle
+                      ? `Open ${p.source} article: ${p.coverage}`
+                      : undefined}
+                    disabled={!perspectiveArticle}
+                    onPress={() => {
+                      if (perspectiveArticle) router.push(`/article/${perspectiveArticle.id}`);
+                    }}
+                    style={({ pressed }) => [
+                        styles.perspectiveRow,
+                        index < perspectives.length - 1 && styles.perspectiveDivider,
+                        pressed && perspectiveArticle && styles.perspectivePressed,
+                      ]}
                   >
-                    <ThemedView style={styles.perspectiveHeader}>
-                      <ThemedView style={[styles.leanTag, { backgroundColor: tone.color }]}>
-                        <ThemedText style={styles.leanTagText}>{tone.label}</ThemedText>
+                    <ThemedView
+                      accessibilityElementsHidden
+                      importantForAccessibility="no-hide-descendants"
+                      style={[styles.perspectiveMarker, { backgroundColor: tone.color }]}
+                    />
+                    <ThemedView style={styles.perspectiveContent}>
+                      <ThemedView style={styles.perspectiveHeader}>
+                        <PerspectiveTag label={tone.label} />
+                        <ThemedText
+                          type="defaultSemiBold"
+                          style={styles.perspectiveSource}
+                          numberOfLines={1}
+                        >
+                          {p.source}
+                        </ThemedText>
+                        {perspectiveArticle && (
+                          <IconSymbol name="chevron.right" size={14} color={c.muted} />
+                        )}
                       </ThemedView>
-                      <ThemedText type="defaultSemiBold" style={styles.perspectiveSource}>{p.source}</ThemedText>
+                      <ThemedText style={styles.perspectiveQuote}>{p.coverage}</ThemedText>
                     </ThemedView>
-                    <ThemedText style={styles.perspectiveQuote}>{p.coverage}</ThemedText>
-                  </ThemedView>
+                  </Pressable>
                 );
               })}
             </ThemedView>
@@ -252,7 +299,7 @@ export default function SummaryScreen() {
 
         {/* Public opinion = average scored position of matched posts;
             hidden until enough community posts exist for this story */}
-        {summary?.public_position != null && (
+        {SHOW_PUBLIC_OPINION && summary?.public_position != null && (
           <Spectrum width={contentWidth} height={20} topic="Public Opinion" position={summary.public_position} textStyle={{fontWeight: '800'}}/>
         )}
 
@@ -579,23 +626,40 @@ const makeStyles = (c: Palette) => StyleSheet.create({
     fontSize: 12,
     lineHeight: 16,
   },
-  perspectives: {
-    flexDirection: 'row',
-    gap: 10,
+  perspectivePanel: {
+    overflow: 'hidden',
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: c.cardBorder,
+    backgroundColor: c.card,
     marginBottom: 8,
   },
-  perspectivesStack: {
-    flexDirection: 'column',
-  },
-  perspectiveCard: {
+  perspectiveRow: {
     minWidth: 0,
-    borderRadius: 12,
-    borderLeftWidth: 4,
-    padding: 12,
-    gap: 6,
+    flexDirection: 'row',
+    gap: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 15,
+    backgroundColor: 'transparent',
   },
-  perspectiveCardWide: {
+  perspectiveDivider: {
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: c.cardBorder,
+  },
+  perspectivePressed: {
+    backgroundColor: c.accentSoftBg,
+  },
+  perspectiveMarker: {
+    width: 3,
+    minHeight: 54,
+    borderRadius: 999,
+    backgroundColor: 'transparent',
+  },
+  perspectiveContent: {
     flex: 1,
+    minWidth: 0,
+    gap: 8,
+    backgroundColor: 'transparent',
   },
   perspectiveHeader: {
     flexDirection: 'row',
@@ -603,24 +667,19 @@ const makeStyles = (c: Palette) => StyleSheet.create({
     gap: 8,
     backgroundColor: 'transparent',
   },
-  leanTag: {
-    borderRadius: 9,
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-  },
-  leanTagText: {
-    color: c.onPrimary,
-    fontSize: 12,
-    fontWeight: '800',
-    lineHeight: 16,
-  },
   perspectiveSource: {
-    fontSize: 14,
-    fontWeight: '700',
+    flex: 1,
+    minWidth: 0,
+    color: c.subtle,
+    fontSize: 12,
+    lineHeight: 16,
+    fontWeight: '800',
+    textAlign: 'right',
   },
   perspectiveQuote: {
     fontSize: 15,
-    lineHeight: 21,
+    lineHeight: 22,
+    fontWeight: '600',
   },
   coverageHeader: {
     flexDirection: 'row',

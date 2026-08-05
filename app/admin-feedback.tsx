@@ -112,7 +112,7 @@ export default function AdminFeedbackScreen() {
       contentContainerStyle={styles.container}
       refreshControl={<AppRefreshControl refreshing={refreshing} onRefresh={async () => { setRefreshing(true); await load(); setRefreshing(false); }} />}
     >
-      {items.length === 0 ? <ThemedText style={styles.empty}>No open beta feedback.</ThemedText> : items.map((item) => (
+      {items.length === 0 ? <ThemedText style={styles.empty}>No open feedback.</ThemedText> : items.map((item) => (
         <FeedbackCard key={item.id} item={item} onDone={(id) => setItems((current) => current?.filter((entry) => entry.id !== id) ?? [])} />
       ))}
     </ScrollView>

@@ -347,6 +347,30 @@ particular typeface.
 - Exact store copy is maintained in `docs/APP_STORE_METADATA_DRAFT.md`; update
   App Store Connect from that file instead of improvising release metadata.
 
+## App Store Connect audit state (2026-08-05)
+
+- Name, subtitle, promotional text, description, and keywords match
+  `docs/APP_STORE_METADATA_DRAFT.md`. Public release copy does not describe the
+  production app as a beta and accurately describes perspective cards as
+  attributed publisher headlines.
+- App Privacy discloses 15 collected data types. Browsing History is linked to
+  the account, used for analytics and product personalization, and not used for
+  tracking. Product Interaction and Other Usage Data are linked, used for app
+  functionality, analytics, and product personalization, and not used for
+  tracking. The native privacy manifest uses the same purposes.
+- The truthful age-rating questionnaire calculates 16+ in most storefronts,
+  with Apple's regional mappings (including 18+ in Brazil and 15+ in Korea).
+  The app does not override that calculated rating.
+- Availability is configured for 174 storefronts. China mainland is excluded;
+  future App Store storefronts are enabled automatically. Mac and Vision Pro
+  availability remain off, and distribution remains public/discoverable.
+- Manual release remains the required release mode for the fictional-fixture
+  cleanup sequence.
+- DSA trader status is still an account-holder decision and must not be guessed
+  by an agent. Screenshots, the copyright owner string, reviewer password, and
+  the final build selection are also intentionally incomplete at this audit
+  point. Build 7 has not been created.
+
 ## Submission checklist
 
 - Production backend, database, email/reset links, push setup, forumAI, images,

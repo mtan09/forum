@@ -366,10 +366,12 @@ particular typeface.
   availability remain off, and distribution remains public/discoverable.
 - Manual release remains the required release mode for the fictional-fixture
   cleanup sequence.
-- DSA trader status is still an account-holder decision and must not be guessed
-  by an agent. Screenshots, the copyright owner string, reviewer password, and
-  the final build selection are also intentionally incomplete at this audit
-  point. Build 7 has not been created.
+- The account holder completed DSA compliance on 2026-08-05; App Store Connect
+  reports that all current regulatory requirements are complete. Copyright is
+  `2026 Michael Tan`, and the non-admin reviewer credentials and notes are saved
+  only in App Store Connect. The notes explain both the configured-account path
+  and the complete new-account onboarding flow. Screenshots and the final build
+  selection remain incomplete. Build 7 has not been created.
 
 ## Submission checklist
 

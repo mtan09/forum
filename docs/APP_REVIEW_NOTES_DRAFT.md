@@ -8,24 +8,28 @@ Connect after the controlled account is created and verified.
 forum: Every Side is a native social news-discussion app. A network connection
 is required. The supplied account is a normal, non-admin, public account.
 
-The prelaunch review database has 31 fictional demo accounts. Each is visibly
-labeled `(Fictional demo account)` wherever its identity appears and uses a
-forum-owned colored logo avatar. Their bios, viewpoints, and activity are
-fictional. A fixture scheduler staggers posts, comments, reactions, and Floor
-positions so reviewers can test populated feeds and threads. It also gives new
-publisher cards a few persona-shaped votes and, occasionally, one visibly
-fictional headline-based comment. This is disclosed sample data, not real-user
-activity or a hidden review mode. It will be removed before public release; the
-non-admin reviewer account will remain available.
+The supplied account is configured and opens Home. To test signup, sign out and
+choose Create Account. Signup asks for username, accessible email, password,
+Terms/Privacy acceptance, and an Allow/Not now OpenAI choice. The three-step
+welcome asks users to choose interests, optionally follow active accounts, then
+verify email. Verification is sent only on reaching step 3. Closing mid-flow
+keeps the account signed in; the next launch opens Home.
+
+The prelaunch database has 31 fictional demo accounts, each visibly labeled
+`(Fictional demo account)` and using a forum-owned logo avatar. Their bios,
+viewpoints, and activity are fictional. A scheduler staggers social and Floor
+positions for populated feeds and threads. It also gives new publisher cards a
+few persona-shaped votes and occasionally one visibly fictional headline-based
+comment. This is disclosed sample data, not real-user activity or a hidden
+review mode. It will be removed before release; the reviewer account remains.
 
 News flow: forum polls public RSS/Atom feeds and displays the publisher,
-attributed headline, date, canonical link, and a remote preview image when feed
-or page metadata supplies one. The complete article remains at the publisher.
-Feed or page text may be processed transiently during ingestion to derive
-relevance, search/recommendation signals, and a one-way clustering profile; the
-article body is then discarded and is neither stored nor displayed. Summary
-perspective cards contain attributed headlines, not copied article bodies.
-Preview images are not copied to forum's object storage.
+headline, date, canonical link, and a remote metadata image. The complete
+article remains at the publisher.
+Feed or page text may be processed transiently to derive relevance,
+search/recommendation signals, and a one-way clustering profile, then discarded.
+Article bodies are neither stored nor displayed. Summary cards contain
+attributed headlines. Preview images are not copied to forum's storage.
 
 Main areas to review:
 
@@ -42,8 +46,7 @@ Main areas to review:
 4. forumAI is optional. Before any personal data or user content is sent to
    OpenAI, forum identifies OpenAI, explains the data and purposes, links the
    Privacy Policy, and asks the user to Allow or choose Not now. Declining keeps
-   browsing, text posts/comments/DMs, profile editing, voting, saving, following,
-   reporting, and blocking available under forum's on-server rules. Image
+   browsing and text social features available under forum's on-server rules. Image
    uploads and forumAI ask again because they require OpenAI image safety or
    generation. The choice is in Settings → Privacy → OpenAI processing.
    News grounding contains eligible attributed headlines and forum-generated

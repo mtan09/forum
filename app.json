@@ -139,6 +139,13 @@
       "expo-router",
       "expo-notifications",
       [
+        "@sentry/react-native",
+        {
+          "organization": "e1256f3339ad",
+          "project": "forum"
+        }
+      ],
+      [
         "expo-secure-store",
         {
           "faceIDPermission": false

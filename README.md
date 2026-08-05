@@ -149,7 +149,7 @@ EXPO_PUBLIC_API_URL=https://api.forumeveryside.com
 
 Local `.env` files are gitignored. Keep deployed API and Sentry values in local/EAS environment configuration; never commit them.
 
-The current native baseline is Expo SDK 57 / React Native 0.86. The beta is
+The current native baseline is Expo SDK 57 / React Native 0.86. The initial release is
 iPhone-only (`ios.supportsTablet=false`) and supports iOS 16.4 or newer.
 Local native builds require an Xcode release that includes Swift tools 6.2 or
 newer. Xcode 16.2 includes Swift 6.0 and fails while resolving ExpoModulesJSI,
@@ -177,8 +177,8 @@ LAN address.
 
 The browser build uses a web-specific responsive shell rather than stretching the phone UI. At laptop widths, navigation lives in a left rail, the feed stays in a constrained center column, and The Floor appears beside it as a live right rail. Tablet-sized browsers use a compact top navigation, while phone-sized browsers use a bottom navigation and a small composer action in the header. Search, forumAI, profile, summary, The Floor, and the post composer adapt to the available width while reusing the same API, auth, theme, and content logic as iOS and Android. Horizontal topic, image, and coverage rails expose mouse-friendly previous/next controls on larger browsers.
 
-The current production web beta is **https://mtan-forum.expo.app**. It is an
-EAS Hosting production alias backed by the same Railway API as the iOS beta.
+The current production web deployment is **https://mtan-forum.expo.app**. It is an
+EAS Hosting production alias backed by the same Railway API as the iOS app.
 The permanent support and privacy pages live at
 **https://api.forumeveryside.com/support** and
 **https://api.forumeveryside.com/legal/privacy**. EAS custom domains require a

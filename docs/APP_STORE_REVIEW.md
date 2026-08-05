@@ -1,6 +1,6 @@
 # App Store Review strategy
 
-Last official-policy review: 2026-08-03
+Last official-policy review: 2026-08-05
 
 This is the durable release-policy record for forum. It exists so future work
 does not rely on conversational memory or repeatedly collapse Apple policy,
@@ -344,6 +344,8 @@ particular typeface.
 - Product description: a social news-discussion platform that organizes
   attributed coverage across perspectives and directs readers to publishers,
   rather than a publisher or full-article reader.
+- Exact store copy is maintained in `docs/APP_STORE_METADATA_DRAFT.md`; update
+  App Store Connect from that file instead of improvising release metadata.
 
 ## Submission checklist
 
@@ -351,7 +353,7 @@ particular typeface.
   support, privacy, and deletion are reachable.
 - The review-facing URLs are
   `https://api.forumeveryside.com/support` and
-  `https://api.forumeveryside.com/legal/privacy`. The browser beta currently
+  `https://api.forumeveryside.com/legal/privacy`. The browser deployment currently
   lives at `https://mtan-forum.expo.app`; Apple does not require the full web
   client and the review URLs to share a hostname.
 - Signup allow/decline, existing-user just-in-time OpenAI permission, withdrawal,

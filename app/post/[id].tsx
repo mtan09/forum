@@ -6,6 +6,7 @@ import { ThemedView } from '@/components/themed-view';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import WebPageFrame from '@/components/web-page-frame';
 import { type Palette } from '@/constants/theme';
+import { useInteractionController } from '@/context/interactionContext';
 import { usePosts } from '@/context/postContext';
 import { usePalette } from '@/hooks/use-palette';
 import { api } from '@/lib/api';
@@ -20,6 +21,7 @@ export default function PostScreen() {
   const styles = useMemo(() => makeStyles(c), [c]);
   const { id } = useLocalSearchParams();
   const { posts, refresh, ensurePost } = usePosts();
+  const interactions = useInteractionController();
 
   const post = posts.find(p => p.id === id);
 
@@ -44,10 +46,13 @@ export default function PostScreen() {
       tapMedium();
       setSubmitting(true);
       await api('/comments', { body: { post_id: post.id, content } });
+      interactions.update('post', post.id, (current) => ({
+        commentCount: (current.commentCount ?? post.commentCount ?? 0) + 1,
+      }), { commentCount: post.commentCount ?? 0 });
       setCommentText('');
       Keyboard.dismiss();
       setRefreshKey((k) => k + 1); // reload the comment list
-      refresh(); // pick up the new comment count on the post
+      void refresh(); // reconcile the optimistic count with the server
     } catch (e: any) {
       setCommentError(e?.message ?? 'Failed to post comment.');
     } finally {
@@ -71,6 +76,7 @@ export default function PostScreen() {
           <Post
             post={post}
             variant="detail"
+            onDeleted={() => router.back()}
           />
           <ThemedView style={styles.container}>
           {/* Hand this post to forumAI as the chat subject */}

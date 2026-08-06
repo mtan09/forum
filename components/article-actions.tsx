@@ -1,66 +1,64 @@
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { IconSymbol } from '@/components/ui/icon-symbol';
+import ContentShareSheet from '@/components/content-share-sheet';
+import { useContentInteraction, type InteractionVote } from '@/context/interactionContext';
 import { usePalette } from '@/hooks/use-palette';
-import { notifySuccess, tapLight } from '@/lib/haptics';
+import { tapLight } from '@/lib/haptics';
 import { api } from '@/lib/api';
-import { useEffect, useState } from 'react';
-import { Pressable, Share, StyleSheet } from 'react-native';
+import { publicArticleUrl } from '@/lib/public-links';
+import { useState } from 'react';
+import { Pressable, StyleSheet } from 'react-native';
 import { type ArticleType } from './articleComponent';
 
-type VoteDirection = 'up' | 'down' | null;
-type VoteState = { upvotes: number; downvotes: number; myVote: VoteDirection };
-
-// Articles aren't held in a context like posts are, so each actions row
-// owns its vote state: optimistic update, then reconcile with the server.
 export default function ArticleActions({ article }: { article: ArticleType }) {
   const { c } = usePalette();
-  const [isBookmarked, setBookmarked] = useState(article.my_bookmark ?? false);
-  useEffect(() => setBookmarked(article.my_bookmark ?? false), [article.my_bookmark]);
+  const [shareOpen, setShareOpen] = useState(false);
+  const { state, getCurrent, patch, update } = useContentInteraction('article', article.id, {
+    upvotes: article.upvotes ?? 0,
+    downvotes: article.downvotes ?? 0,
+    myVote: article.my_vote ?? null,
+    bookmarked: article.my_bookmark ?? false,
+    commentCount: article.commentcount ?? 0,
+  });
+  const isBookmarked = state.bookmarked ?? false;
 
   // Optimistic toggle, reconciled with the server's answer
   const toggleBookmark = async () => {
     tapLight();
     const prev = isBookmarked;
-    setBookmarked(!prev);
+    patch({ bookmarked: !prev });
     try {
       const res = await api<{ bookmarked: boolean }>('/bookmarks/toggle', {
         body: { article_id: article.id },
       });
-      setBookmarked(res.bookmarked);
+      patch({ bookmarked: res.bookmarked });
     } catch (error: any) {
       console.log('Error toggling bookmark:', error?.message);
-      setBookmarked(prev);
+      patch({ bookmarked: prev });
     }
   };
 
-  const [state, setState] = useState<VoteState>({
-    upvotes: article.upvotes ?? 0,
-    downvotes: article.downvotes ?? 0,
-    myVote: article.my_vote ?? null,
-  });
-
-  const applyVote = (prev: VoteState, direction: VoteDirection): VoteState => {
-    let { upvotes, downvotes } = prev;
-    if (prev.myVote === 'up') upvotes = Math.max(upvotes - 1, 0);
-    if (prev.myVote === 'down') downvotes = Math.max(downvotes - 1, 0);
-    if (direction === 'up') upvotes += 1;
-    if (direction === 'down') downvotes += 1;
-    return { upvotes, downvotes, myVote: direction };
-  };
-
-  const vote = async (direction: VoteDirection) => {
-    const prev = state;
-    setState(applyVote(prev, direction));
+  const vote = async (direction: InteractionVote) => {
+    const prev = getCurrent();
+    update((current) => {
+      let upvotes = current.upvotes ?? 0;
+      let downvotes = current.downvotes ?? 0;
+      if (current.myVote === 'up') upvotes = Math.max(upvotes - 1, 0);
+      if (current.myVote === 'down') downvotes = Math.max(downvotes - 1, 0);
+      if (direction === 'up') upvotes += 1;
+      if (direction === 'down') downvotes += 1;
+      return { upvotes, downvotes, myVote: direction };
+    });
     try {
-      const res = await api<{ upvotes: number; downvotes: number; my_vote: VoteDirection }>(
+      const res = await api<{ upvotes: number; downvotes: number; my_vote: InteractionVote }>(
         `/articles/${article.id}/vote`,
         { body: { direction } }
       );
-      setState({ upvotes: res.upvotes, downvotes: res.downvotes, myVote: res.my_vote });
+      patch({ upvotes: res.upvotes, downvotes: res.downvotes, myVote: res.my_vote });
     } catch (error: any) {
       console.log('Error voting on article:', error?.message);
-      setState(prev);
+      patch({ upvotes: prev.upvotes, downvotes: prev.downvotes, myVote: prev.myVote });
     }
   };
 
@@ -77,17 +75,9 @@ export default function ArticleActions({ article }: { article: ArticleType }) {
     return count.toString();
   };
 
-  const handleShare = async () => {
-    try {
-      notifySuccess();
-      await Share.share({
-        message: `${article.title} (${article.source})`,
-        url: article.url,
-        title: 'Share Article',
-      });
-    } catch (error) {
-      console.error(error);
-    }
+  const handleShare = () => {
+    tapLight();
+    setShareOpen(true);
   };
 
   return (
@@ -98,7 +88,7 @@ export default function ArticleActions({ article }: { article: ArticleType }) {
         <ThemedView style={styles.reactions}>
           <IconSymbol name={isUpvoted ? "arrowshape.up.fill" : "arrowshape.up"} size={20} color={isUpvoted ? c.voteUp : c.textMuted} />
           <ThemedText style={{color: isUpvoted ? c.voteUp : c.textMuted}}>
-            {state.upvotes === 0 ? 0 : `+${formatCount(state.upvotes)}`}
+            {(state.upvotes ?? 0) === 0 ? 0 : `+${formatCount(state.upvotes)}`}
           </ThemedText>
         </ThemedView>
       </Pressable>
@@ -108,7 +98,7 @@ export default function ArticleActions({ article }: { article: ArticleType }) {
         <ThemedView style={styles.reactions}>
           <IconSymbol name={isDownvoted ? "arrowshape.down.fill" : "arrowshape.down"} size={20} color={isDownvoted ? c.voteDown : c.textMuted} />
           <ThemedText style={{color: isDownvoted ? c.voteDown : c.textMuted}}>
-            {state.downvotes === 0 ? 0 : `-${formatCount(state.downvotes)}`}
+            {(state.downvotes ?? 0) === 0 ? 0 : `-${formatCount(state.downvotes)}`}
           </ThemedText>
         </ThemedView>
       </Pressable>
@@ -116,7 +106,7 @@ export default function ArticleActions({ article }: { article: ArticleType }) {
       {/* Comment count */}
       <ThemedView style={[styles.reactions, styles.comments]}>
         <IconSymbol name="bubble" size={20} color={c.muted} />
-        <ThemedText style={{color: c.muted}}>{formatCount(article.commentcount)}</ThemedText>
+        <ThemedText style={{color: c.muted}}>{formatCount(state.commentCount)}</ThemedText>
       </ThemedView>
 
       {/* Bookmark */}
@@ -132,6 +122,16 @@ export default function ArticleActions({ article }: { article: ArticleType }) {
           <IconSymbol name="square.and.arrow.up" size={20} color={c.muted} />
         </Pressable>
       </ThemedView>
+
+      <ContentShareSheet
+        visible={shareOpen}
+        onClose={() => setShareOpen(false)}
+        kind="article"
+        contentId={article.id}
+        url={publicArticleUrl(article.id)}
+        message={`${article.title} (${article.source})`}
+        title="Share Article"
+      />
     </ThemedView>
   );
 }

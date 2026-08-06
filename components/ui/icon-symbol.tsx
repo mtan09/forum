@@ -44,6 +44,7 @@ const MAPPING = {
   plus: 'plus',
   ellipsis: 'dots-horizontal',
   'eye.slash': 'eye-off-outline',
+  trash: 'trash-can-outline',
 
   // Content / profile
   'checkmark.circle.fill': 'check-circle',
@@ -59,6 +60,10 @@ const MAPPING = {
   'hand.raised': 'hand-back-left-outline',
   'hand.raised.fill': 'hand-back-left',
   'paperplane.fill': 'send',
+  'message.fill': 'message',
+  link: 'link-variant',
+  'phone.fill': 'phone',
+  'lock.fill': 'lock',
 } as IconMapping;
 
 type IconSymbolName = keyof typeof MAPPING;

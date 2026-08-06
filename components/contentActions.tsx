@@ -7,7 +7,7 @@ import { usePalette } from '@/hooks/use-palette';
 import { api } from '@/lib/api';
 import type { RecommendationContext } from '@/lib/feed-events';
 import { useMemo, useState } from 'react';
-import { Alert, Modal, Platform, Pressable, StyleSheet } from 'react-native';
+import { Alert, Modal, Platform, Pressable, StyleSheet, View } from 'react-native';
 
 // A small "•••" overflow menu for user-generated content. Report works on
 // any target; Block appears only when an author is known and it isn't the
@@ -33,7 +33,20 @@ type Props = {
   color?: string;
   onBlocked?: () => void;
   onNotInterested?: () => void;
+  onDeleted?: (result: DeleteResult) => void;
+  onDismiss?: () => void;
   recommendationContext?: RecommendationContext;
+  displayMode?: 'menu' | 'inline';
+};
+
+export type DeleteResult = {
+  deleted: true;
+  id: string;
+  removed_comment_count?: number;
+  post_id?: string | null;
+  article_id?: string | null;
+  debate_id?: string | null;
+  parent_comment_id?: string | null;
 };
 
 export default function ContentActions({
@@ -44,15 +57,26 @@ export default function ContentActions({
   color,
   onBlocked,
   onNotInterested,
+  onDeleted,
+  onDismiss,
   recommendationContext,
+  displayMode = 'menu',
 }: Props) {
   const { c } = usePalette();
   const styles = useMemo(() => makeStyles(c), [c]);
   const { user } = useAuth();
   const [menuOpen, setMenuOpen] = useState(false);
   const [reasonOpen, setReasonOpen] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const canBlock = !!authorId && authorId !== user?.id;
   const canHideRecommendation = targetKind === 'post' || targetKind === 'article';
+  const canDelete = !!authorId && authorId === user?.id
+    && (targetKind === 'post' || targetKind === 'comment');
+
+  const dismissMenu = () => {
+    setMenuOpen(false);
+    if (displayMode === 'inline') onDismiss?.();
+  };
 
   const markNotInterested = async () => {
     setMenuOpen(false);
@@ -66,6 +90,7 @@ export default function ContentActions({
         },
       });
       onNotInterested?.();
+      onDismiss?.();
     } catch (err: any) {
       Alert.alert('Could not update your feed', err?.message ?? 'Please try again.');
     }
@@ -76,6 +101,7 @@ export default function ContentActions({
     try {
       await api('/reports', { body: { target_kind: targetKind, target_id: targetId, reason } });
       Alert.alert('Thanks for the report', 'Our team will review this shortly.');
+      onDismiss?.();
     } catch (err: any) {
       Alert.alert('Could not send report', err?.message ?? 'Please try again.');
     }
@@ -95,6 +121,7 @@ export default function ContentActions({
             try {
               await api(`/users/${authorId}/block`, { body: {} });
               onBlocked?.();
+              onDismiss?.();
             } catch (err: any) {
               Alert.alert('Could not block', err?.message ?? 'Please try again.');
             }
@@ -104,17 +131,97 @@ export default function ContentActions({
     );
   };
 
+  const confirmDelete = () => {
+    setMenuOpen(false);
+    const isPost = targetKind === 'post';
+    Alert.alert(
+      `Delete ${isPost ? 'post' : 'comment'}?`,
+      isPost
+        ? 'This permanently deletes the post and all of its comments.'
+        : 'This permanently deletes the comment and any replies to it.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: async () => {
+            if (deleting) return;
+            setDeleting(true);
+            try {
+              const result = await api<DeleteResult>(`/${targetKind}s/${targetId}`, {
+                method: 'DELETE',
+              });
+              onDeleted?.(result);
+              onDismiss?.();
+            } catch (err: any) {
+              Alert.alert(
+                `Could not delete ${isPost ? 'post' : 'comment'}`,
+                err?.message ?? 'Please try again.',
+              );
+            } finally {
+              setDeleting(false);
+            }
+          },
+        },
+      ],
+    );
+  };
+
+  const actionRows = (
+    <>
+      {canHideRecommendation && (
+        <Pressable
+          style={({ pressed }) => [styles.action, pressed && styles.actionPressed]}
+          onPress={markNotInterested}
+        >
+          <IconSymbol name="eye.slash" size={20} color={c.text} />
+          <ThemedText style={styles.actionText}>Not interested</ThemedText>
+        </Pressable>
+      )}
+      <Pressable
+        style={({ pressed }) => [styles.action, pressed && styles.actionPressed]}
+        onPress={() => { setMenuOpen(false); setReasonOpen(true); }}
+      >
+        <IconSymbol name="flag" size={20} color={c.red} />
+        <ThemedText style={styles.actionText}>Report</ThemedText>
+      </Pressable>
+      {canBlock && (
+        <Pressable
+          style={({ pressed }) => [styles.action, pressed && styles.actionPressed]}
+          onPress={confirmBlock}
+        >
+          <IconSymbol name="hand.raised" size={20} color={c.red} />
+          <ThemedText style={styles.actionText}>Block {authorName ?? 'user'}</ThemedText>
+        </Pressable>
+      )}
+      {canDelete && (
+        <Pressable
+          disabled={deleting}
+          style={({ pressed }) => [styles.action, pressed && styles.actionPressed]}
+          onPress={confirmDelete}
+        >
+          <IconSymbol name="trash" size={20} color={c.danger} />
+          <ThemedText style={[styles.actionText, { color: c.danger }]}>Delete</ThemedText>
+        </Pressable>
+      )}
+    </>
+  );
+
   return (
     <>
-      <Pressable
-        onPress={() => setMenuOpen(true)}
-        hitSlop={10}
-        accessibilityRole="button"
-        accessibilityLabel="More options"
-        style={({ pressed }) => ({ opacity: pressed ? 0.5 : 1 })}
-      >
-        <IconSymbol name="ellipsis" size={20} color={color ?? c.muted} />
-      </Pressable>
+      {displayMode === 'inline' ? (
+        <View style={styles.inlinePanel}>{actionRows}</View>
+      ) : (
+        <Pressable
+          onPress={() => setMenuOpen(true)}
+          hitSlop={10}
+          accessibilityRole="button"
+          accessibilityLabel="More options"
+          style={({ pressed }) => ({ opacity: pressed ? 0.5 : 1 })}
+        >
+          <IconSymbol name="ellipsis" size={20} color={color ?? c.muted} />
+        </Pressable>
+      )}
 
       {/* Overflow sheet */}
       {menuOpen && (
@@ -122,34 +229,10 @@ export default function ContentActions({
           <Pressable style={styles.backdrop} onPress={() => setMenuOpen(false)}>
             <Pressable style={styles.sheet} onPress={(e) => e.stopPropagation()}>
               <ThemedView style={styles.handle} />
-              {canHideRecommendation && (
-                <Pressable
-                  style={({ pressed }) => [styles.action, pressed && styles.actionPressed]}
-                  onPress={markNotInterested}
-                >
-                  <IconSymbol name="eye.slash" size={20} color={c.text} />
-                  <ThemedText style={styles.actionText}>Not interested</ThemedText>
-                </Pressable>
-              )}
-              <Pressable
-                style={({ pressed }) => [styles.action, pressed && styles.actionPressed]}
-                onPress={() => { setMenuOpen(false); setReasonOpen(true); }}
-              >
-                <IconSymbol name="flag" size={20} color={c.red} />
-                <ThemedText style={styles.actionText}>Report</ThemedText>
-              </Pressable>
-              {canBlock && (
-                <Pressable
-                  style={({ pressed }) => [styles.action, pressed && styles.actionPressed]}
-                  onPress={confirmBlock}
-                >
-                  <IconSymbol name="hand.raised" size={20} color={c.red} />
-                  <ThemedText style={styles.actionText}>Block {authorName ?? 'user'}</ThemedText>
-                </Pressable>
-              )}
+              {actionRows}
               <Pressable
                 style={({ pressed }) => [styles.action, styles.cancel, pressed && styles.actionPressed]}
-                onPress={() => setMenuOpen(false)}
+                onPress={dismissMenu}
               >
                 <ThemedText style={styles.cancelText}>Cancel</ThemedText>
               </Pressable>
@@ -208,6 +291,15 @@ const makeStyles = (c: Palette) => StyleSheet.create({
     paddingHorizontal: 20,
     paddingTop: 12,
     paddingBottom: 32,
+  },
+  inlinePanel: {
+    width: '100%',
+    overflow: 'hidden',
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: c.cardBorder,
+    paddingHorizontal: 16,
+    backgroundColor: c.overlayCard,
   },
   handle: {
     alignSelf: 'center',

@@ -4,6 +4,7 @@ import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import UserAvatar from '@/components/user-avatar';
 import { type Palette } from '@/constants/theme';
+import { useContentInteraction } from '@/context/interactionContext';
 import { usePalette } from '@/hooks/use-palette';
 import { useRelativeTime } from '@/hooks/useRelativeTime';
 import { api } from '@/lib/api';
@@ -13,6 +14,7 @@ import { useRouter } from 'expo-router';
 import { memo, useEffect, useMemo, useState } from 'react';
 import { Platform, Pressable, StyleSheet, useWindowDimensions } from 'react-native';
 import ContentActions from './contentActions';
+import ContentLongPress from './content-long-press';
 import PostActions from './post-actions';
 import ScorerReceipts from './scorerReceipts';
 import Spectrum from './spectrum';
@@ -52,9 +54,10 @@ type Props = {
   post: PostType;
   variant?: 'feed' | 'detail';
   recommendationContext?: RecommendationContext;
+  onDeleted?: () => void;
 }
 
-function Post({ post, variant = 'feed', recommendationContext }: Props) {
+function Post({ post, variant = 'feed', recommendationContext, onDeleted }: Props) {
 
   const router = useRouter();
   const { c } = usePalette();
@@ -65,6 +68,9 @@ function Post({ post, variant = 'feed', recommendationContext }: Props) {
   const timeAgo = useRelativeTime(post.timestamp);
   const [receiptsOpen, setReceiptsOpen] = useState(false);
   const [hidden, setHidden] = useState(false);
+  const { state: sharedState, patch: patchSharedState } = useContentInteraction('post', post.id, {
+    deleted: false,
+  });
   const detail = variant === 'detail';
 
   const [fetchedUser, setFetchedUser] = useState<UserType | null>(null);
@@ -84,9 +90,31 @@ function Post({ post, variant = 'feed', recommendationContext }: Props) {
     return () => { cancelled = true; };
   }, [post.user, post.username, post.avatarUrl]);
 
-  if (hidden) return null;
+  const handleDeleted = () => {
+    patchSharedState({ deleted: true });
+    onDeleted?.();
+  };
+
+  if (hidden || sharedState.deleted) return null;
 
   return (
+    <ContentLongPress
+      preview={{
+        kind: 'post',
+        id: post.id,
+        authorId: post.user,
+        authorName: user.username,
+        authorAvatar: user.avatar_url,
+        authorIsDemo: user.is_demo,
+        text: post.text,
+        media: post.media,
+        position: post.position,
+      }}
+      recommendationContext={recommendationContext}
+      onBlocked={() => setHidden(true)}
+      onNotInterested={() => setHidden(true)}
+      onDeleted={handleDeleted}
+    >
     <ThemedView style={[styles.post, detail && styles.postDetailWeb]}>
       <ThemedView style={[styles.postContent, detail && styles.postContentDetailWeb]}>
         <ThemedView style={styles.container}>
@@ -117,6 +145,7 @@ function Post({ post, variant = 'feed', recommendationContext }: Props) {
                 authorName={user.username}
                 onBlocked={() => setHidden(true)}
                 onNotInterested={() => setHidden(true)}
+                onDeleted={handleDeleted}
                 recommendationContext={recommendationContext}
               />
             </ThemedView>
@@ -185,6 +214,7 @@ function Post({ post, variant = 'feed', recommendationContext }: Props) {
         <PostActions post={post} user={user} />
       </ThemedView>
     </ThemedView>
+    </ContentLongPress>
 
   )
 }

@@ -1,4 +1,5 @@
 import { PostType } from '@/components/postComponent';
+import { useInteractionController } from '@/context/interactionContext';
 import { api } from '@/lib/api';
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { useAuth } from './authContext';
@@ -106,6 +107,7 @@ export function PostProvider({ children }: { children: React.ReactNode }) {
   const [hasMorePosts, setHasMorePosts] = useState(true);
   const [postsEpoch, setPostsEpoch] = useState(0);
   const { isAuthenticated } = useAuth();
+  const interactions = useInteractionController();
 
   const postsRef = useRef<PostType[]>([]);
   useEffect(() => { postsRef.current = posts; }, [posts]);
@@ -186,24 +188,63 @@ export function PostProvider({ children }: { children: React.ReactNode }) {
 
   const vote = useCallback(
     async (postId: string, direction: VoteDirection) => {
-      setPosts((prev) => prev.map((p) => (p.id === postId ? applyVote(p, direction) : p)));
+      const currentPost = postsRef.current.find((post) => post.id === postId);
+      const fallback = currentPost ? {
+        upvotes: currentPost.upvotes,
+        downvotes: currentPost.downvotes,
+        myVote: currentPost.myVote ?? null,
+        bookmarked: currentPost.myBookmark ?? false,
+        commentCount: currentPost.commentCount,
+      } : {};
+      const previous = interactions.get('post', postId, fallback);
+      interactions.update('post', postId, (current) => {
+        let upvotes = current.upvotes ?? 0;
+        let downvotes = current.downvotes ?? 0;
+        if (current.myVote === 'up') upvotes = Math.max(upvotes - 1, 0);
+        if (current.myVote === 'down') downvotes = Math.max(downvotes - 1, 0);
+        if (direction === 'up') upvotes += 1;
+        if (direction === 'down') downvotes += 1;
+        return { upvotes, downvotes, myVote: direction };
+      }, fallback);
+      setPosts((prev) => {
+        const index = prev.findIndex((post) => post.id === postId);
+        if (index < 0) return prev;
+        const next = [...prev];
+        next[index] = applyVote(prev[index], direction);
+        return next;
+      });
       try {
         const result = await api<{ upvotes: number; downvotes: number; my_vote: VoteDirection }>(
           `/posts/${postId}/vote`,
           { body: { direction } }
         );
-        setPosts((prev) =>
-          prev.map((p) =>
-            p.id === postId
-              ? { ...p, upvotes: result.upvotes, downvotes: result.downvotes, myVote: result.my_vote }
-              : p
-          )
-        );
+        setPosts((prev) => {
+          const index = prev.findIndex((post) => post.id === postId);
+          if (index < 0) return prev;
+          const next = [...prev];
+          next[index] = {
+            ...prev[index],
+            upvotes: result.upvotes,
+            downvotes: result.downvotes,
+            myVote: result.my_vote,
+          };
+          return next;
+        });
+        interactions.patch('post', postId, {
+          upvotes: result.upvotes,
+          downvotes: result.downvotes,
+          myVote: result.my_vote,
+        });
       } catch {
+        interactions.patch('post', postId, {
+          upvotes: previous.upvotes,
+          downvotes: previous.downvotes,
+          myVote: previous.myVote,
+        });
         refresh(); // reconcile with the server if the vote failed
       }
     },
-    [refresh]
+    [interactions, refresh]
   );
 
   const contextValue = useMemo<PostContextType>(() => ({

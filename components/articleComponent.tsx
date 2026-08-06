@@ -15,6 +15,7 @@ import { useRouter } from 'expo-router';
 import { memo, useEffect, useMemo, useState } from 'react';
 import { Platform, Pressable, StyleSheet, useWindowDimensions } from 'react-native';
 import ArticleActions from './article-actions';
+import ContentLongPress from './content-long-press';
 import ContentActions from './contentActions';
 import ScorerReceipts from './scorerReceipts';
 
@@ -111,6 +112,18 @@ function Article({ article, variant = 'feed', recommendationContext }: Props) {
   if (hidden) return null;
 
   return (
+    <ContentLongPress
+      preview={{
+        kind: 'article',
+        id: article.id,
+        title: article.title,
+        source: article.source,
+        media,
+        position: sourceLean,
+      }}
+      recommendationContext={recommendationContext}
+      onNotInterested={() => setHidden(true)}
+    >
     <ThemedView style={[styles.post, detail && styles.postDetailWeb]}>
       <ThemedView style={[styles.postContent, detail && styles.postContentDetailWeb]}>
           <ThemedView
@@ -239,6 +252,7 @@ function Article({ article, variant = 'feed', recommendationContext }: Props) {
         {/* <PostActions post={post} user={user} /> */}
       </ThemedView>
     </ThemedView>
+    </ContentLongPress>
     
   )
 }

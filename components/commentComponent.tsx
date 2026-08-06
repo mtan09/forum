@@ -1,11 +1,13 @@
 import AppTextInput from '@/components/app-text-input';
 import ContentActions from '@/components/contentActions';
+import ContentLongPress from '@/components/content-long-press';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import UserAvatar from '@/components/user-avatar';
 import DisplayName from '@/components/display-name';
 import { type Palette } from '@/constants/theme';
+import { useContentInteraction, useInteractionController, type InteractionVote } from '@/context/interactionContext';
 import { usePalette } from '@/hooks/use-palette';
 import { tapLight, tapMedium } from '@/lib/haptics';
 import { useRelativeTime } from '@/hooks/useRelativeTime';
@@ -133,8 +135,6 @@ export default function CommentList({
 	);
 }
 
-type VoteDirection = 'up' | 'down' | null;
-
 function CommentItem({ comment }: { comment: Comment }) {
 	const { c } = usePalette();
 	const styles = useMemo(() => makeStyles(c), [c]);
@@ -143,38 +143,38 @@ function CommentItem({ comment }: { comment: Comment }) {
 	const [replyText, setReplyText] = useState('');
 	const [replySubmitting, setReplySubmitting] = useState(false);
 	const [replyRefresh, setReplyRefresh] = useState(0);
-	const [replyCount, setReplyCount] = useState(comment.reply_count);
 	const timeAgo = useRelativeTime(comment.created_at);
-
-	// Optimistic vote state, reconciled with the server response
-	const [votes, setVotes] = useState<{ up: number; down: number; myVote: VoteDirection }>({
-		up: comment.upvotes ?? 0,
-		down: comment.downvotes ?? 0,
+	const interactionController = useInteractionController();
+	const { state: votes, getCurrent, patch, update } = useContentInteraction('comment', comment.id, {
+		upvotes: comment.upvotes ?? 0,
+		downvotes: comment.downvotes ?? 0,
 		myVote: comment.my_vote ?? null,
+		replyCount: comment.reply_count ?? 0,
+		deleted: false,
 	});
 
-	const applyVote = (prev: typeof votes, direction: VoteDirection) => {
-		let { up, down } = prev;
-		if (prev.myVote === 'up') up = Math.max(up - 1, 0);
-		if (prev.myVote === 'down') down = Math.max(down - 1, 0);
-		if (direction === 'up') up += 1;
-		if (direction === 'down') down += 1;
-		return { up, down, myVote: direction };
-	};
-
-	const vote = async (direction: VoteDirection) => {
+	// Optimistic vote state, reconciled with the server response
+	const vote = async (direction: InteractionVote) => {
 		tapLight();
-		const prev = votes;
-		setVotes(applyVote(prev, direction));
+		const prev = getCurrent();
+		update((current) => {
+			let upvotes = current.upvotes ?? 0;
+			let downvotes = current.downvotes ?? 0;
+			if (current.myVote === 'up') upvotes = Math.max(upvotes - 1, 0);
+			if (current.myVote === 'down') downvotes = Math.max(downvotes - 1, 0);
+			if (direction === 'up') upvotes += 1;
+			if (direction === 'down') downvotes += 1;
+			return { upvotes, downvotes, myVote: direction };
+		});
 		try {
-			const res = await api<{ upvotes: number; downvotes: number; my_vote: VoteDirection }>(
+			const res = await api<{ upvotes: number; downvotes: number; my_vote: InteractionVote }>(
 				`/comments/${comment.id}/vote`,
 				{ body: { direction } }
 			);
-			setVotes({ up: res.upvotes, down: res.downvotes, myVote: res.my_vote });
+			patch({ upvotes: res.upvotes, downvotes: res.downvotes, myVote: res.my_vote });
 		} catch (e: any) {
 			console.log('Error voting on comment:', e?.message);
-			setVotes(prev);
+			patch({ upvotes: prev.upvotes, downvotes: prev.downvotes, myVote: prev.myVote });
 		}
 	};
 
@@ -187,7 +187,16 @@ function CommentItem({ comment }: { comment: Comment }) {
 			await api('/comments', { body: { parent_comment_id: comment.id, content } });
 			setReplyText('');
 			setReplyOpen(false);
-			setReplyCount((n) => n + 1);
+			update((current) => ({ replyCount: (current.replyCount ?? 0) + 1 }));
+			if (comment.post_id) {
+				interactionController.update('post', comment.post_id, (current) => ({
+					commentCount: (current.commentCount ?? 0) + 1,
+				}));
+			} else if (comment.article_id) {
+				interactionController.update('article', comment.article_id, (current) => ({
+					commentCount: (current.commentCount ?? 0) + 1,
+				}));
+			}
 			setShowReplies(true);
 			setReplyRefresh((k) => k + 1);
 			Keyboard.dismiss();
@@ -200,11 +209,48 @@ function CommentItem({ comment }: { comment: Comment }) {
 
 	const isUpvoted = votes.myVote === 'up';
 	const isDownvoted = votes.myVote === 'down';
+	const replyCount = votes.replyCount ?? 0;
 	const [hidden, setHidden] = useState(false);
+	const handleDeleted = (result: {
+		removed_comment_count?: number;
+		post_id?: string | null;
+		article_id?: string | null;
+		parent_comment_id?: string | null;
+	}) => {
+		const removed = Math.max(1, result.removed_comment_count ?? 1);
+		patch({ deleted: true });
+		if (result.parent_comment_id) {
+			interactionController.update('comment', result.parent_comment_id, (current) => ({
+				replyCount: Math.max(0, (current.replyCount ?? 1) - 1),
+			}));
+		}
+		if (result.post_id) {
+			interactionController.update('post', result.post_id, (current) => ({
+				commentCount: Math.max(0, (current.commentCount ?? removed) - removed),
+			}));
+		} else if (result.article_id) {
+			interactionController.update('article', result.article_id, (current) => ({
+				commentCount: Math.max(0, (current.commentCount ?? removed) - removed),
+			}));
+		}
+	};
 
-	if (hidden) return null;
+	if (hidden || votes.deleted) return null;
 
 	return (
+		<ContentLongPress
+			preview={{
+				kind: 'comment',
+				id: comment.id,
+				authorId: comment.user_id,
+				authorName: comment.username,
+				authorAvatar: comment.avatar_url,
+				authorIsDemo: comment.is_demo,
+				text: comment.content,
+			}}
+			onBlocked={() => setHidden(true)}
+			onDeleted={handleDeleted}
+		>
 		<ThemedView style={styles.comment}>
 			{/* Header: avatar + username · time on one line; tapping the
 			    identity opens the author's public profile */}
@@ -230,6 +276,7 @@ function CommentItem({ comment }: { comment: Comment }) {
 					authorId={comment.user_id}
 					authorName={comment.username}
 					onBlocked={() => setHidden(true)}
+					onDeleted={handleDeleted}
 				/>
 			</ThemedView>
 
@@ -239,11 +286,11 @@ function CommentItem({ comment }: { comment: Comment }) {
 			<View style={styles.commentActions}>
 				<Pressable onPress={() => vote(isUpvoted ? null : 'up')} style={styles.voteButton}>
 					<IconSymbol name={isUpvoted ? 'arrowshape.up.fill' : 'arrowshape.up'} size={16} color={isUpvoted ? c.voteUp : c.textMuted} />
-					<ThemedText style={[styles.voteCount, isUpvoted && { color: c.voteUp }]}>{votes.up}</ThemedText>
+					<ThemedText style={[styles.voteCount, isUpvoted && { color: c.voteUp }]}>{votes.upvotes ?? 0}</ThemedText>
 				</Pressable>
 				<Pressable onPress={() => vote(isDownvoted ? null : 'down')} style={styles.voteButton}>
 					<IconSymbol name={isDownvoted ? 'arrowshape.down.fill' : 'arrowshape.down'} size={16} color={isDownvoted ? c.voteDown : c.textMuted} />
-					<ThemedText style={[styles.voteCount, isDownvoted && { color: c.voteDown }]}>{votes.down}</ThemedText>
+					<ThemedText style={[styles.voteCount, isDownvoted && { color: c.voteDown }]}>{votes.downvotes ?? 0}</ThemedText>
 				</Pressable>
 				<Pressable onPress={() => setReplyOpen((o) => !o)} style={styles.voteButton}>
 					<IconSymbol name="bubble" size={15} color={c.muted} />
@@ -280,6 +327,7 @@ function CommentItem({ comment }: { comment: Comment }) {
 				<CommentList parentCommentId={comment.id} initialPageSize={5} indent={16} refreshKey={replyRefresh} />
 			)}
 		</ThemedView>
+		</ContentLongPress>
 	);
 }
 

@@ -48,8 +48,15 @@ blocking.
 Implemented release behavior: post, article, comment, profile, and received-DM
 actions use the same report queue. A DM report is accepted only from the
 message recipient; the admin can hide that message, ban its sender, or dismiss
-the report. Blocking removes interaction in both directions. The hosted support
-page provides the moderation contact path.
+the report. The same actions are accessible from the visible overflow button
+and from a press-and-hold preview throughout the app. Authors may permanently
+delete their own posts and comments; post deletion also removes its thread,
+while deleting a comment removes its reply subtree. This author control is a
+product behavior, not a claim that Guideline 1.2 explicitly requires per-item
+deletion. Blocking removes interaction in both directions. Public accounts
+can receive DMs normally; a private account accepts a DM only from an account it
+already follows, while prior thread history remains readable. The hosted
+support page provides the moderation contact path.
 
 ### 1.5 — Developer information
 
@@ -163,6 +170,10 @@ forum's implemented OpenAI posture is:
   declined text is sent to OpenAI. Image uploads, feedback screenshots, and
   forumAI ask again because those features inherently use OpenAI image-safety
   or generation.
+- Sharing an existing forum post or publisher article through a DM stores a
+  typed reference to that already-reviewed item and introduces no new authored
+  text, so the share action does not resend its contents to OpenAI. Ordinary DM
+  text continues to follow the consent and moderation behavior above.
 - Settings → Privacy → OpenAI processing shows current status and allows
   withdrawal. Withdrawal stops future sharing and never claims to reverse
   processing that already occurred.
@@ -379,9 +390,10 @@ particular typeface.
   support, privacy, and deletion are reachable.
 - The review-facing URLs are
   `https://api.forumeveryside.com/support` and
-  `https://api.forumeveryside.com/legal/privacy`. The browser deployment currently
-  lives at `https://mtan-forum.expo.app`; Apple does not require the full web
-  client and the review URLs to share a hostname.
+  `https://api.forumeveryside.com/legal/privacy`. The production browser client
+  is deployed through Cloudflare Pages at `https://forumeveryside.com`;
+  `https://forum-web-6tw.pages.dev` is the generated Pages hostname and
+  `https://mtan-forum.expo.app` remains an EAS Hosting fallback.
 - Signup allow/decline, existing-user just-in-time OpenAI permission, withdrawal,
   and re-consent work; no affected request reaches OpenAI before current consent.
 - Reviewer credentials are non-admin, stable, and stored only in App Store

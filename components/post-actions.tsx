@@ -1,12 +1,15 @@
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { IconSymbol } from '@/components/ui/icon-symbol';
+import ContentShareSheet from '@/components/content-share-sheet';
 import { usePalette } from '@/hooks/use-palette';
-import { notifySuccess, tapLight } from '@/lib/haptics';
+import { tapLight } from '@/lib/haptics';
+import { useContentInteraction } from '@/context/interactionContext';
 import { usePostVote } from '@/context/postContext';
-import { api, API_URL } from '@/lib/api';
-import { Pressable, Share, StyleSheet } from 'react-native';
-import { useEffect, useState } from 'react';
+import { api } from '@/lib/api';
+import { publicPostUrl } from '@/lib/public-links';
+import { Pressable, StyleSheet } from 'react-native';
+import { useState } from 'react';
 import { type PostType, type UserType } from './postComponent';
 
 export type PostActionsProps = {
@@ -16,29 +19,36 @@ export type PostActionsProps = {
 
 export default function PostActions({ post, user }: PostActionsProps) {
   const { c } = usePalette();
-  const [isBookmarked, setBookmarked] = useState(post.myBookmark ?? false);
-  useEffect(() => setBookmarked(post.myBookmark ?? false), [post.myBookmark]);
+  const [shareOpen, setShareOpen] = useState(false);
+  const { state, patch } = useContentInteraction('post', post.id, {
+    upvotes: post.upvotes ?? 0,
+    downvotes: post.downvotes ?? 0,
+    myVote: post.myVote ?? null,
+    bookmarked: post.myBookmark ?? false,
+    commentCount: post.commentCount ?? 0,
+  });
+  const isBookmarked = state.bookmarked ?? false;
 
   // Optimistic toggle, reconciled with the server's answer
   const toggleBookmark = async () => {
     tapLight();
     const prev = isBookmarked;
-    setBookmarked(!prev);
+    patch({ bookmarked: !prev });
     try {
       const res = await api<{ bookmarked: boolean }>('/bookmarks/toggle', {
         body: { post_id: post.id },
       });
-      setBookmarked(res.bookmarked);
+      patch({ bookmarked: res.bookmarked });
     } catch (error: any) {
       console.log('Error toggling bookmark:', error?.message);
-      setBookmarked(prev);
+      patch({ bookmarked: prev });
     }
   };
 
   const vote = usePostVote();
 
-  const isUpvoted = post.myVote === 'up';
-  const isDownvoted = post.myVote === 'down';
+  const isUpvoted = state.myVote === 'up';
+  const isDownvoted = state.myVote === 'down';
 
   const formatCount = (count: number | null | undefined): string => {
     if (!count) return '0';
@@ -57,18 +67,9 @@ export default function PostActions({ post, user }: PostActionsProps) {
     return count.toString();
   };
 
-  const handleShare = async () => {
-    try {
-      notifySuccess();
-      await Share.share({
-        message: `${user.username}${post.isDemo ? ' (Fictional demo account)' : ''} on forum: "${post.text.slice(0, 120)}"`,
-        // Lands on the API's share page: OG preview + open-in-app link
-        url: `${API_URL}/p/${post.id}`,
-        title: 'Share Post',
-      });
-    } catch (error) {
-      console.error(error);
-    }
+  const handleShare = () => {
+    tapLight();
+    setShareOpen(true);
   };
 
   return (
@@ -79,7 +80,7 @@ export default function PostActions({ post, user }: PostActionsProps) {
         <ThemedView style={styles.reactions}>
           <IconSymbol name={isUpvoted ? "arrowshape.up.fill" : "arrowshape.up"} size={20} color={isUpvoted ? c.voteUp : c.textMuted} />
           <ThemedText style={{color: isUpvoted ? c.voteUp : c.textMuted}}>
-            {post.upvotes === 0 ? post.upvotes : `+${formatCount(post.upvotes)}`}
+            {(state.upvotes ?? 0) === 0 ? 0 : `+${formatCount(state.upvotes)}`}
           </ThemedText>
         </ThemedView>
       </Pressable>
@@ -89,7 +90,7 @@ export default function PostActions({ post, user }: PostActionsProps) {
         <ThemedView style={styles.reactions}>
           <IconSymbol name={isDownvoted ? "arrowshape.down.fill" : "arrowshape.down"} size={20} color={isDownvoted ? c.voteDown : c.textMuted} />
           <ThemedText style={{color: isDownvoted ? c.voteDown : c.textMuted}}>
-            {post.downvotes === 0 ? post.downvotes: `-${formatCount(post.downvotes)}`}
+            {(state.downvotes ?? 0) === 0 ? 0 : `-${formatCount(state.downvotes)}`}
           </ThemedText>
         </ThemedView>
       </Pressable>
@@ -97,7 +98,7 @@ export default function PostActions({ post, user }: PostActionsProps) {
       {/* Comment */}
       <ThemedView style={[styles.reactions, styles.comments]}>
         <IconSymbol name="bubble" size={20} color={c.muted} />
-        <ThemedText style={{color: c.muted}}>{formatCount(post.commentCount)}</ThemedText>
+        <ThemedText style={{color: c.muted}}>{formatCount(state.commentCount)}</ThemedText>
       </ThemedView>
 
       {/* Bookmark */}
@@ -113,6 +114,16 @@ export default function PostActions({ post, user }: PostActionsProps) {
           <IconSymbol name="square.and.arrow.up" size={20} color={c.muted} />
         </Pressable>
       </ThemedView>
+
+      <ContentShareSheet
+        visible={shareOpen}
+        onClose={() => setShareOpen(false)}
+        kind="post"
+        contentId={post.id}
+        url={publicPostUrl(post.id)}
+        message={`${user.username}${post.isDemo ? ' (Fictional demo account)' : ''} on forum: "${post.text.slice(0, 120)}"`}
+        title="Share Post"
+      />
     </ThemedView>
   );
 }

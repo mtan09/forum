@@ -1,6 +1,8 @@
 import Article, { ArticleType } from '@/components/articleComponent';
 import AvatarVisual from '@/components/avatar-visual';
 import DisplayName from '@/components/display-name';
+import ContentActions from '@/components/contentActions';
+import ContentLongPress from '@/components/content-long-press';
 import Post, { PostType } from '@/components/postComponent';
 import ScalableImage from '@/components/scalable-image';
 import ShareCardModal from '@/components/shareCardModal';
@@ -12,6 +14,7 @@ import { ThemedView } from '@/components/themed-view';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { type Palette } from '@/constants/theme';
 import { useAuth } from '@/context/authContext';
+import { useContentInteraction, useInteractionController, useInteractionRevision } from '@/context/interactionContext';
 import { mapPost } from '@/context/postContext';
 import { usePalette } from '@/hooks/use-palette';
 import { useRelativeTime } from '@/hooks/useRelativeTime';
@@ -49,6 +52,7 @@ type CommentRow = {
   article_id: string | null;
   parent_kind: 'post' | 'article';
   parent_title: string | null;
+  parent_comment_id?: string | null;
 };
 
 // Upvoted and Saved return posts and articles interleaved
@@ -68,28 +72,78 @@ const mapMixed = (rows: any[]): MixedItem[] =>
 
 function CommentItem({ comment }: { comment: CommentRow }) {
   const router = useRouter();
+  const { user } = useAuth();
   const { c } = usePalette();
   const styles = useMemo(() => makeStyles(c), [c]);
   const timeAgo = useRelativeTime(comment.created_at);
+  const interactionController = useInteractionController();
+  const { state: votes, patch } = useContentInteraction('comment', comment.id, {
+    upvotes: comment.upvotes ?? 0,
+    downvotes: comment.downvotes ?? 0,
+    deleted: false,
+  });
   const target = comment.parent_kind === 'article'
     ? `/article/${comment.article_id}`
     : `/post/${comment.post_id}`;
 
+  const handleDeleted = (result: { removed_comment_count?: number; post_id?: string | null; article_id?: string | null; parent_comment_id?: string | null }) => {
+    const removed = Math.max(1, result.removed_comment_count ?? 1);
+    patch({ deleted: true });
+    if (result.parent_comment_id) {
+      interactionController.update('comment', result.parent_comment_id, (current) => ({
+        replyCount: Math.max(0, (current.replyCount ?? 1) - 1),
+      }));
+    }
+    const kind = result.post_id ? 'post' : result.article_id ? 'article' : null;
+    const id = result.post_id ?? result.article_id;
+    if (kind && id) {
+      interactionController.update(kind, id, (current) => ({
+        commentCount: Math.max(0, (current.commentCount ?? removed) - removed),
+      }));
+    }
+  };
+
+  if (votes.deleted) return null;
+
   return (
+    <ContentLongPress
+      preview={{
+        kind: 'comment',
+        id: comment.id,
+        authorId: user?.id ?? '',
+        authorName: user?.username ?? 'You',
+        authorAvatar: user?.avatar_url,
+        authorIsDemo: user?.is_demo,
+        text: comment.content,
+      }}
+      onDeleted={handleDeleted}
+    >
     <Pressable
       onPress={() => router.push(target as any)}
       style={({ pressed }) => ({ opacity: pressed ? 0.6 : 1.0 })}
     >
       <ThemedView style={styles.commentRow}>
-        <ThemedText style={styles.commentContext} numberOfLines={1}>
-          On {comment.parent_kind === 'article' ? 'article' : 'post'}: {comment.parent_title ?? '…'}
-        </ThemedText>
+        <ThemedView style={styles.commentContextRow}>
+          <ThemedText style={styles.commentContext} numberOfLines={1}>
+            On {comment.parent_kind === 'article' ? 'article' : 'post'}: {comment.parent_title ?? '…'}
+          </ThemedText>
+          {!!user?.id && (
+            <ContentActions
+              targetKind="comment"
+              targetId={comment.id}
+              authorId={user.id}
+              authorName={user.username}
+              onDeleted={handleDeleted}
+            />
+          )}
+        </ThemedView>
         <ThemedText style={styles.commentText} numberOfLines={3}>{comment.content}</ThemedText>
         <ThemedText style={styles.commentMeta}>
-          ▲ {comment.upvotes}   ▼ {comment.downvotes}   ·   {timeAgo}
+          ▲ {votes.upvotes ?? 0}   ▼ {votes.downvotes ?? 0}   ·   {timeAgo}
         </ThemedText>
       </ThemedView>
     </Pressable>
+    </ContentLongPress>
   );
 }
 
@@ -104,6 +158,8 @@ export default function Profile() {
 
   // profile data comes from the auth session (/users/me)
   const { user: profile, refreshUser } = useAuth();
+  const interactionController = useInteractionController();
+  const interactionRevision = useInteractionRevision();
 
   // Banner picker: tap the camera on the header image to choose a new
   // banner — uploads and saves immediately (also editable in Edit Profile)
@@ -252,8 +308,25 @@ export default function Profile() {
 
   const renderMixed = (items: MixedItem[] | null, emptyText: string) => {
     if (!items) return null;
-    if (items.length === 0) return <ThemedText style={styles.emptyText}>{emptyText}</ThemedText>;
-    return items.map((entry) =>
+    // The revision subscription makes removals from Upvoted/Saved immediate,
+    // including when the action happened on another screen.
+    void interactionRevision;
+    const visibleItems = items.filter((entry) => {
+      if (entry.kind === 'post') {
+        const state = interactionController.get('post', entry.post.id, {
+          myVote: entry.post.myVote ?? null,
+          bookmarked: entry.post.myBookmark ?? false,
+        });
+        return activeTab === 'Upvoted' ? state.myVote === 'up' : state.bookmarked === true;
+      }
+      const state = interactionController.get('article', entry.article.id, {
+        myVote: entry.article.my_vote ?? null,
+        bookmarked: entry.article.my_bookmark ?? false,
+      });
+      return activeTab === 'Upvoted' ? state.myVote === 'up' : state.bookmarked === true;
+    });
+    if (visibleItems.length === 0) return <ThemedText style={styles.emptyText}>{emptyText}</ThemedText>;
+    return visibleItems.map((entry) =>
       entry.kind === 'post' ? (
         <Pressable
           key={`post-${entry.post.id}`}
@@ -754,7 +827,13 @@ const makeStyles = (c: Palette) => StyleSheet.create({
     borderBottomColor: c.border,
     gap: 4,
   },
+  commentContextRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
   commentContext: {
+    flex: 1,
     color: c.primary,
     fontSize: 13,
     fontWeight: '600',

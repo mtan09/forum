@@ -7,6 +7,7 @@ import { usePalette } from '@/hooks/use-palette';
 import { ThemedText } from './themed-text';
 import { ThemedView } from './themed-view';
 import { IconSymbol } from './ui/icon-symbol';
+import ContentLongPress from './content-long-press';
 
 type ImageCarouselProps = {
   images: CarouselImage[];
@@ -16,6 +17,9 @@ type ImageCarouselProps = {
 export type CarouselImage = {
   uri: string;
   source: string;
+  articleId: string;
+  title: string;
+  position?: number | null;
   articleUrl: string;
   cachePolicy: 'none' | 'memory-disk';
 };
@@ -94,6 +98,16 @@ export default function ImageCarousel({ images: allImages, height = 300 }: Image
         onMomentumScrollEnd={handleMomentumEnd}
         viewabilityConfig={{ viewAreaCoveragePercentThreshold: 50 }}
         renderItem={({ item }) => (
+          <ContentLongPress
+            preview={{
+              kind: 'article',
+              id: item.articleId,
+              title: item.title,
+              source: item.source,
+              media: item.uri,
+              position: item.position,
+            }}
+          >
           <Pressable
             accessibilityRole="link"
             accessibilityLabel={`Read the original reporting from ${item.source}`}
@@ -124,6 +138,7 @@ export default function ImageCarousel({ images: allImages, height = 300 }: Image
               <IconSymbol name="arrow.up.right" size={13} color={c.onImage} />
             </ThemedView>
           </Pressable>
+          </ContentLongPress>
         )}
         getItemLayout={(_, index) => ({
           length: itemWidth,

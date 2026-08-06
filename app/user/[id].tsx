@@ -31,6 +31,7 @@ type PublicUser = {
   is_private?: boolean;
   is_demo?: boolean;
   can_view_history?: boolean;
+  can_message?: boolean;
   follower_count?: number;
   following_count?: number;
 };
@@ -211,12 +212,14 @@ export default function PublicProfile() {
               </Pressable>
             ) : (
               <ThemedView style={styles.actionsRow}>
-                <Pressable
-                  onPress={() => { tapLight(); router.push(`/dm/${user.id}`); }}
-                  style={styles.messageBtn}
-                >
-                  <IconSymbol name="envelope" size={16} color={c.primary} />
-                </Pressable>
+                {user.can_message !== false && (
+                  <Pressable
+                    onPress={() => { tapLight(); router.push(`/dm/${user.id}`); }}
+                    style={styles.messageBtn}
+                  >
+                    <IconSymbol name="envelope" size={16} color={c.primary} />
+                  </Pressable>
+                )}
                 <Pressable
                   onPress={toggleFollow}
                   style={[styles.followBtn, followStatus && styles.followingBtn]}

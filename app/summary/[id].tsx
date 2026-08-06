@@ -1,4 +1,5 @@
 import { ArticleType } from '@/components/articleComponent';
+import ContentLongPress from '@/components/content-long-press';
 import ImageCarousel, { type CarouselImage } from '@/components/imageCarousel';
 import Spectrum from '@/components/spectrum';
 import { ThemedText } from '@/components/themed-text';
@@ -143,6 +144,9 @@ export default function SummaryScreen() {
       return [{
         uri,
         source: article.source,
+        articleId: article.id,
+        title: article.title,
+        position: article.source_lean ?? article.political_lean ?? null,
         articleUrl: article.url,
         cachePolicy: getArticleImageCachePolicy(article.image_mode),
       }];
@@ -246,9 +250,8 @@ export default function SummaryScreen() {
                     || articleHeadline.startsWith(perspectiveHeadline)
                     || perspectiveHeadline.startsWith(articleHeadline);
                 }) ?? sourceArticles[0];
-                return (
+                const row = (
                   <Pressable
-                    key={p.lean}
                     accessibilityRole={perspectiveArticle ? 'link' : undefined}
                     accessibilityLabel={perspectiveArticle
                       ? `Open ${p.source} article: ${p.coverage}`
@@ -285,6 +288,27 @@ export default function SummaryScreen() {
                       <ThemedText style={styles.perspectiveQuote}>{p.coverage}</ThemedText>
                     </ThemedView>
                   </Pressable>
+                );
+                if (!perspectiveArticle) return <ThemedView key={p.lean}>{row}</ThemedView>;
+                const perspectiveMedia = getDisplayableArticleMedia(
+                  perspectiveArticle.media_thumbnail_url ?? perspectiveArticle.media,
+                  perspectiveArticle.url,
+                  perspectiveArticle.image_mode,
+                );
+                return (
+                  <ContentLongPress
+                    key={p.lean}
+                    preview={{
+                      kind: 'article',
+                      id: perspectiveArticle.id,
+                      title: perspectiveArticle.title,
+                      source: perspectiveArticle.source,
+                      media: perspectiveMedia,
+                      position: perspectiveArticle.source_lean ?? perspectiveArticle.political_lean ?? null,
+                    }}
+                  >
+                    {row}
+                  </ContentLongPress>
                 );
               })}
             </ThemedView>
@@ -369,8 +393,18 @@ export default function SummaryScreen() {
                   item.image_mode
                 );
                 return (
-                <Pressable
+                <ContentLongPress
                   key={item.id}
+                  preview={{
+                    kind: 'article',
+                    id: item.id,
+                    title: item.title,
+                    source: item.source,
+                    media,
+                    position: item.source_lean ?? item.political_lean ?? null,
+                  }}
+                >
+                <Pressable
                   onPress={() => router.push(`/article/${item.id}`)}
                   style={({ pressed }) => ({ opacity: pressed ? 0.7 : 1.0 })}
                 >
@@ -412,6 +446,7 @@ export default function SummaryScreen() {
                     </ThemedText>
                   </ThemedView>
                 </Pressable>
+                </ContentLongPress>
                 );
               })}
             </ScrollView>

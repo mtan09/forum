@@ -19,16 +19,16 @@ A political discussion social media app built with Expo / React Native. The feed
   - Content tabs: Posts, Comments, Upvoted, and Saved (real bookmarks)
   - Settings live behind a gear button (not a tab)
 - **Follows + Following feed** — follow anyone from their profile; Home stays focused on `For You / Random / Against You`, while a dedicated Following feed lives on your profile alongside follower counts
-- **Direct messages** — a full DM inbox (envelope on your profile) with per-thread unread badges, optimistic sends, block-aware delivery, and report/block actions on received messages
+- **Direct messages** — a full DM inbox (envelope on your profile) with per-thread unread badges, optimistic sends, grouped date/time separators, swipe-to-reveal exact timestamps, tappable conversation identities, rich in-app post/article shares, and report/block actions on received messages. Public accounts can receive DMs normally; a private account can receive a DM only from someone it follows
 - **Shareable cards** — export a branded image of your lean or a debate stance to the native share sheet; post shares link to web share pages with rich previews and an open-in-app button
 - **Moderation and OpenAI permission** — forum's deterministic hard stops run first. Signup usernames use only forum's on-server rules. Before profile text, a post, comment, DM, forumAI prompt, or uploaded image is sent to OpenAI for additional safety processing or generation, the user receives a clear versioned allow/decline choice. Declining preserves text-based social features as well as browsing, voting, saving, and following; Settings allows later permission or withdrawal. Report/block tools remain available and admins get separate report and pre-publication review queues
 - **Onboarding** — immediately after signup, new accounts can pick interests and follow suggested active users. Topics save when Step 1 advances and follows save immediately; onboarding is a one-session welcome flow, so a cold relaunch opens the signed-in home feed rather than forcing an unfinished flow to resume
-- **Private accounts** — private profiles expose only their basic identity and spectrum until a follow request is accepted; requests can be approved, declined, cancelled, and removed, while individually encountered posts remain in feeds, search, and threads
+- **Private accounts** — private profiles expose only their basic identity and spectrum until a follow request is accepted; requests can be approved, declined, cancelled, and removed, while individually encountered posts remain in feeds, search, and threads. Messaging a private account requires that account to follow the sender
 - **Notifications** — Push and Email are independently configurable for replies, upvotes, DMs, and follow activity. Push permission is requested contextually from Settings; a granted OS permission is not mistaken for device registration, and Settings repairs stale registration without reopening the system prompt. The backend checks Expo's final delivery receipts and removes dead tokens. Replies/DM emails are immediate, and opted-in upvote email is coalesced
 - **Feedback** — authenticated structured feedback captures category, route, theme, version/build, device metadata, and an optional privately stored screenshot; admins can triage it as open, planned, resolved, or dismissed, and account deletion removes the feedback record before its private screenshot is cleaned up asynchronously
-- **Posting**: a partial-height composer keeps the feed visible behind it, with an explicit close control, image/hashtag tools, and a unified send action; uploaded images are server-resized and EXIF-stripped
+- **Posting**: the create action opens a distraction-free three-quarter-height composer, focuses the writing surface immediately, and keeps a Photo Library control attached above the keyboard. Inline `#hashtags` remain supported; uploaded images are moderated, server-resized, and EXIF-stripped. The app does not request camera access
 - **Article media** — the backend prefers publisher RSS/Atom media and may fall back to publisher page image metadata, then stores that remote URL. The app loads it directly with its normal device cache, rejects obvious video/HLS assets and malformed article-URL-as-image values, and falls back cleanly when a publisher image is unavailable. Summary carousels label every image with its publisher and tap through to the original article
-- **Interactions** — persistent up/downvotes, nested comments with replies, real bookmarks, and consistent vote/bookmark colors and spacing in both themes
+- **Interactions** — persistent up/downvotes, nested comments with replies, and real bookmarks. Optimistic interaction state is synchronized by content ID across feed, detail, profile, search, summary, and comment surfaces, so votes, saves, comment counts, and owner deletions update immediately without waiting for a screen refetch. Authors can permanently delete their own posts or comments from the shared three-dot menu; a press-and-hold on any post, article, or comment raises a focused preview over a blurred background with the same context-aware actions below it
 - **forumAI**: a guided three-perspective workspace that streams Left / Center / Right readings and searches eligible recent publisher headlines plus forum-generated story metadata for relevant context. Publisher bodies are neither stored nor sent to OpenAI, and source-policy controls exclude restricted publishers from AI context
   - "Explain like I'm: …" framing selector (student, policymaker, skeptic, …)
 - **Settings** — account (edit profile, change password, private-account control, follow requests, email verification + password reset), **Appearance (Light / Dark / Match system)**, a persisted home-feed content choice (**posts + articles / posts only / articles only**), per-channel notification preferences, structured feedback, privacy/blocking, version/build information, Terms + Privacy, and account deletion
@@ -79,7 +79,8 @@ app/               screens (expo-router file-based routing)
 components/        post/article/comment cards, spectrum bar + trail,
                   scorer receipts, share cards, report/block menu, carousels
 context/          authContext (session), aiConsentContext (explicit OpenAI
-                  permission UI), postContext (feed + votes),
+                  permission UI), interactionContext (per-item cross-screen
+                  votes/bookmarks/comment counts), postContext (normalized feed),
                   themeContext (Light / Dark / Match system preference),
                   feedPreferenceContext (persisted feed content filter)
 lib/api.ts        API client: fetch wrapper, token storage, image upload
@@ -161,6 +162,7 @@ retrying `npx expo run:ios`.
 ```bash
 npm start            # Forum development client (i = iOS simulator, a = Android)
 npm run web          # browser development server
+npm run web:export   # production static export in dist/
 npm run lint         # eslint
 npx tsc --noEmit     # typecheck
 ```
@@ -177,16 +179,28 @@ LAN address.
 
 The browser build uses a web-specific responsive shell rather than stretching the phone UI. At laptop widths, navigation lives in a left rail, the feed stays in a constrained center column, and The Floor appears beside it as a live right rail. Tablet-sized browsers use a compact top navigation, while phone-sized browsers use a bottom navigation and a small composer action in the header. Search, forumAI, profile, summary, The Floor, and the post composer adapt to the available width while reusing the same API, auth, theme, and content logic as iOS and Android. Horizontal topic, image, and coverage rails expose mouse-friendly previous/next controls on larger browsers.
 
-The current production web deployment is **https://mtan-forum.expo.app**. It is an
-EAS Hosting production alias backed by the same Railway API as the iOS app.
+The production web deployment is **https://forumeveryside.com**. It is a
+Cloudflare Pages direct-upload project named `forum-web`, backed by the same
+Railway API as the iOS app. **https://forum-web-6tw.pages.dev** is Cloudflare's
+generated project hostname, and **https://mtan-forum.expo.app** remains an EAS
+Hosting fallback.
+Shared user posts and articles use canonical
+`https://forumeveryside.com/post/<post-id>` and
+`https://forumeveryside.com/article/<article-id>` links. Set
+`EXPO_PUBLIC_WEB_URL` only when a development or preview build needs a different
+public web origin; production defaults to the permanent domain.
 The permanent support and privacy pages live at
 **https://api.forumeveryside.com/support** and
-**https://api.forumeveryside.com/legal/privacy**. EAS custom domains require a
-paid Expo plan, so the root `forumeveryside.com` website remains a separate,
-optional hosting decision; it is not required for TestFlight while the
-domain-owned support and privacy URLs remain live.
+**https://api.forumeveryside.com/legal/privacy**.
 
-The authenticated web client is exported as a single-page app because post, article, summary, user, and conversation URLs are dynamic. Configure the host to rewrite unknown paths to `index.html` (`public/_redirects` covers compatible hosts). A production web build must also set `EXPO_PUBLIC_API_URL` to the deployed HTTPS `forum-api` origin; without it, the development fallback is `http://localhost:3000`.
+The authenticated web client is exported as a single-page app because post,
+article, summary, user, and conversation URLs are dynamic. `public/_redirects`
+rewrites unknown Cloudflare Pages paths to `index.html`. To publish an update,
+set `EXPO_PUBLIC_API_URL=https://api.forumeveryside.com` in the local production
+environment, run `npm run web:export`, and upload the generated `dist/` folder
+as a new production deployment in the `forum-web` Pages project. A production
+export without `EXPO_PUBLIC_API_URL` falls back to `http://localhost:3000` and
+must not be uploaded.
 
 CI (GitHub Actions) runs typecheck + lint on every push. See **[LAUNCH.md](LAUNCH.md)** for the App Store launch checklist — deployment, EAS builds, and the account setup (Apple/Resend/Sentry/Railway) each feature is env-gated behind.
 

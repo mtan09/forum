@@ -44,7 +44,10 @@ export default function WebTabLayout() {
   const compact = width < 1180;
   const phone = width < 700;
   const compactFloorRail = width < 1320;
-  const showFloorRail = pathname === '/' && width >= 1180;
+  // The tab layout can render for one frame while the root navigator redirects
+  // a signed-out visitor to the landing page. Do not issue authenticated Floor
+  // requests during that transition.
+  const showFloorRail = !!user && pathname === '/' && width >= 1180;
 
   return (
     <ThemedView style={styles.page}>

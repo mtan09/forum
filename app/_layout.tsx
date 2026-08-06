@@ -12,11 +12,13 @@ import { PostProvider } from '../context/postContext';
 
 import { AuthProvider, useAuth } from '@/context/authContext';
 import { AIConsentProvider } from '@/context/aiConsentContext';
+import { InteractionProvider } from '@/context/interactionContext';
 
 import { FeedPreferenceProvider } from '@/context/feedPreferenceContext';
 import { ThemeModeProvider } from '@/context/themeContext';
 
 import { ActivityIndicator, Platform, Pressable, Text, View } from 'react-native';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
 
 import { useCallback, useEffect, useMemo, useRef } from 'react';
 
@@ -33,19 +35,23 @@ initSentry();
 
 export default function RootLayout() {
   return (
-    <AppErrorBoundary>
-      <ThemeModeProvider>
-        <FeedPreferenceProvider>
-          <AuthProvider>
-            <AIConsentProvider>
-              <PostProvider>
-                <ThemedShell />
-              </PostProvider>
-            </AIConsentProvider>
-          </AuthProvider>
-        </FeedPreferenceProvider>
-      </ThemeModeProvider>
-    </AppErrorBoundary>
+    <GestureHandlerRootView style={{ flex: 1 }}>
+      <AppErrorBoundary>
+        <ThemeModeProvider>
+          <FeedPreferenceProvider>
+            <AuthProvider>
+              <AIConsentProvider>
+                <InteractionProvider>
+                  <PostProvider>
+                    <ThemedShell />
+                  </PostProvider>
+                </InteractionProvider>
+              </AIConsentProvider>
+            </AuthProvider>
+          </FeedPreferenceProvider>
+        </ThemeModeProvider>
+      </AppErrorBoundary>
+    </GestureHandlerRootView>
   );
 }
 
@@ -202,12 +208,12 @@ function AppNavigator() {
             options={{
               presentation: Platform.OS === 'web' ? 'transparentModal' : 'formSheet',
               headerShown: false,
-              sheetAllowedDetents: Platform.OS === 'web' ? undefined : [0.9],
-              sheetInitialDetentIndex: 0,
-              sheetGrabberVisible: Platform.OS !== 'web',
+              sheetAllowedDetents: Platform.OS === 'web' ? undefined : [0.75],
+              sheetInitialDetentIndex: Platform.OS === 'web' ? undefined : 0,
+              sheetGrabberVisible: false,
               sheetCornerRadius: 24,
               sheetLargestUndimmedDetentIndex: 'none',
-              contentStyle: { backgroundColor: Platform.OS === 'web' ? 'transparent' : c.surfaceRaised },
+              contentStyle: { backgroundColor: c.background },
             }}
           />
           <Stack.Screen

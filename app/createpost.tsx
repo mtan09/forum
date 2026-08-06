@@ -1,4 +1,3 @@
-import AppTextInput from '@/components/app-text-input';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { IconSymbol } from '@/components/ui/icon-symbol';
@@ -8,88 +7,77 @@ import { usePalette } from '@/hooks/use-palette';
 import { api, uploadImage } from '@/lib/api';
 import { notifySuccess, tapLight, tapMedium } from '@/lib/haptics';
 import * as ImagePicker from 'expo-image-picker';
-import { useRouter } from 'expo-router';
-import { useMemo, useState } from 'react';
-import { Image, Keyboard, Platform, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { useFocusEffect, useRouter } from 'expo-router';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import {
+  Image,
+  InteractionManager,
+  Keyboard,
+  KeyboardAvoidingView,
+  Platform,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  TextInput,
+  View,
+} from 'react-native';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+
+type PickedImage = {
+  uri: string;
+  width: number;
+  height: number;
+};
 
 export default function CreatePost() {
   const router = useRouter();
   const { c } = usePalette();
   const styles = useMemo(() => makeStyles(c), [c]);
+  const insets = useSafeAreaInsets();
   const { refresh } = usePosts();
+  const inputRef = useRef<TextInput>(null);
 
-  const [post, setPost] = useState<{
-    content: string;
-    media: string | null;
-  }>({
-    content: '',
-    media: null,
-  })
-
-  // Author-selected hashtags; a space/comma/return commits the typed tag
-  // as a chip. The server also picks up any inline #tags in the text.
-  const [hashtags, setHashtags] = useState<string[]>([]);
-  const [tagInput, setTagInput] = useState('');
-
-  const commitTag = (raw: string) => {
-    const tag = raw.replace(/^#/, '').toLowerCase().replace(/[^a-z0-9_]/g, '');
-    if (tag.length >= 2 && tag.length <= 30 && !hashtags.includes(tag) && hashtags.length < 8) {
-      setHashtags((prev) => [...prev, tag]);
-    }
-  };
-
-  const onTagInputChange = (text: string) => {
-    if (/[ ,]$/.test(text)) {
-      commitTag(text.slice(0, -1));
-      setTagInput('');
-    } else {
-      setTagInput(text);
-    }
-  };
-
-  const removeTag = (tag: string) => setHashtags((prev) => prev.filter((t) => t !== tag));
-
+  const [content, setContent] = useState('');
+  const [pickedImage, setPickedImage] = useState<PickedImage | null>(null);
   const [loading, setLoading] = useState(false);
+  const [keyboardHeight, setKeyboardHeight] = useState(0);
   const [err, setErr] = useState<string | null>(null);
 
-  const handlePost = async () => {
-    setErr(null);
-    try {
-      tapMedium();
-      setLoading(true);
+  useFocusEffect(
+    useCallback(() => {
+      const task = InteractionManager.runAfterInteractions(() => inputRef.current?.focus());
+      return () => task.cancel();
+    }, []),
+  );
 
-      let mediaUrl: string | null = null;
-      if (pickedImage) {
-        mediaUrl = await uploadImage(pickedImage.uri);
-      }
+  useEffect(() => {
+    if (Platform.OS !== 'ios') return;
+    const change = Keyboard.addListener('keyboardWillChangeFrame', (event) => {
+      Keyboard.scheduleLayoutAnimation(event);
+      setKeyboardHeight(Math.max(0, event.endCoordinates.height));
+    });
+    const hide = Keyboard.addListener('keyboardWillHide', (event) => {
+      Keyboard.scheduleLayoutAnimation(event);
+      setKeyboardHeight(0);
+    });
+    return () => {
+      change.remove();
+      hide.remove();
+    };
+  }, []);
 
-      await api('/posts', {
-        body: {
-          content: post.content.trim(),
-          media_url: mediaUrl,
-          hashtags: tagInput ? [...hashtags, tagInput] : hashtags,
-        },
-      });
+  const dismissComposer = useCallback(() => {
+    Keyboard.dismiss();
+    if (router.canGoBack()) router.back();
+    else router.replace('/');
+  }, [router]);
 
-      await refresh();
-
-      // reset UI and dismiss the modal back to the feed
-      setPost({ content: '', media: null });
-      setHashtags([]);
-      setTagInput('');
-      setPickedImage(null);
-      notifySuccess();
-      dismissComposer();
-    } catch (e: any) {
-      setErr(e?.message ?? 'Something went wrong.');
-    } finally {
-      setLoading(false);
-    }
+  const closeComposer = () => {
+    tapLight();
+    dismissComposer();
   };
 
-  const [pickedImage, setPickedImage] = useState<{ uri: string; width: number; height: number } | null>(null);
-
-  const pickImage = async () => {
+  const choosePhoto = async () => {
     tapLight();
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: 'images' as const,
@@ -104,298 +92,342 @@ export default function CreatePost() {
         width: asset.width ?? 1,
         height: asset.height ?? 1,
       });
+      InteractionManager.runAfterInteractions(() => inputRef.current?.focus());
     }
   };
 
-  const removePickedImage = () => setPickedImage(null);
-  const canPost = !loading && Boolean(post.content.trim() || pickedImage);
-
-  const dismissComposer = () => {
-    Keyboard.dismiss();
-    if (router.canGoBack()) router.back();
-    else router.replace('/');
-  };
-
-  const closeComposer = () => {
+  const removePickedImage = () => {
     tapLight();
-    dismissComposer();
+    setPickedImage(null);
+    inputRef.current?.focus();
   };
 
-  return(
-    <Pressable style={styles.backdrop} onPress={Keyboard.dismiss} accessible={false}>
-      <ThemedView style={styles.container}>
-        <ScrollView 
-          style={styles.scrollView}
-          contentContainerStyle={styles.scrollContent}
-          showsVerticalScrollIndicator={false}
-          keyboardDismissMode="on-drag"
-          keyboardShouldPersistTaps="handled"
+  const canPost = !loading && Boolean(content.trim() || pickedImage);
+
+  const handlePost = async () => {
+    if (!canPost) return;
+    setErr(null);
+    tapMedium();
+    setLoading(true);
+
+    try {
+      const mediaUrl = pickedImage ? await uploadImage(pickedImage.uri) : null;
+      await api('/posts', {
+        body: {
+          content: content.trim(),
+          media_url: mediaUrl,
+        },
+      });
+      await refresh();
+      notifySuccess();
+      dismissComposer();
+    } catch (e: any) {
+      setErr(e?.message ?? 'Something went wrong.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const mediaBar = (attachedToKeyboard: boolean) => (
+    <View
+      style={[
+        styles.mediaBar,
+        {
+          paddingBottom: attachedToKeyboard
+            ? 9
+            : Math.max(insets.bottom, Platform.OS === 'ios' ? 24 : 10),
+        },
+      ]}
+    >
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel="Choose a photo from your library"
+        onPress={choosePhoto}
+        style={({ pressed }) => [styles.mediaButton, pressed && styles.mediaButtonPressed]}
+      >
+        <View style={styles.mediaIconBubble}>
+          <IconSymbol name="photo" size={21} color={c.primary} />
+        </View>
+        <ThemedText style={styles.mediaButtonText}>Photo</ThemedText>
+      </Pressable>
+    </View>
+  );
+
+  return (
+    <ThemedView style={styles.screen}>
+      <SafeAreaView style={styles.safeArea} edges={['left', 'right']}>
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'android' ? 'height' : undefined}
+          style={styles.keyboardView}
         >
-          <ThemedView style={styles.header}>
-            <ThemedText type="title" style={styles.headerTitle}>Create Post</ThemedText>
-            <Pressable
-              onPress={closeComposer}
-              style={({ pressed }) => [styles.closeButton, { opacity: pressed ? 0.65 : 1 }]}
-              accessibilityRole="button"
-              accessibilityLabel="Close create post"
-              hitSlop={8}
-            >
-              <IconSymbol name="xmark" size={22} color={c.textSecondary} />
-            </Pressable>
-          </ThemedView>
-
-          <AppTextInput
-            placeholder="What do you want to post?"
-            value={post.content}
-            onChangeText={(text) => setPost((prev) => ({ ...prev, content: text }))}
-            autoCapitalize="sentences"
-            keyboardType="default"
-            multiline
-            onSubmitEditing={Keyboard.dismiss}
-            textAlignVertical="top"
-            containerStyle={styles.postInput}
-            style={styles.postInputText}
-          />
-
-          {pickedImage && (
-            <View style={styles.imageContainer}>
-              <Image
-                source={{ uri: pickedImage.uri }}
-                style={{
-                  width: '100%',
-                  aspectRatio: pickedImage.width / pickedImage.height,
-                  borderRadius: 16,
-                }}
-                resizeMode="cover"
-              />
-              <Pressable onPress={removePickedImage} style={styles.removeButton}>
-                <IconSymbol name="x.circle.fill" size={28} color={c.primary} />
-              </Pressable>
-            </View>
-          )}
-
-          {!!err && (
-            <ThemedView style={styles.errorContainer}>
-              <ThemedText style={styles.errorText}>{err}</ThemedText>
-            </ThemedView>
-          )}
-
-          <ThemedView style={styles.actionContainer}>
-            <Pressable onPress={pickImage} style={styles.secondaryButton}>
-              <IconSymbol name="photo" size={20} color={c.primary} />
-              <ThemedText style={styles.secondaryButtonText}>Add Image</ThemedText>
-            </Pressable>
-
-            <ThemedView style={styles.tagSection}>
-              {hashtags.length > 0 && (
-                <View style={styles.tagChips}>
-                  {hashtags.map((tag) => (
-                    <Pressable key={tag} onPress={() => removeTag(tag)} style={styles.tagChip}>
-                      <ThemedText style={styles.tagChipText}>#{tag}</ThemedText>
-                      <IconSymbol name="x.circle.fill" size={16} color={c.primary} />
-                    </Pressable>
-                  ))}
-                </View>
-              )}
-              <AppTextInput
-                placeholder="Add hashtags (space to add)"
-                value={tagInput}
-                onChangeText={onTagInputChange}
-                onSubmitEditing={() => { commitTag(tagInput); setTagInput(''); }}
-                autoCapitalize="none"
-                autoCorrect={false}
-              />
-            </ThemedView>
-          </ThemedView>
-        </ScrollView>
-
-        <ThemedView style={styles.bottomContainer}>
-          <Pressable
-            onPress={handlePost}
+          <View
             style={[
-              styles.primaryButton,
-              !canPost ? styles.primaryButtonDisabled : null
+              styles.topActions,
+              {
+                paddingTop: Platform.OS === 'ios'
+                  ? 12
+                  : insets.top + 8,
+              },
             ]}
-            disabled={!canPost}
           >
-            <ThemedText style={[styles.primaryButtonText, !canPost && styles.primaryButtonTextDisabled]}>
-              {loading ? 'Posting...' : 'Post'}
-            </ThemedText>
-            {!loading && <IconSymbol name="paperplane.fill" size={19} color={canPost ? c.onPrimary : c.textDisabled} />}
-          </Pressable>
-        </ThemedView>
-      </ThemedView>
-    </Pressable>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Cancel post"
+              disabled={loading}
+              hitSlop={10}
+              onPress={closeComposer}
+              style={({ pressed }) => [styles.cancelButton, pressed && styles.buttonPressed]}
+            >
+              <ThemedText style={styles.cancelText}>Cancel</ThemedText>
+            </Pressable>
+
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={loading ? 'Posting' : 'Post'}
+              disabled={!canPost}
+              onPress={handlePost}
+              style={({ pressed }) => [
+                styles.postButton,
+                !canPost && styles.postButtonDisabled,
+                pressed && canPost && styles.buttonPressed,
+              ]}
+            >
+              <ThemedText style={[styles.postButtonText, !canPost && styles.postButtonTextDisabled]}>
+                {loading ? 'Posting…' : 'Post'}
+              </ThemedText>
+            </Pressable>
+          </View>
+
+          <ScrollView
+            style={styles.editorScroll}
+            contentContainerStyle={styles.editorContent}
+            keyboardDismissMode="interactive"
+            keyboardShouldPersistTaps="handled"
+            showsVerticalScrollIndicator={false}
+          >
+            <TextInput
+              ref={inputRef}
+              accessibilityLabel="Post text"
+              autoCapitalize="sentences"
+              autoCorrect
+              autoFocus
+              multiline
+              onChangeText={(text) => {
+                setContent(text);
+                if (err) setErr(null);
+              }}
+              placeholder="What do you want to post?"
+              placeholderTextColor={c.muted}
+              scrollEnabled={false}
+              style={styles.editor}
+              textAlignVertical="top"
+              value={content}
+            />
+
+            {pickedImage ? (
+              <View style={styles.imageContainer}>
+                <Image
+                  source={{ uri: pickedImage.uri }}
+                  style={styles.imagePreview}
+                  resizeMode="cover"
+                  accessibilityLabel="Selected post image"
+                />
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel="Remove selected image"
+                  hitSlop={8}
+                  onPress={removePickedImage}
+                  style={({ pressed }) => [styles.removeButton, pressed && styles.buttonPressed]}
+                >
+                  <IconSymbol name="xmark" size={17} color={c.onImage} />
+                </Pressable>
+              </View>
+            ) : null}
+
+            {err ? (
+              <View style={styles.errorContainer}>
+                <ThemedText style={styles.errorText}>{err}</ThemedText>
+              </View>
+            ) : null}
+          </ScrollView>
+
+          {Platform.OS === 'ios' ? (
+            <View style={[styles.iosMediaBarPosition, { bottom: keyboardHeight }]}>
+              {mediaBar(keyboardHeight > 0)}
+            </View>
+          ) : mediaBar(false)}
+        </KeyboardAvoidingView>
+      </SafeAreaView>
+    </ThemedView>
   );
 }
 
 const makeStyles = (c: Palette) => StyleSheet.create({
-  backdrop: {
+  screen: {
     flex: 1,
     alignItems: Platform.OS === 'web' ? 'center' : 'stretch',
     justifyContent: Platform.OS === 'web' ? 'center' : 'flex-start',
     padding: Platform.OS === 'web' ? 24 : 0,
-    backgroundColor: Platform.OS === 'web' ? c.scrim : c.surfaceRaised,
+    backgroundColor: Platform.OS === 'web' ? c.scrim : c.background,
   },
-  container: {
+  safeArea: {
     flex: Platform.OS === 'web' ? undefined : 1,
     width: '100%',
-    maxWidth: Platform.OS === 'web' ? 680 : undefined,
-    height: Platform.OS === 'web' ? 'min(560px, calc(100vh - 48px))' as any : undefined,
+    maxWidth: Platform.OS === 'web' ? 720 : undefined,
+    height: Platform.OS === 'web' ? 'min(75vh, 760px)' as any : undefined,
+    overflow: 'hidden',
     borderRadius: Platform.OS === 'web' ? 24 : 0,
     borderWidth: Platform.OS === 'web' ? 1 : 0,
     borderColor: c.cardBorder,
-    overflow: 'hidden',
-    backgroundColor: c.surfaceRaised,
+    backgroundColor: c.background,
   },
-  scrollView: {
+  keyboardView: {
     flex: 1,
   },
-  scrollContent: {
-    paddingHorizontal: Platform.OS === 'web' ? 24 : 16,
-    paddingTop: Platform.OS === 'web' ? 20 : 16,
-    paddingBottom: 120,
-  },
-  header: {
+  topActions: {
+    minHeight: 58,
+    paddingHorizontal: 18,
+    paddingBottom: 9,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: 24,
-    marginTop: Platform.OS === 'web' ? 0 : 26,
-    backgroundColor: 'transparent',
   },
-  headerTitle: {
-    color: c.primary,
+  cancelButton: {
+    minHeight: 40,
+    justifyContent: 'center',
+    paddingHorizontal: 2,
+  },
+  cancelText: {
+    color: c.text,
+    fontSize: 16,
+    lineHeight: 21,
+    fontWeight: '700',
+  },
+  postButton: {
+    minWidth: 76,
+    minHeight: 40,
+    paddingHorizontal: 20,
+    borderRadius: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: c.primary,
+  },
+  postButtonDisabled: {
+    backgroundColor: c.surfaceMuted,
+  },
+  postButtonText: {
+    color: c.onPrimary,
+    fontSize: 15,
+    lineHeight: 20,
     fontWeight: '800',
   },
-  closeButton: {
+  postButtonTextDisabled: {
+    color: c.textDisabled,
+  },
+  buttonPressed: {
+    opacity: 0.66,
+  },
+  editorScroll: {
+    flex: 1,
+  },
+  editorContent: {
+    flexGrow: 1,
+    paddingHorizontal: 20,
+    paddingBottom: 104,
+  },
+  editor: {
+    flexGrow: 1,
+    minHeight: 260,
+    paddingTop: 12,
+    paddingHorizontal: 0,
+    paddingBottom: 20,
+    color: c.text,
+    fontSize: 20,
+    lineHeight: 28,
+    fontWeight: '500',
+    textAlignVertical: 'top',
+  },
+  imageContainer: {
+    width: '100%',
+    height: 240,
+    position: 'relative',
+    overflow: 'hidden',
+    marginBottom: 16,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: c.cardBorder,
+    backgroundColor: c.surfaceMuted,
+  },
+  imagePreview: {
+    width: '100%',
+    height: '100%',
+  },
+  removeButton: {
+    position: 'absolute',
+    top: 10,
+    right: 10,
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: c.imageControlBg,
+  },
+  errorContainer: {
+    marginBottom: 4,
+    paddingHorizontal: 13,
+    paddingVertical: 11,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: c.red,
+    backgroundColor: c.redBg,
+  },
+  errorText: {
+    color: c.danger,
+    fontSize: 14,
+    lineHeight: 19,
+    fontWeight: '600',
+  },
+  mediaBar: {
+    minHeight: 64,
+    paddingTop: 9,
+    paddingHorizontal: 16,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: c.border,
+    backgroundColor: c.surfaceRaised,
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+  },
+  iosMediaBarPosition: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    zIndex: 4,
+  },
+  mediaButton: {
+    minHeight: 44,
+    paddingRight: 14,
+    paddingLeft: 4,
+    borderRadius: 22,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  mediaButtonPressed: {
+    backgroundColor: c.accentSoftBg,
+  },
+  mediaIconBubble: {
     width: 38,
     height: 38,
     borderRadius: 19,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: c.surfaceMuted,
-    borderWidth: 1,
-    borderColor: c.border,
-    transform: [{ translateY: Platform.OS === 'web' ? 0 : -3 }],
+    backgroundColor: c.accentSoftBg,
   },
-  postInput: {
-    width: '100%',
-    minHeight: 140,
-    marginBottom: 16,
-    alignItems: 'flex-start',
-  },
-  postInputText: {
-    minHeight: 116,
-    fontSize: 16,
-    textAlignVertical: 'top',
-  },
-  imageContainer: {
-    width: '100%',
-    position: 'relative',
-    marginBottom: 16,
-    borderRadius: 16,
-    overflow: 'hidden',
-  },
-  removeButton: {
-    position: 'absolute',
-    top: 8,
-    right: 8,
-    backgroundColor: c.background,
-    borderRadius: 16,
-    padding: 4,
-  },
-  errorContainer: {
-    backgroundColor: c.redBg,
-    borderColor: c.red,
-    borderWidth: 1,
-    borderRadius: 12,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    marginBottom: 16,
-  },
-  errorText: {
-    color: c.danger,
-    fontWeight: '600',
-    fontSize: 14,
-  },
-  actionContainer: {
-    gap: 12,
-    marginBottom: 20,
-    backgroundColor: 'transparent',
-  },
-  tagSection: {
-    backgroundColor: 'transparent',
-  },
-  tagChips: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-    marginBottom: 8,
-  },
-  tagChip: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 12,
-    backgroundColor: c.card,
-    borderWidth: 1,
-    borderColor: c.accentFaint,
-  },
-  tagChipText: {
+  mediaButtonText: {
     color: c.primary,
+    fontSize: 15,
+    lineHeight: 20,
     fontWeight: '700',
-    fontSize: 14,
-  },
-  secondaryButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    borderRadius: 16,
-    borderWidth: 2,
-    borderColor: c.accentFaint,
-    backgroundColor: c.card,
-  },
-  secondaryButtonText: {
-    fontWeight: '700',
-    fontSize: 16,
-    color: c.primary,
-  },
-  bottomContainer: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    paddingHorizontal: 16,
-    paddingVertical: 16,
-    backgroundColor: c.surfaceRaised,
-    borderTopWidth: 1,
-    borderTopColor: c.cardBorder,
-  },
-  primaryButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-    paddingVertical: 14,
-    paddingHorizontal: 24,
-    borderRadius: 16,
-    backgroundColor: c.primary,
-  },
-  primaryButtonDisabled: {
-    backgroundColor: c.surfaceMuted,
-  },
-  primaryButtonText: {
-    color: c.onPrimary,
-    fontWeight: '800',
-    fontSize: 16,
-  },
-  primaryButtonTextDisabled: {
-    color: c.textDisabled,
   },
 });

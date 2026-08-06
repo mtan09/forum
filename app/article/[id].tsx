@@ -6,6 +6,7 @@ import { ThemedView } from '@/components/themed-view';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import WebPageFrame from '@/components/web-page-frame';
 import { type Palette } from '@/constants/theme';
+import { useInteractionController } from '@/context/interactionContext';
 import { usePalette } from '@/hooks/use-palette';
 import { api } from '@/lib/api';
 import { queueFeedEvent, type FeedMode } from '@/lib/feed-events';
@@ -21,6 +22,7 @@ export default function ArticleScreen() {
   const styles = useMemo(() => makeStyles(c), [c]);
   const { id, feed_session, feed_algorithm, feed_mode, feed_position } = useLocalSearchParams();
   const articleId = useMemo(() => (Array.isArray(id) ? id[0] : id) as string | undefined, [id]);
+  const interactions = useInteractionController();
 
   const [article, setArticle] = useState<ArticleType | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
@@ -56,6 +58,9 @@ export default function ArticleScreen() {
       tapMedium();
       setSubmitting(true);
       await api('/comments', { body: { article_id: articleId, content } });
+      interactions.update('article', articleId, (current) => ({
+        commentCount: (current.commentCount ?? article?.commentcount ?? 0) + 1,
+      }), { commentCount: article?.commentcount ?? 0 });
       setCommentText('');
       Keyboard.dismiss();
       setRefreshKey((k) => k + 1); // reload the comment list

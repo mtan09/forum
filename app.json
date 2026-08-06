@@ -120,7 +120,10 @@
       },
       "infoPlist": {
         "NSPhotoLibraryUsageDescription": "Lets you attach photos to posts and set your profile picture and banner.",
-        "ITSAppUsesNonExemptEncryption": false
+        "ITSAppUsesNonExemptEncryption": false,
+        "LSApplicationQueriesSchemes": [
+          "whatsapp"
+        ]
       }
     },
     "android": {

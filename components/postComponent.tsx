@@ -3,8 +3,9 @@ import DisplayName from '@/components/display-name';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import UserAvatar from '@/components/user-avatar';
+import { IconSymbol } from '@/components/ui/icon-symbol';
 import { type Palette } from '@/constants/theme';
-import { useContentInteraction } from '@/context/interactionContext';
+import { useContentInteraction, useInteractionController } from '@/context/interactionContext';
 import { usePalette } from '@/hooks/use-palette';
 import { useRelativeTime } from '@/hooks/useRelativeTime';
 import { api } from '@/lib/api';
@@ -18,6 +19,8 @@ import ContentLongPress from './content-long-press';
 import PostActions from './post-actions';
 import ScorerReceipts from './scorerReceipts';
 import Spectrum from './spectrum';
+import QuotedContentCard from './quoted-content-card';
+import type { QuotedContent, RepostAttribution } from '@/types/quoted-content';
 
 export type PostType = {
   id: string;
@@ -41,6 +44,9 @@ export type PostType = {
   isDemo?: boolean;
   myVote?: 'up' | 'down' | null;
   myBookmark?: boolean;
+  repostCount?: number;
+  myRepost?: boolean;
+  quotedContent?: QuotedContent | null;
 }
 
 export type UserType = {
@@ -55,9 +61,10 @@ type Props = {
   variant?: 'feed' | 'detail';
   recommendationContext?: RecommendationContext;
   onDeleted?: () => void;
+  repostAttribution?: RepostAttribution | null;
 }
 
-function Post({ post, variant = 'feed', recommendationContext, onDeleted }: Props) {
+function Post({ post, variant = 'feed', recommendationContext, onDeleted, repostAttribution }: Props) {
 
   const router = useRouter();
   const { c } = usePalette();
@@ -71,6 +78,7 @@ function Post({ post, variant = 'feed', recommendationContext, onDeleted }: Prop
   const { state: sharedState, patch: patchSharedState } = useContentInteraction('post', post.id, {
     deleted: false,
   });
+  const interactions = useInteractionController();
   const detail = variant === 'detail';
 
   const [fetchedUser, setFetchedUser] = useState<UserType | null>(null);
@@ -92,6 +100,11 @@ function Post({ post, variant = 'feed', recommendationContext, onDeleted }: Prop
 
   const handleDeleted = () => {
     patchSharedState({ deleted: true });
+    if (post.quotedContent) {
+      interactions.update(post.quotedContent.kind, post.quotedContent.id, (current) => ({
+        repostCount: Math.max(0, (current.repostCount ?? 0) - 1),
+      }));
+    }
     onDeleted?.();
   };
 
@@ -109,6 +122,7 @@ function Post({ post, variant = 'feed', recommendationContext, onDeleted }: Prop
         text: post.text,
         media: post.media,
         position: post.position,
+        quotedContent: post.quotedContent ?? null,
       }}
       recommendationContext={recommendationContext}
       onBlocked={() => setHidden(true)}
@@ -118,6 +132,19 @@ function Post({ post, variant = 'feed', recommendationContext, onDeleted }: Prop
     <ThemedView style={[styles.post, detail && styles.postDetailWeb]}>
       <ThemedView style={[styles.postContent, detail && styles.postContentDetailWeb]}>
         <ThemedView style={styles.container}>
+          {repostAttribution ? (
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={`Open ${repostAttribution.username}'s profile`}
+              onPress={() => router.push(`/user/${repostAttribution.userId}`)}
+              style={({ pressed }) => [styles.repostAttribution, pressed && { opacity: 0.6 }]}
+            >
+              <IconSymbol name="arrow.2.squarepath" size={14} color={c.muted} />
+              <ThemedText style={styles.repostAttributionText} numberOfLines={1}>
+                {repostAttribution.username}{repostAttribution.isDemo ? ' (Fictional demo account)' : ''} reposted
+              </ThemedText>
+            </Pressable>
+          ) : null}
           {/* Avatar + name open the author's public profile; overflow menu at right */}
           <ThemedView style={styles.headerRow}>
             <ThemedView style={styles.header}>
@@ -184,6 +211,12 @@ function Post({ post, variant = 'feed', recommendationContext, onDeleted }: Prop
                 dimension={contentWidth}
                 style={styles.media}
               />
+            ) : null}
+
+            {post.quotedContent ? (
+              <ThemedView style={styles.quoteWrap}>
+                <QuotedContentCard content={post.quotedContent} />
+              </ThemedView>
             ) : null}
 
           </ThemedView>
@@ -258,6 +291,14 @@ const makeStyles = (c: Palette) => StyleSheet.create({
   content: {
     width: '100%',
   },
+  repostAttribution: {
+    paddingLeft: 4,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  repostAttributionText: { flex: 1, color: c.muted, fontSize: 12, lineHeight: 16, fontWeight: '800' },
+  quoteWrap: { marginTop: 12 },
   text: {
     flexShrink: 1,
     flexWrap: 'wrap',

@@ -18,6 +18,7 @@ import ArticleActions from './article-actions';
 import ContentLongPress from './content-long-press';
 import ContentActions from './contentActions';
 import ScorerReceipts from './scorerReceipts';
+import type { RepostAttribution } from '@/types/quoted-content';
 
 export type ArticleType = {
   id: string;
@@ -48,6 +49,8 @@ export type ArticleType = {
   commentcount?: number;
   my_vote?: 'up' | 'down' | null;
   my_bookmark?: boolean;
+  repost_count?: number;
+  my_repost?: boolean;
 }
 
 export type UserType = {
@@ -71,9 +74,10 @@ type Props = {
   article: ArticleType;
   variant?: 'feed' | 'detail';
   recommendationContext?: RecommendationContext;
+  repostAttribution?: RepostAttribution | null;
 }
 
-function Article({ article, variant = 'feed', recommendationContext }: Props) {
+function Article({ article, variant = 'feed', recommendationContext, repostAttribution }: Props) {
 
   const { c } = usePalette();
   const styles = useMemo(() => makeStyles(c), [c]);
@@ -133,6 +137,19 @@ function Article({ article, variant = 'feed', recommendationContext }: Props) {
               if (next > 0 && next !== measuredWidth) setMeasuredWidth(next);
             }}
           >
+          {repostAttribution ? (
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={`Open ${repostAttribution.username}'s profile`}
+              onPress={() => router.push(`/user/${repostAttribution.userId}`)}
+              style={({ pressed }) => [styles.repostAttribution, pressed && { opacity: 0.6 }]}
+            >
+              <IconSymbol name="arrow.2.squarepath" size={14} color={c.muted} />
+              <ThemedText style={styles.repostAttributionText} numberOfLines={1}>
+                {repostAttribution.username}{repostAttribution.isDemo ? ' (Fictional demo account)' : ''} reposted
+              </ThemedText>
+            </Pressable>
+          ) : null}
           <ThemedView style={styles.header}>
             {/* Outlet mark opens the source's detail page. */}
             <Pressable
@@ -264,6 +281,8 @@ const makeStyles = (c: Palette) => StyleSheet.create({
     gap: 8,
     flexDirection: 'column',
   },
+  repostAttribution: { paddingLeft: 4, flexDirection: 'row', alignItems: 'center', gap: 6 },
+  repostAttributionText: { flex: 1, color: c.muted, fontSize: 12, lineHeight: 16, fontWeight: '800' },
   post: {
     paddingHorizontal: Platform.OS === 'web' ? 12 : 16,
   },

@@ -15,6 +15,8 @@ import { useCallback, useMemo, useState, type ReactNode } from 'react';
 import { Modal, Platform, Pressable, StyleSheet, View } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import type { QuotedContent } from '@/types/quoted-content';
+import QuotedContentCard from '@/components/quoted-content-card';
 
 export type LongPressPreviewData =
   | {
@@ -27,6 +29,7 @@ export type LongPressPreviewData =
       text: string;
       media?: string | null;
       position?: number | null;
+      quotedContent?: QuotedContent | null;
     }
   | {
       kind: 'article';
@@ -183,6 +186,11 @@ function PreviewCard({ preview }: { preview: LongPressPreviewData }) {
       {preview.kind === 'post' && preview.media ? (
         <Image source={{ uri: preview.media }} style={styles.postMedia} contentFit="cover" />
       ) : null}
+      {preview.kind === 'post' && preview.quotedContent ? (
+        <View style={styles.quotePreview}>
+          <QuotedContentCard content={preview.quotedContent} compact />
+        </View>
+      ) : null}
     </View>
   );
 }
@@ -226,6 +234,7 @@ const makeStyles = (c: Palette) => StyleSheet.create({
   postText: { paddingHorizontal: 16, paddingTop: 13, paddingBottom: 15, fontSize: 16, lineHeight: 22 },
   commentText: { paddingHorizontal: 16, paddingTop: 12, paddingBottom: 17, fontSize: 15, lineHeight: 21 },
   postMedia: { width: '100%', height: 190, backgroundColor: c.surfaceMuted },
+  quotePreview: { paddingHorizontal: 14, paddingBottom: 14 },
   articleMedia: { width: '100%', height: 190, backgroundColor: c.surfaceMuted },
   articleFallback: { height: 118, alignItems: 'center', justifyContent: 'center', backgroundColor: c.card },
   sourceRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },

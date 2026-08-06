@@ -38,6 +38,8 @@ const MAPPING = {
   'bookmark.fill': 'bookmark',
   bookmark: 'bookmark-outline',
   'square.and.arrow.up': 'share-variant-outline',
+  'arrow.2.squarepath': 'repeat-variant',
+  'quote.bubble': 'comment-quote-outline',
   'arrow.up.circle.fill': 'arrow-up-circle',
   'x.circle.fill': 'close-circle',
   xmark: 'close',

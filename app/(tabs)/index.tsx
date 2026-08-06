@@ -11,6 +11,8 @@ import { mapPost, reusePostSnapshot, usePosts } from '@/context/postContext';
 import { usePalette } from '@/hooks/use-palette';
 import { api } from '@/lib/api';
 import { getDisplayableArticleMedia } from '@/lib/article-media';
+import { mapRepostAttribution } from '@/lib/quoted-content';
+import type { RepostAttribution } from '@/types/quoted-content';
 import {
   createFeedSessionId,
   flushFeedEvents,
@@ -47,8 +49,8 @@ type HotTopic = {
 };
 
 type FeedItem =
-  | { kind: 'post'; id: string; data: PostType; recommendationContext: RecommendationContext; reason: string }
-  | { kind: 'article'; id: string; data: ArticleType; recommendationContext: RecommendationContext; reason: string };
+  | { kind: 'post'; id: string; data: PostType; recommendationContext: RecommendationContext; reason: string; repostAttribution?: RepostAttribution | null }
+  | { kind: 'article'; id: string; data: ArticleType; recommendationContext: RecommendationContext; reason: string; repostAttribution?: RepostAttribution | null };
 
 const feedItemKey = (item: FeedItem) => item.id;
 const FEED_VIEWABILITY_CONFIG = { itemVisiblePercentThreshold: 50 };
@@ -69,7 +71,7 @@ const FeedRow = memo(function FeedRow({ item }: { item: FeedItem }) {
         }}
         style={({ pressed }) => ({ opacity: pressed ? 0.6 : 1.0 })}
       >
-        <Post post={item.data} recommendationContext={item.recommendationContext} />
+        <Post post={item.data} recommendationContext={item.recommendationContext} repostAttribution={item.repostAttribution} />
       </Pressable>
     );
   }
@@ -92,12 +94,14 @@ const FeedRow = memo(function FeedRow({ item }: { item: FeedItem }) {
       }}
       style={({ pressed }) => ({ opacity: pressed ? 0.6 : 1.0 })}
     >
-      <Article article={item.data} recommendationContext={item.recommendationContext} />
+      <Article article={item.data} recommendationContext={item.recommendationContext} repostAttribution={item.repostAttribution} />
     </Pressable>
   );
 }, (previous, next) =>
   previous.item.id === next.item.id &&
   previous.item.data === next.item.data &&
+  previous.item.repostAttribution?.userId === next.item.repostAttribution?.userId &&
+  previous.item.repostAttribution?.repostedAt === next.item.repostAttribution?.repostedAt &&
   previous.item.recommendationContext.sessionId === next.item.recommendationContext.sessionId
 );
 
@@ -224,6 +228,7 @@ export default function Feed() {
             data,
             recommendationContext,
             reason: entry.recommendation_reason,
+            repostAttribution: mapRepostAttribution(entry.data),
           };
         }
         const data = entry.data as ArticleType;
@@ -233,6 +238,7 @@ export default function Feed() {
           data,
           recommendationContext,
           reason: entry.recommendation_reason,
+          repostAttribution: mapRepostAttribution(entry.data),
         };
       });
       if (mappedPosts.length > 0) {

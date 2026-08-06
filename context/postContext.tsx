@@ -1,6 +1,7 @@
 import { PostType } from '@/components/postComponent';
 import { useInteractionController } from '@/context/interactionContext';
 import { api } from '@/lib/api';
+import { mapQuotedContent } from '@/lib/quoted-content';
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { useAuth } from './authContext';
 
@@ -50,6 +51,9 @@ export const mapPost = (row: any): PostType => ({
   isDemo: !!row.is_demo,
   myVote: row.my_vote ?? null,
   myBookmark: row.my_bookmark ?? false,
+  repostCount: row.repost_count ?? 0,
+  myRepost: row.my_repost ?? false,
+  quotedContent: mapQuotedContent(row.quoted_content),
 });
 
 const sameArray = <T,>(left?: T[], right?: T[]): boolean => {
@@ -80,6 +84,9 @@ export const reusePostSnapshot = (current: PostType | undefined, next: PostType)
     current.isDemo === next.isDemo &&
     current.myVote === next.myVote &&
     current.myBookmark === next.myBookmark &&
+    current.repostCount === next.repostCount &&
+    current.myRepost === next.myRepost &&
+    JSON.stringify(current.quotedContent) === JSON.stringify(next.quotedContent) &&
     sameArray(current.hashtags, next.hashtags) &&
     sameArray(current.positionSignals, next.positionSignals);
   return unchanged ? current : next;

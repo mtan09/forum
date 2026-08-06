@@ -10,16 +10,20 @@ import { publicArticleUrl } from '@/lib/public-links';
 import { useState } from 'react';
 import { Pressable, StyleSheet } from 'react-native';
 import { type ArticleType } from './articleComponent';
+import RepostSheet from '@/components/repost-sheet';
 
 export default function ArticleActions({ article }: { article: ArticleType }) {
   const { c } = usePalette();
   const [shareOpen, setShareOpen] = useState(false);
+  const [repostOpen, setRepostOpen] = useState(false);
   const { state, getCurrent, patch, update } = useContentInteraction('article', article.id, {
     upvotes: article.upvotes ?? 0,
     downvotes: article.downvotes ?? 0,
     myVote: article.my_vote ?? null,
     bookmarked: article.my_bookmark ?? false,
     commentCount: article.commentcount ?? 0,
+    repostCount: article.repost_count ?? 0,
+    reposted: article.my_repost ?? false,
   });
   const isBookmarked = state.bookmarked ?? false;
 
@@ -109,6 +113,21 @@ export default function ArticleActions({ article }: { article: ArticleType }) {
         <ThemedText style={{color: c.muted}}>{formatCount(state.commentCount)}</ThemedText>
       </ThemedView>
 
+      {/* Repost + quote */}
+      <Pressable
+        style={styles.repost}
+        accessibilityRole="button"
+        accessibilityLabel={state.reposted ? 'Repost options, reposted' : 'Repost or quote article'}
+        onPress={() => { tapLight(); setRepostOpen(true); }}
+      >
+        <ThemedView style={styles.reactions}>
+          <IconSymbol name="arrow.2.squarepath" size={20} color={state.reposted ? c.primary : c.textMuted} />
+          <ThemedText style={{ color: state.reposted ? c.primary : c.textMuted }}>
+            {formatCount(state.repostCount)}
+          </ThemedText>
+        </ThemedView>
+      </Pressable>
+
       {/* Bookmark */}
       <ThemedView style={[styles.reactions, styles.bookmark]}>
         <Pressable accessibilityRole="button" accessibilityLabel={isBookmarked ? 'Remove bookmark' : 'Bookmark'} onPress={toggleBookmark}>
@@ -131,6 +150,14 @@ export default function ArticleActions({ article }: { article: ArticleType }) {
         url={publicArticleUrl(article.id)}
         message={`${article.title} (${article.source})`}
         title="Share Article"
+      />
+      <RepostSheet
+        visible={repostOpen}
+        onClose={() => setRepostOpen(false)}
+        kind="article"
+        id={article.id}
+        initialCount={article.repost_count ?? 0}
+        initiallyReposted={article.my_repost ?? false}
       />
     </ThemedView>
   );
@@ -156,6 +183,7 @@ const styles = StyleSheet.create({
   comments: {
     flex: 2,
   },
+  repost: { flex: 2 },
   bookmark: {
    flex: 1,
    justifyContent: 'flex-end'

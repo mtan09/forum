@@ -19,6 +19,8 @@ export type InteractionSnapshot = {
   bookmarked?: boolean;
   commentCount?: number;
   replyCount?: number;
+  repostCount?: number;
+  reposted?: boolean;
   deleted?: boolean;
 };
 
@@ -45,6 +47,8 @@ function snapshotsEqual(left: InteractionSnapshot, right: InteractionSnapshot): 
     && left.bookmarked === right.bookmarked
     && left.commentCount === right.commentCount
     && left.replyCount === right.replyCount
+    && left.repostCount === right.repostCount
+    && left.reposted === right.reposted
     && left.deleted === right.deleted;
 }
 
@@ -191,6 +195,8 @@ export function useContentInteraction(
     initial.myVote,
     initial.upvotes,
     initial.replyCount,
+    initial.repostCount,
+    initial.reposted,
     key,
     kind,
   ]);

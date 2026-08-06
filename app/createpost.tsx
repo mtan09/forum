@@ -1,19 +1,26 @@
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { IconSymbol } from '@/components/ui/icon-symbol';
+import QuotedContentCard from '@/components/quoted-content-card';
 import { type Palette } from '@/constants/theme';
 import { usePosts } from '@/context/postContext';
+import { useInteractionController } from '@/context/interactionContext';
 import { usePalette } from '@/hooks/use-palette';
 import { api, uploadImage } from '@/lib/api';
+import { mapQuotedContent, quotedContentFromArticle, quotedContentFromPost } from '@/lib/quoted-content';
+import type { QuotedContent } from '@/types/quoted-content';
 import { notifySuccess, tapLight, tapMedium } from '@/lib/haptics';
 import * as ImagePicker from 'expo-image-picker';
-import { useFocusEffect, useRouter } from 'expo-router';
+import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Image,
+  ActivityIndicator,
+  FlatList,
   InteractionManager,
   Keyboard,
   KeyboardAvoidingView,
+  Modal,
   Platform,
   Pressable,
   ScrollView,
@@ -31,14 +38,26 @@ type PickedImage = {
 
 export default function CreatePost() {
   const router = useRouter();
+  const routeParams = useLocalSearchParams<{ quote_kind?: string; quote_id?: string }>();
   const { c } = usePalette();
   const styles = useMemo(() => makeStyles(c), [c]);
   const insets = useSafeAreaInsets();
   const { refresh } = usePosts();
+  const interactions = useInteractionController();
   const inputRef = useRef<TextInput>(null);
 
   const [content, setContent] = useState('');
   const [pickedImage, setPickedImage] = useState<PickedImage | null>(null);
+  const [quotedContent, setQuotedContent] = useState<QuotedContent | null>(null);
+  const [quotePickerOpen, setQuotePickerOpen] = useState(false);
+  const [quoteSource, setQuoteSource] = useState<'bookmarks' | 'upvoted' | 'posts'>('bookmarks');
+  const [quoteChoices, setQuoteChoices] = useState<Record<string, QuotedContent[] | null>>({
+    bookmarks: null,
+    upvoted: null,
+    posts: null,
+  });
+  const [initialQuoteLoading, setInitialQuoteLoading] = useState(false);
+  const [pickerLoading, setPickerLoading] = useState(false);
   const [loading, setLoading] = useState(false);
   const [keyboardHeight, setKeyboardHeight] = useState(0);
   const [err, setErr] = useState<string | null>(null);
@@ -65,6 +84,32 @@ export default function CreatePost() {
       hide.remove();
     };
   }, []);
+
+  const initialQuoteKey = `${routeParams.quote_kind ?? ''}:${routeParams.quote_id ?? ''}`;
+  useEffect(() => {
+    const kind = routeParams.quote_kind;
+    const id = routeParams.quote_id;
+    if ((kind !== 'post' && kind !== 'article') || !id) return;
+    let cancelled = false;
+    setInitialQuoteLoading(true);
+    api<any>(kind === 'post' ? `/posts/${id}` : `/articles/${id}`)
+      .then((row) => {
+        if (cancelled) return;
+        setQuotedContent(kind === 'post'
+          ? mapQuotedContent({
+              kind: 'post', id: row.id, available: true, author_id: row.user_id,
+              username: row.username, avatar_url: row.avatar_url, is_demo: row.is_demo,
+              text: row.content, media: row.media_url, position: row.position,
+              created_at: row.created_at,
+            })
+          : quotedContentFromArticle(row));
+      })
+      .catch((error: any) => {
+        if (!cancelled) setErr(error?.message ?? 'The quoted content could not be loaded.');
+      })
+      .finally(() => { if (!cancelled) setInitialQuoteLoading(false); });
+    return () => { cancelled = true; };
+  }, [initialQuoteKey, routeParams.quote_id, routeParams.quote_kind]);
 
   const dismissComposer = useCallback(() => {
     Keyboard.dismiss();
@@ -102,7 +147,55 @@ export default function CreatePost() {
     inputRef.current?.focus();
   };
 
-  const canPost = !loading && Boolean(content.trim() || pickedImage);
+  const removeQuote = () => {
+    tapLight();
+    setQuotedContent(null);
+    inputRef.current?.focus();
+  };
+
+  const openQuotePicker = () => {
+    tapLight();
+    Keyboard.dismiss();
+    setQuotePickerOpen(true);
+  };
+
+  const closeQuotePicker = () => {
+    setQuotePickerOpen(false);
+    InteractionManager.runAfterInteractions(() => inputRef.current?.focus());
+  };
+
+  useEffect(() => {
+    if (!quotePickerOpen || quoteChoices[quoteSource] !== null) return;
+    let cancelled = false;
+    setPickerLoading(true);
+    const path = quoteSource === 'bookmarks'
+      ? '/bookmarks'
+      : quoteSource === 'upvoted'
+        ? '/users/me/upvoted'
+        : '/users/me/posts';
+    api<any[]>(path)
+      .then((rows) => {
+        if (cancelled) return;
+        const choices = quoteSource === 'posts'
+          ? rows.map((row) => quotedContentFromPost(row))
+          : rows.map((entry) => entry.kind === 'post'
+              ? quotedContentFromPost(entry.item)
+              : quotedContentFromArticle(entry.item));
+        setQuoteChoices((current) => ({ ...current, [quoteSource]: choices }));
+      })
+      .catch((error: any) => {
+        if (!cancelled) setErr(error?.message ?? 'Could not load content to quote.');
+      })
+      .finally(() => { if (!cancelled) setPickerLoading(false); });
+    return () => { cancelled = true; };
+  }, [quoteChoices, quotePickerOpen, quoteSource]);
+
+  const chooseQuote = (choice: QuotedContent) => {
+    setQuotedContent(choice);
+    closeQuotePicker();
+  };
+
+  const canPost = !loading && Boolean(content.trim() || pickedImage || quotedContent);
 
   const handlePost = async () => {
     if (!canPost) return;
@@ -116,8 +209,15 @@ export default function CreatePost() {
         body: {
           content: content.trim(),
           media_url: mediaUrl,
+          quoted_post_id: quotedContent?.kind === 'post' ? quotedContent.id : undefined,
+          quoted_article_id: quotedContent?.kind === 'article' ? quotedContent.id : undefined,
         },
       });
+      if (quotedContent) {
+        interactions.update(quotedContent.kind, quotedContent.id, (current) => ({
+          repostCount: (current.repostCount ?? 0) + 1,
+        }));
+      }
       await refresh();
       notifySuccess();
       dismissComposer();
@@ -149,6 +249,17 @@ export default function CreatePost() {
           <IconSymbol name="photo" size={21} color={c.primary} />
         </View>
         <ThemedText style={styles.mediaButtonText}>Photo</ThemedText>
+      </Pressable>
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel="Choose a post or article to quote"
+        onPress={openQuotePicker}
+        style={({ pressed }) => [styles.mediaButton, pressed && styles.mediaButtonPressed]}
+      >
+        <View style={styles.mediaIconBubble}>
+          <IconSymbol name="quote.bubble" size={21} color={c.primary} />
+        </View>
+        <ThemedText style={styles.mediaButtonText}>Quote</ThemedText>
       </Pressable>
     </View>
   );
@@ -219,7 +330,7 @@ export default function CreatePost() {
               placeholder="What do you want to post?"
               placeholderTextColor={c.muted}
               scrollEnabled={false}
-              style={styles.editor}
+              style={[styles.editor, quotedContent && styles.editorWithQuote]}
               textAlignVertical="top"
               value={content}
             />
@@ -244,6 +355,26 @@ export default function CreatePost() {
               </View>
             ) : null}
 
+            {initialQuoteLoading && !quotedContent ? (
+              <View style={styles.quoteLoading}>
+                <ActivityIndicator color={c.muted} />
+                <ThemedText style={styles.quoteLoadingText}>Loading quote…</ThemedText>
+              </View>
+            ) : quotedContent ? (
+              <View style={styles.quoteContainer}>
+                <QuotedContentCard content={quotedContent} />
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel="Remove quoted content"
+                  hitSlop={8}
+                  onPress={removeQuote}
+                  style={({ pressed }) => [styles.quoteRemove, pressed && styles.buttonPressed]}
+                >
+                  <IconSymbol name="xmark" size={16} color={c.onImage} />
+                </Pressable>
+              </View>
+            ) : null}
+
             {err ? (
               <View style={styles.errorContainer}>
                 <ThemedText style={styles.errorText}>{err}</ThemedText>
@@ -258,6 +389,64 @@ export default function CreatePost() {
           ) : mediaBar(false)}
         </KeyboardAvoidingView>
       </SafeAreaView>
+
+      <Modal visible={quotePickerOpen} transparent animationType="fade" onRequestClose={closeQuotePicker}>
+        <Pressable style={styles.pickerBackdrop} onPress={closeQuotePicker}>
+          <Pressable style={styles.pickerSheet} onPress={(event) => event.stopPropagation()}>
+            <View style={styles.pickerHandle} />
+            <View style={styles.pickerHeader}>
+              <View style={styles.pickerHeaderCopy}>
+                <ThemedText style={styles.pickerTitle}>Choose a post or article to quote</ThemedText>
+                <ThemedText style={styles.pickerSubtitle}>Posts and articles you already know.</ThemedText>
+              </View>
+              <Pressable accessibilityRole="button" accessibilityLabel="Close quote picker" hitSlop={8} onPress={closeQuotePicker}>
+                <IconSymbol name="xmark" size={22} color={c.text} />
+              </Pressable>
+            </View>
+            <View style={styles.pickerTabs}>
+              {([
+                ['bookmarks', 'Bookmarks'],
+                ['upvoted', 'Upvoted'],
+                ['posts', 'Your Posts'],
+              ] as const).map(([key, label]) => (
+                <Pressable
+                  key={key}
+                  onPress={() => { tapLight(); setQuoteSource(key); }}
+                  style={[styles.pickerTab, quoteSource === key && styles.pickerTabActive]}
+                >
+                  <ThemedText style={[styles.pickerTabText, quoteSource === key && styles.pickerTabTextActive]}>{label}</ThemedText>
+                </Pressable>
+              ))}
+            </View>
+            {pickerLoading && quoteChoices[quoteSource] === null ? (
+              <View style={styles.pickerLoading}><ActivityIndicator color={c.muted} /></View>
+            ) : (
+              <FlatList
+                data={quoteChoices[quoteSource] ?? []}
+                keyExtractor={(item) => `${item.kind}-${item.id}`}
+                keyboardShouldPersistTaps="handled"
+                contentContainerStyle={styles.pickerList}
+                renderItem={({ item }) => (
+                  <QuotedContentCard content={item} compact onPress={() => chooseQuote(item)} />
+                )}
+                ItemSeparatorComponent={() => <View style={styles.pickerSeparator} />}
+                ListEmptyComponent={(
+                  <View style={styles.pickerEmpty}>
+                    <ThemedText style={styles.pickerEmptyTitle}>Nothing here yet</ThemedText>
+                    <ThemedText style={styles.pickerEmptyText}>
+                      {quoteSource === 'bookmarks'
+                        ? 'Bookmark a post or article and it will appear here.'
+                        : quoteSource === 'upvoted'
+                          ? 'Upvote a post or article and it will appear here.'
+                          : 'Your posts will appear here after you publish them.'}
+                    </ThemedText>
+                  </View>
+                )}
+              />
+            )}
+          </Pressable>
+        </Pressable>
+      </Modal>
     </ThemedView>
   );
 }
@@ -347,6 +536,10 @@ const makeStyles = (c: Palette) => StyleSheet.create({
     fontWeight: '500',
     textAlignVertical: 'top',
   },
+  editorWithQuote: {
+    flexGrow: 0,
+    minHeight: 150,
+  },
   imageContainer: {
     width: '100%',
     height: 240,
@@ -358,6 +551,13 @@ const makeStyles = (c: Palette) => StyleSheet.create({
     borderColor: c.cardBorder,
     backgroundColor: c.surfaceMuted,
   },
+  quoteContainer: { width: '100%', position: 'relative', marginBottom: 16 },
+  quoteRemove: {
+    position: 'absolute', top: 8, right: 8, width: 30, height: 30, borderRadius: 15,
+    alignItems: 'center', justifyContent: 'center', backgroundColor: c.imageControlBg,
+  },
+  quoteLoading: { minHeight: 72, marginBottom: 16, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 9 },
+  quoteLoadingText: { color: c.muted, fontSize: 14, lineHeight: 19 },
   imagePreview: {
     width: '100%',
     height: '100%',
@@ -416,6 +616,38 @@ const makeStyles = (c: Palette) => StyleSheet.create({
   mediaButtonPressed: {
     backgroundColor: c.accentSoftBg,
   },
+  pickerBackdrop: {
+    flex: 1,
+    justifyContent: Platform.OS === 'web' ? 'center' : 'flex-end',
+    alignItems: Platform.OS === 'web' ? 'center' : 'stretch',
+    padding: Platform.OS === 'web' ? 24 : 0,
+    backgroundColor: c.scrim,
+  },
+  pickerSheet: {
+    width: '100%', maxWidth: Platform.OS === 'web' ? 720 : undefined,
+    height: Platform.OS === 'web' ? 'min(76vh, 760px)' as any : '76%',
+    maxHeight: 760, paddingTop: 12, paddingHorizontal: 16,
+    borderRadius: Platform.OS === 'web' ? 24 : 0,
+    borderTopLeftRadius: 24, borderTopRightRadius: 24,
+    borderWidth: Platform.OS === 'web' ? 1 : 0, borderColor: c.cardBorder,
+    backgroundColor: c.overlayCard,
+  },
+  pickerHandle: { alignSelf: 'center', width: 40, height: 4, borderRadius: 2, marginBottom: 14, backgroundColor: c.faint },
+  pickerHeader: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', gap: 16, paddingHorizontal: 4 },
+  pickerHeaderCopy: { flex: 1 },
+  pickerTitle: { color: c.text, fontSize: 20, lineHeight: 26, fontWeight: '900' },
+  pickerSubtitle: { marginTop: 2, color: c.muted, fontSize: 13, lineHeight: 18 },
+  pickerTabs: { flexDirection: 'row', gap: 7, marginTop: 18, marginBottom: 14 },
+  pickerTab: { flex: 1, minHeight: 38, alignItems: 'center', justifyContent: 'center', borderRadius: 19, backgroundColor: c.surfaceMuted },
+  pickerTabActive: { backgroundColor: c.accentSoftBg },
+  pickerTabText: { color: c.muted, fontSize: 12, lineHeight: 16, fontWeight: '800' },
+  pickerTabTextActive: { color: c.primary },
+  pickerLoading: { flex: 1, alignItems: 'center', justifyContent: 'center' },
+  pickerList: { paddingBottom: 34 },
+  pickerSeparator: { height: 10 },
+  pickerEmpty: { paddingHorizontal: 24, paddingVertical: 64, alignItems: 'center' },
+  pickerEmptyTitle: { color: c.text, fontSize: 17, lineHeight: 22, fontWeight: '800' },
+  pickerEmptyText: { marginTop: 7, color: c.muted, fontSize: 14, lineHeight: 20, textAlign: 'center' },
   mediaIconBubble: {
     width: 38,
     height: 38,

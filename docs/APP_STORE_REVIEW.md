@@ -53,7 +53,10 @@ and from a press-and-hold preview throughout the app. Authors may permanently
 delete their own posts and comments; post deletion also removes its thread,
 while deleting a comment removes its reply subtree. This author control is a
 product behavior, not a claim that Guideline 1.2 explicitly requires per-item
-deletion. Blocking removes interaction in both directions. Public accounts
+deletion. Posts and attributed publisher links support direct reposts and
+authored quote posts. A direct repost references the original item; a quote is
+moderated and reportable as a new post while its embedded source remains
+tappable. Blocking removes interaction in both directions. Public accounts
 can receive DMs normally; a private account accepts a DM only from an account it
 already follows, while prior thread history remains readable. The hosted
 support page provides the moderation contact path.
@@ -124,6 +127,7 @@ as valid News-category apps. Forum must present its differentiating native
 functionality clearly:
 
 - posts, comments, profiles, follows, votes, bookmarks, and DMs;
+- direct reposts and authored quote posts with in-app source navigation;
 - left/center/right coverage comparison;
 - bias spectra and user spectrum participation;
 - The Floor;
@@ -170,10 +174,11 @@ forum's implemented OpenAI posture is:
   declined text is sent to OpenAI. Image uploads, feedback screenshots, and
   forumAI ask again because those features inherently use OpenAI image-safety
   or generation.
-- Sharing an existing forum post or publisher article through a DM stores a
-  typed reference to that already-reviewed item and introduces no new authored
-  text, so the share action does not resend its contents to OpenAI. Ordinary DM
-  text continues to follow the consent and moderation behavior above.
+- Sharing or quoting an existing forum post or publisher article stores a typed
+  reference to that already-reviewed item. The reference itself does not resend
+  the original contents to OpenAI. New quote commentary is a normal post and
+  follows the post consent/moderation behavior above; ordinary DM text likewise
+  follows the DM behavior above.
 - Settings → Privacy → OpenAI processing shows current status and allows
   withdrawal. Withdrawal stops future sharing and never claims to reverse
   processing that already occurred.
@@ -333,6 +338,11 @@ and explicit audio/video/HLS assets are rejected, while valid extensionless CDN
 image URLs remain eligible. A failed publisher image falls back to forum-owned
 purple artwork. R2 remains in use for user uploads and private feedback
 screenshots, not as a mandatory publisher-image proxy.
+
+Publisher articles quoted by users keep the same bounded preview posture as
+other article cards: source, headline, optional remote feed image, and an in-app
+route to the attributed article screen. Quoting does not copy or display the
+publisher's article body.
 
 ## Typography strategy
 

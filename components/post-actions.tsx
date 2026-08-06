@@ -11,6 +11,7 @@ import { publicPostUrl } from '@/lib/public-links';
 import { Pressable, StyleSheet } from 'react-native';
 import { useState } from 'react';
 import { type PostType, type UserType } from './postComponent';
+import RepostSheet from '@/components/repost-sheet';
 
 export type PostActionsProps = {
   post: PostType;
@@ -20,12 +21,15 @@ export type PostActionsProps = {
 export default function PostActions({ post, user }: PostActionsProps) {
   const { c } = usePalette();
   const [shareOpen, setShareOpen] = useState(false);
+  const [repostOpen, setRepostOpen] = useState(false);
   const { state, patch } = useContentInteraction('post', post.id, {
     upvotes: post.upvotes ?? 0,
     downvotes: post.downvotes ?? 0,
     myVote: post.myVote ?? null,
     bookmarked: post.myBookmark ?? false,
     commentCount: post.commentCount ?? 0,
+    repostCount: post.repostCount ?? 0,
+    reposted: post.myRepost ?? false,
   });
   const isBookmarked = state.bookmarked ?? false;
 
@@ -101,6 +105,21 @@ export default function PostActions({ post, user }: PostActionsProps) {
         <ThemedText style={{color: c.muted}}>{formatCount(state.commentCount)}</ThemedText>
       </ThemedView>
 
+      {/* Repost + quote */}
+      <Pressable
+        style={styles.repost}
+        accessibilityRole="button"
+        accessibilityLabel={state.reposted ? 'Repost options, reposted' : 'Repost or quote post'}
+        onPress={() => { tapLight(); setRepostOpen(true); }}
+      >
+        <ThemedView style={styles.reactions}>
+          <IconSymbol name="arrow.2.squarepath" size={20} color={state.reposted ? c.primary : c.textMuted} />
+          <ThemedText style={{ color: state.reposted ? c.primary : c.textMuted }}>
+            {formatCount(state.repostCount)}
+          </ThemedText>
+        </ThemedView>
+      </Pressable>
+
       {/* Bookmark */}
       <ThemedView style={[styles.reactions, styles.bookmark]}>
         <Pressable accessibilityRole="button" accessibilityLabel={isBookmarked ? 'Remove bookmark' : 'Bookmark'} onPress={toggleBookmark}>
@@ -123,6 +142,14 @@ export default function PostActions({ post, user }: PostActionsProps) {
         url={publicPostUrl(post.id)}
         message={`${user.username}${post.isDemo ? ' (Fictional demo account)' : ''} on forum: "${post.text.slice(0, 120)}"`}
         title="Share Post"
+      />
+      <RepostSheet
+        visible={repostOpen}
+        onClose={() => setRepostOpen(false)}
+        kind="post"
+        id={post.id}
+        initialCount={post.repostCount ?? 0}
+        initiallyReposted={post.myRepost ?? false}
       />
     </ThemedView>
   );
@@ -148,6 +175,7 @@ const styles = StyleSheet.create({
   comments: {
     flex: 2,
   },
+  repost: { flex: 2 },
   bookmark: {
    flex: 1,
    justifyContent: 'flex-end'

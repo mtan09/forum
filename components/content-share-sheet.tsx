@@ -246,7 +246,7 @@ export default function ContentShareSheet({
       icon: 'ellipsis' as const,
       onPress: () => { tapLight(); openMore(); },
     },
-  ];
+  ].filter((action) => kind !== 'article' || action.key !== 'whatsapp');
 
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>

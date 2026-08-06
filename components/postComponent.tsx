@@ -298,7 +298,9 @@ const makeStyles = (c: Palette) => StyleSheet.create({
     gap: 6,
   },
   repostAttributionText: { flex: 1, color: c.muted, fontSize: 12, lineHeight: 16, fontWeight: '800' },
-  quoteWrap: { marginTop: 12 },
+  // Post text, hashtags, and media already contribute the standard 8-point
+  // content gap. Add space only beneath the quote to protect the action row.
+  quoteWrap: { marginBottom: 12 },
   text: {
     flexShrink: 1,
     flexWrap: 'wrap',

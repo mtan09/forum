@@ -55,12 +55,19 @@ type CommentRow = {
   parent_comment_id?: string | null;
 };
 
-// Upvoted and Saved return posts and articles interleaved
+// Upvoted, Reposts and Saved return posts and articles interleaved
 type MixedItem =
   | { kind: 'post'; post: PostType }
   | { kind: 'article'; article: ArticleType };
 
-const TABS = ['Posts', 'Comments', 'Upvoted', 'Saved'] as const;
+const TABS = ['Posts', 'Comments', 'Upvoted', 'Reposts', 'Saved'] as const;
+
+// These lists render unvirtualized inside the profile's ScrollView, so they
+// arrive a page at a time. Loading every row at once locked the UI for
+// seconds on accounts with a long upvote history.
+const PROFILE_PAGE_SIZE = 30;
+// Start fetching the next page while this much content is still below.
+const LOAD_MORE_THRESHOLD_PX = 900;
 type Tab = (typeof TABS)[number];
 
 const mapMixed = (rows: any[]): MixedItem[] =>
@@ -196,26 +203,59 @@ export default function Profile() {
   const [myPosts, setMyPosts] = useState<PostType[] | null>(null);
   const [myComments, setMyComments] = useState<CommentRow[] | null>(null);
   const [upvoted, setUpvoted] = useState<MixedItem[] | null>(null);
+  const [reposts, setReposts] = useState<MixedItem[] | null>(null);
   const [saved, setSaved] = useState<MixedItem[] | null>(null);
   const [tabLoading, setTabLoading] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [hasMore, setHasMore] = useState<Partial<Record<Tab, boolean>>>({});
   const loadedTabsRef = useRef<Set<Tab>>(new Set());
+  const loadingMoreRef = useRef(false);
+  // Row counts drive the next page's offset, so they must stay in step with
+  // the state setters below rather than being derived at render time.
+  const countsRef = useRef<Partial<Record<Tab, number>>>({});
 
   const loadTab = useCallback(async (
     tab: Tab,
-    { showLoading = !loadedTabsRef.current.has(tab) }: { showLoading?: boolean } = {}
+    {
+      showLoading = !loadedTabsRef.current.has(tab),
+      append = false,
+    }: { showLoading?: boolean; append?: boolean } = {}
   ): Promise<boolean> => {
+    if (append && loadingMoreRef.current) return false;
+    if (append) {
+      loadingMoreRef.current = true;
+      setLoadingMore(true);
+    }
     if (showLoading) setTabLoading(true);
+    const offset = append ? countsRef.current[tab] ?? 0 : 0;
+    const paging = `limit=${PROFILE_PAGE_SIZE}&offset=${offset}`;
+    const grow = <T,>(previous: T[] | null, next: T[]): T[] =>
+      append && previous ? [...previous, ...next] : next;
     try {
+      let received = 0;
       if (tab === 'Posts') {
-        const rows = await api<any[]>('/users/me/posts');
-        setMyPosts(rows.map(mapPost));
+        const rows = await api<any[]>(`/users/me/posts?${paging}`);
+        received = rows.length;
+        setMyPosts((previous) => grow(previous, rows.map(mapPost)));
       } else if (tab === 'Comments') {
-        setMyComments(await api<CommentRow[]>('/users/me/comments'));
+        const rows = await api<CommentRow[]>(`/users/me/comments?${paging}`);
+        received = rows.length;
+        setMyComments((previous) => grow(previous, rows));
       } else if (tab === 'Upvoted') {
-        setUpvoted(mapMixed(await api<any[]>('/users/me/upvoted')));
+        const rows = await api<any[]>(`/users/me/upvoted?${paging}`);
+        received = rows.length;
+        setUpvoted((previous) => grow(previous, mapMixed(rows)));
+      } else if (tab === 'Reposts') {
+        const rows = await api<any[]>(`/users/me/reposts?${paging}`);
+        received = rows.length;
+        setReposts((previous) => grow(previous, mapMixed(rows)));
       } else {
-        setSaved(mapMixed(await api<any[]>('/bookmarks')));
+        const rows = await api<any[]>(`/bookmarks?${paging}`);
+        received = rows.length;
+        setSaved((previous) => grow(previous, mapMixed(rows)));
       }
+      countsRef.current[tab] = offset + received;
+      setHasMore((current) => ({ ...current, [tab]: received === PROFILE_PAGE_SIZE }));
       loadedTabsRef.current.add(tab);
       return true;
     } catch (err: any) {
@@ -223,6 +263,10 @@ export default function Profile() {
       return false;
     } finally {
       if (showLoading) setTabLoading(false);
+      if (append) {
+        loadingMoreRef.current = false;
+        setLoadingMore(false);
+      }
     }
   }, []);
 
@@ -258,44 +302,43 @@ export default function Profile() {
   // Re-tapping the profile tab button jumps to the top and reloads the open tab
   const scrollRef = useRef<ScrollView>(null);
   const currentOffsetRef = useRef(0);
-  const tabOffsetsRef = useRef<Partial<Record<Tab, number>>>({ Posts: 0 });
-  const switchRequestRef = useRef(0);
 
-  useEffect(() => {
-    if (tabLoading) return;
-    const frame = requestAnimationFrame(() => {
-      const y = tabOffsetsRef.current[activeTab] ?? currentOffsetRef.current;
-      scrollRef.current?.scrollTo({ y, animated: false });
-      currentOffsetRef.current = y;
-    });
-    return () => cancelAnimationFrame(frame);
-  }, [activeTab, tabLoading]);
+  // Reserving a viewport's worth of space below the tab bar means the bar can
+  // always scroll to the top of the screen. Without it, moving from a long tab
+  // to a short one shrinks the page and iOS clamps the offset — which reads as
+  // the screen jumping even though nothing scrolled it.
+  const [viewportHeight, setViewportHeight] = useState(0);
+  const [tabBarHeight, setTabBarHeight] = useState(0);
+  const tabContentMinHeight = Math.max(0, viewportHeight - tabBarHeight);
+
+  // Switching tabs deliberately does not scroll. Each tab used to restore its
+  // own remembered offset, which threw the page to a different position on
+  // every switch; keeping the offset untouched leaves the tab bar exactly
+  // where the user left it.
 
   useEffect(() => {
     return onTabRefresh('profile', () => {
-      tabOffsetsRef.current[activeTab] = 0;
       currentOffsetRef.current = 0;
       scrollRef.current?.scrollTo({ y: 0, animated: true });
       loadTab(activeTab);
     });
   }, [loadTab, activeTab]);
 
-  const switchTab = async (tab: Tab) => {
-    const request = ++switchRequestRef.current;
+  // The tab switches immediately and the content area shows its own spinner
+  // while the first page arrives. Awaiting the fetch before switching left the
+  // whole bar unresponsive for the length of a request — around a second — with
+  // no feedback, which read as a frozen button rather than a load.
+  const switchTab = (tab: Tab) => {
     if (tab === activeTab) return;
     selectTick();
-    const currentOffset = currentOffsetRef.current;
-    tabOffsetsRef.current[activeTab] = currentOffset;
-    if (tabOffsetsRef.current[tab] == null) {
-      tabOffsetsRef.current[tab] = currentOffset;
-    }
-
-    if (!loadedTabsRef.current.has(tab)) {
-      const loaded = await loadTab(tab, { showLoading: false });
-      if (!loaded || request !== switchRequestRef.current) return;
-    }
     activeTabRef.current = tab;
     setActiveTab(tab);
+
+    if (!loadedTabsRef.current.has(tab)) {
+      loadTab(tab).catch(() => {
+        // loadTab already logs; a failed tab keeps its empty state.
+      });
+    }
   };
 
   const joined = profile?.created_at
@@ -308,22 +351,27 @@ export default function Profile() {
 
   const renderMixed = (items: MixedItem[] | null, emptyText: string) => {
     if (!items) return null;
-    // The revision subscription makes removals from Upvoted/Saved immediate,
-    // including when the action happened on another screen.
+    // The revision subscription makes removals from Upvoted/Reposts/Saved
+    // immediate, including when the action happened on another screen.
     void interactionRevision;
+    const stillBelongs = (state: { myVote?: string | null; bookmarked?: boolean; reposted?: boolean }) => {
+      if (activeTab === 'Upvoted') return state.myVote === 'up';
+      if (activeTab === 'Reposts') return state.reposted === true;
+      return state.bookmarked === true;
+    };
     const visibleItems = items.filter((entry) => {
       if (entry.kind === 'post') {
-        const state = interactionController.get('post', entry.post.id, {
+        return stillBelongs(interactionController.get('post', entry.post.id, {
           myVote: entry.post.myVote ?? null,
           bookmarked: entry.post.myBookmark ?? false,
-        });
-        return activeTab === 'Upvoted' ? state.myVote === 'up' : state.bookmarked === true;
+          reposted: entry.post.myRepost ?? false,
+        }));
       }
-      const state = interactionController.get('article', entry.article.id, {
+      return stillBelongs(interactionController.get('article', entry.article.id, {
         myVote: entry.article.my_vote ?? null,
         bookmarked: entry.article.my_bookmark ?? false,
-      });
-      return activeTab === 'Upvoted' ? state.myVote === 'up' : state.bookmarked === true;
+        reposted: entry.article.my_repost ?? false,
+      }));
     });
     if (visibleItems.length === 0) return <ThemedText style={styles.emptyText}>{emptyText}</ThemedText>;
     return visibleItems.map((entry) =>
@@ -351,11 +399,18 @@ export default function Profile() {
     <ScrollView
       ref={scrollRef}
       showsVerticalScrollIndicator={false}
+      onLayout={(event) => setViewportHeight(event.nativeEvent.layout.height)}
       scrollEventThrottle={16}
       onScroll={(event) => {
-        const y = event.nativeEvent.contentOffset.y;
+        const { contentOffset, contentSize, layoutMeasurement } = event.nativeEvent;
+        const y = contentOffset.y;
         currentOffsetRef.current = y;
-        tabOffsetsRef.current[activeTabRef.current] = y;
+
+        const remaining = contentSize.height - layoutMeasurement.height - y;
+        if (remaining > LOAD_MORE_THRESHOLD_PX) return;
+        const tab = activeTabRef.current;
+        if (tabLoading || loadingMoreRef.current || !hasMore[tab]) return;
+        loadTab(tab, { showLoading: false, append: true });
       }}
     >
       <ScalableImage
@@ -543,10 +598,18 @@ export default function Profile() {
       )}
 
       {/* Your content — full-width so Post/Article cards line up with the feed */}
-      <ThemedView style={styles.tabBar}>
+      <ThemedView
+        style={styles.tabBar}
+        onLayout={(event) => setTabBarHeight(event.nativeEvent.layout.height)}
+      >
         {TABS.map((tab) => (
           <Pressable key={tab} onPress={() => switchTab(tab)} style={styles.tabButton}>
-            <ThemedText style={[styles.tabLabel, activeTab === tab && styles.tabLabelActive]}>
+            {/* Five tabs leave ~75pt each on the smallest supported iPhone, so
+                keep long labels on one line rather than letting them wrap. */}
+            <ThemedText
+              numberOfLines={1}
+              style={[styles.tabLabel, activeTab === tab && styles.tabLabelActive]}
+            >
               {tab}
             </ThemedText>
             {activeTab === tab && <ThemedView style={styles.tabIndicator} />}
@@ -554,6 +617,7 @@ export default function Profile() {
         ))}
       </ThemedView>
 
+      <ThemedView style={{ minHeight: tabContentMinHeight }}>
       {tabLoading && (
         <ActivityIndicator style={{ marginVertical: 24 }} color={c.primary} />
       )}
@@ -581,8 +645,14 @@ export default function Profile() {
       {!tabLoading && activeTab === 'Upvoted' &&
         renderMixed(upvoted, "Nothing upvoted yet.")}
 
+      {!tabLoading && activeTab === 'Reposts' &&
+        renderMixed(reposts, 'Nothing reposted yet — tap the repost icon on any post or article.')}
+
       {!tabLoading && activeTab === 'Saved' &&
         renderMixed(saved, 'Nothing saved yet — tap the bookmark on any post or article.')}
+
+      {loadingMore && <ActivityIndicator style={styles.footerLoader} color={c.muted} />}
+      </ThemedView>
 
       <ThemedView style={{ height: 32 }} />
     </ScrollView>
@@ -785,6 +855,9 @@ const makeStyles = (c: Palette) => StyleSheet.create({
     color: c.primary,
     fontWeight: '800',
     fontSize: 14,
+  },
+  footerLoader: {
+    paddingVertical: 24,
   },
   tabBar: {
     flexDirection: 'row',

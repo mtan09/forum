@@ -159,12 +159,11 @@ export default function ArticleScreen() {
             }}
             style={({ pressed }) => [styles.readButton, { opacity: pressed ? 0.7 : 1 }]}
           >
-            <ThemedText
-              style={styles.readButtonText}
-              numberOfLines={2}
-              adjustsFontSizeToFit
-              minimumFontScale={0.86}
-            >
+            {/* Long source names are kept in bounds by wrapping to two lines,
+                not by adjustsFontSizeToFit. RN's shrink-to-fit ignored
+                minimumFontScale here and collapsed even short names like "NPR"
+                to roughly 6pt, so the size is now fixed and predictable. */}
+            <ThemedText style={styles.readButtonText} numberOfLines={2}>
               Read on {article.source}
             </ThemedText>
             <IconSymbol name="square.and.arrow.up" size={18} color={c.primary} />
@@ -240,7 +239,7 @@ const makeStyles = (c: Palette) => StyleSheet.create({
   readButtonText: {
     flexShrink: 1,
     textAlign: 'center',
-    lineHeight: 19,
+    fontSize: 16,
     fontWeight: '700',
     color: c.primary,
   },

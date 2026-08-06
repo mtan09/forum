@@ -40,6 +40,9 @@ type CommentListProps = {
 	parentCommentId?: string;
 	initialPageSize?: number;
 	indent?: number; // pixels to indent nested levels
+	depth?: number;
+	onLoadingChange?: (loading: boolean) => void;
+	showLoadingIndicator?: boolean;
 	refreshKey?: number; // bump to force a reload (e.g. after posting a comment)
 };
 
@@ -50,6 +53,9 @@ export default function CommentList({
 	parentCommentId,
 	initialPageSize = 10,
 	indent = 0,
+	depth = 0,
+	onLoadingChange,
+	showLoadingIndicator = true,
 	refreshKey = 0,
 }: CommentListProps) {
 	const { c } = usePalette();
@@ -97,6 +103,10 @@ export default function CommentList({
 		loadPage(0, true);
 	}, [loadPage, refreshKey]);
 
+	useEffect(() => {
+		onLoadingChange?.(loading);
+	}, [loading, onLoadingChange]);
+
 	const loadMore = () => {
 		const next = page + 1;
 		setPage(next);
@@ -112,30 +122,45 @@ export default function CommentList({
 			)}
 
 			{comments.map((c) => (
-				<CommentItem key={c.id} comment={c} />
+				<CommentItem
+					key={c.id}
+					comment={c}
+					depth={depth}
+					connectorWidth={indent}
+				/>
 			))}
 
 			{error && (
 				<ThemedText style={styles.error}>Error: {error}</ThemedText>
 			)}
 
-			<View style={styles.actionsRow}>
-				{loading && <ActivityIndicator />}
-				{!loading && hasMore && (
-					<Pressable
-						accessibilityRole="button"
-						onPress={loadMore}
-						style={styles.button}
-					>
-						<ThemedText type="defaultSemiBold" style={styles.buttonText}>Load more</ThemedText>
-					</Pressable>
-				)}
-			</View>
+			{((loading && showLoadingIndicator) || (!loading && hasMore)) && (
+				<View style={styles.actionsRow}>
+					{loading && <ActivityIndicator />}
+					{!loading && hasMore && (
+						<Pressable
+							accessibilityRole="button"
+							onPress={loadMore}
+							style={styles.button}
+						>
+							<ThemedText type="defaultSemiBold" style={styles.buttonText}>Load more</ThemedText>
+						</Pressable>
+					)}
+				</View>
+			)}
 		</ThemedView>
 	);
 }
 
-function CommentItem({ comment }: { comment: Comment }) {
+function CommentItem({
+	comment,
+	depth,
+	connectorWidth,
+}: {
+	comment: Comment;
+	depth: number;
+	connectorWidth: number;
+}) {
 	const { c } = usePalette();
 	const styles = useMemo(() => makeStyles(c), [c]);
 	const [showReplies, setShowReplies] = useState(false);
@@ -143,6 +168,9 @@ function CommentItem({ comment }: { comment: Comment }) {
 	const [replyText, setReplyText] = useState('');
 	const [replySubmitting, setReplySubmitting] = useState(false);
 	const [replyRefresh, setReplyRefresh] = useState(0);
+	const [repliesLoading, setRepliesLoading] = useState(false);
+	const handleRepliesLoading = useCallback((loading: boolean) => setRepliesLoading(loading), []);
+	const nextIndent = depth < 4 ? 26 : 0;
 	const timeAgo = useRelativeTime(comment.created_at);
 	const interactionController = useInteractionController();
 	const { state: votes, getCurrent, patch, update } = useContentInteraction('comment', comment.id, {
@@ -251,80 +279,124 @@ function CommentItem({ comment }: { comment: Comment }) {
 			onBlocked={() => setHidden(true)}
 			onDeleted={handleDeleted}
 		>
-		<ThemedView style={styles.comment}>
-			{/* Header: avatar + username · time on one line; tapping the
-			    identity opens the author's public profile */}
-			<ThemedView style={styles.header}>
+		<ThemedView style={[styles.comment, depth > 0 && styles.nestedComment]}>
+			{showReplies && (
+				<View
+					pointerEvents="none"
+					style={[
+						styles.parentThreadSpine,
+						{
+							left: depth > 0 ? 13 : 15,
+							top: depth > 0 ? 34 : 40,
+						},
+					]}
+				/>
+			)}
+			<View style={styles.commentLayout}>
+				{depth > 0 && connectorWidth > 0 && (
+					<View
+						pointerEvents="none"
+						style={[
+							styles.nestingConnector,
+							{
+								left: -(connectorWidth - (depth === 1 ? 15.5 : 13.5)),
+								width: Math.max(4, connectorWidth - (depth === 1 ? 15.5 : 13.5)),
+							},
+						]}
+					/>
+				)}
 				<UserAvatar
 					userId={comment.user_id}
 					avatarUrl={comment.avatar_url}
 					isDemo={comment.is_demo}
-					size={28}
+					size={depth > 0 ? 27 : 31}
 					accessibilityLabel={`Open ${comment.username ?? 'user'} profile`}
 				/>
-				<ThemedView style={styles.commentIdentity}>
-					<DisplayName
-						username={comment.username}
-						isDemo={comment.is_demo}
-						nameStyle={styles.username}
-					/>
-					<ThemedText style={styles.timestamp}>· {timeAgo}</ThemedText>
+				<ThemedView style={styles.commentBody}>
+					{/* Tapping only the avatar/name opens the author's profile. */}
+					<ThemedView style={styles.header}>
+						<ThemedView style={styles.commentIdentity}>
+							<DisplayName
+								username={comment.username}
+								isDemo={comment.is_demo}
+								nameStyle={styles.username}
+							/>
+							<ThemedText style={styles.timestamp}>{timeAgo}</ThemedText>
+						</ThemedView>
+						<ContentActions
+							targetKind="comment"
+							targetId={comment.id}
+							authorId={comment.user_id}
+							authorName={comment.username}
+							onBlocked={() => setHidden(true)}
+							onDeleted={handleDeleted}
+						/>
+					</ThemedView>
+
+					<ThemedText style={styles.content}>{comment.content}</ThemedText>
+
+					<View style={styles.commentActions}>
+						<Pressable onPress={() => vote(isUpvoted ? null : 'up')} style={styles.actionButton} hitSlop={7}>
+							<IconSymbol name={isUpvoted ? 'arrowshape.up.fill' : 'arrowshape.up'} size={16} color={isUpvoted ? c.voteUp : c.textMuted} />
+							<ThemedText style={[styles.voteCount, isUpvoted && { color: c.voteUp }]}>{votes.upvotes ?? 0}</ThemedText>
+						</Pressable>
+						<Pressable onPress={() => vote(isDownvoted ? null : 'down')} style={styles.actionButton} hitSlop={7}>
+							<IconSymbol name={isDownvoted ? 'arrowshape.down.fill' : 'arrowshape.down'} size={16} color={isDownvoted ? c.voteDown : c.textMuted} />
+							<ThemedText style={[styles.voteCount, isDownvoted && { color: c.voteDown }]}>{votes.downvotes ?? 0}</ThemedText>
+						</Pressable>
+						<Pressable onPress={() => setReplyOpen((open) => !open)} style={styles.actionButton} hitSlop={7}>
+							<IconSymbol name="bubble" size={15} color={c.muted} />
+							<ThemedText style={styles.replyLabel}>Reply</ThemedText>
+						</Pressable>
+					</View>
+
+					{replyOpen && (
+						<AppTextInput
+							placeholder={`Reply to ${comment.username ?? 'comment'}…`}
+							value={replyText}
+							onChangeText={setReplyText}
+							multiline
+							editable={!replySubmitting}
+							autoFocus
+							actionIcon="paperplane.fill"
+							actionLabel="Post reply"
+							actionDisabled={replySubmitting || !replyText.trim()}
+							onAction={submitReply}
+							containerStyle={styles.replyComposer}
+						/>
+					)}
+
+					{replyCount > 0 && (
+						<View style={styles.repliesControl}>
+							<Pressable
+								style={styles.repliesButton}
+								onPress={() => setShowReplies((shown) => !shown)}
+								hitSlop={6}
+							>
+								<ThemedText style={styles.repliesToggle}>
+									{showReplies
+										? 'Hide replies'
+										: `View ${replyCount} ${replyCount === 1 ? 'reply' : 'replies'}`}
+								</ThemedText>
+							</Pressable>
+							{showReplies && repliesLoading && (
+								<ActivityIndicator size="small" color={c.primary} />
+							)}
+						</View>
+					)}
 				</ThemedView>
-				<ContentActions
-					targetKind="comment"
-					targetId={comment.id}
-					authorId={comment.user_id}
-					authorName={comment.username}
-					onBlocked={() => setHidden(true)}
-					onDeleted={handleDeleted}
-				/>
-			</ThemedView>
-
-			<ThemedText style={styles.content}>{comment.content}</ThemedText>
-
-			{/* Actions: votes, reply, replies toggle */}
-			<View style={styles.commentActions}>
-				<Pressable onPress={() => vote(isUpvoted ? null : 'up')} style={styles.voteButton}>
-					<IconSymbol name={isUpvoted ? 'arrowshape.up.fill' : 'arrowshape.up'} size={16} color={isUpvoted ? c.voteUp : c.textMuted} />
-					<ThemedText style={[styles.voteCount, isUpvoted && { color: c.voteUp }]}>{votes.upvotes ?? 0}</ThemedText>
-				</Pressable>
-				<Pressable onPress={() => vote(isDownvoted ? null : 'down')} style={styles.voteButton}>
-					<IconSymbol name={isDownvoted ? 'arrowshape.down.fill' : 'arrowshape.down'} size={16} color={isDownvoted ? c.voteDown : c.textMuted} />
-					<ThemedText style={[styles.voteCount, isDownvoted && { color: c.voteDown }]}>{votes.downvotes ?? 0}</ThemedText>
-				</Pressable>
-				<Pressable onPress={() => setReplyOpen((o) => !o)} style={styles.voteButton}>
-					<IconSymbol name="bubble" size={15} color={c.muted} />
-					<ThemedText style={styles.replyLabel}>Reply</ThemedText>
-				</Pressable>
-				{replyCount > 0 && (
-					<Pressable style={styles.voteButton} onPress={() => setShowReplies((s) => !s)}>
-						<ThemedText style={styles.repliesToggle}>
-							{showReplies ? 'Hide replies' : `Replies (${replyCount})`}
-						</ThemedText>
-					</Pressable>
-				)}
 			</View>
 
-			{/* Inline reply composer */}
-			{replyOpen && (
-				<AppTextInput
-					placeholder={`Reply to ${comment.username ?? 'comment'}…`}
-					value={replyText}
-					onChangeText={setReplyText}
-					multiline
-					editable={!replySubmitting}
-					autoFocus
-					actionIcon="paperplane.fill"
-					actionLabel="Post reply"
-					actionDisabled={replySubmitting || !replyText.trim()}
-					onAction={submitReply}
-					containerStyle={styles.replyComposer}
-				/>
-			)}
-
-			{/* Nested replies */}
 			{showReplies && (
-				<CommentList parentCommentId={comment.id} initialPageSize={5} indent={16} refreshKey={replyRefresh} />
+				<CommentList
+					parentCommentId={comment.id}
+					initialPageSize={8}
+					indent={nextIndent}
+					depth={depth + 1}
+					onLoadingChange={handleRepliesLoading}
+					showLoadingIndicator={false}
+					refreshKey={replyRefresh}
+				/>
 			)}
 		</ThemedView>
 		</ContentLongPress>
@@ -333,7 +405,7 @@ function CommentItem({ comment }: { comment: Comment }) {
 
 const makeStyles = (c: Palette) => StyleSheet.create({
 	container: {
-		gap: 8,
+		gap: 2,
 	},
 	empty: {
 		color: c.muted,
@@ -360,16 +432,43 @@ const makeStyles = (c: Palette) => StyleSheet.create({
     color: c.primary,
 	},
 	comment: {
-		borderLeftWidth: 2,
-		borderLeftColor: c.border,
-		paddingLeft: 10,
+		paddingVertical: 9,
+		position: 'relative',
+	},
+	nestedComment: {
+		paddingVertical: 7,
+	},
+	commentLayout: {
+		flexDirection: 'row',
+		alignItems: 'flex-start',
+		gap: 10,
+		position: 'relative',
+	},
+	nestingConnector: {
+		position: 'absolute',
+		top: 4,
+		height: 10,
+		borderLeftWidth: 1,
+		borderBottomWidth: 1,
+		borderBottomLeftRadius: 7,
+		borderColor: c.border,
+	},
+	parentThreadSpine: {
+		position: 'absolute',
+		bottom: 12,
+		width: 1,
+		borderRadius: 1,
+		backgroundColor: c.border,
+	},
+	commentBody: {
+		flex: 1,
+		minWidth: 0,
 		gap: 6,
-		paddingVertical: 2,
 	},
 	header: {
 		flexDirection: 'row',
 		alignItems: 'center',
-		gap: 8,
+		minHeight: 24,
 	},
 	commentIdentity: {
 		flex: 1,
@@ -389,13 +488,15 @@ const makeStyles = (c: Palette) => StyleSheet.create({
 	},
 	content: {
 		fontSize: 15,
+		lineHeight: 20,
 	},
 	commentActions: {
 		flexDirection: 'row',
-		gap: 16,
+		gap: 18,
 		alignItems: 'center',
+		minHeight: 22,
 	},
-	voteButton: {
+	actionButton: {
 		flexDirection: 'row',
 		alignItems: 'center',
 		gap: 4,
@@ -412,7 +513,17 @@ const makeStyles = (c: Palette) => StyleSheet.create({
 	repliesToggle: {
 		fontSize: 13,
 		color: c.primary,
-		fontWeight: '600',
+		fontWeight: '700',
+	},
+	repliesButton: {
+		alignSelf: 'flex-start',
+		paddingVertical: 2,
+	},
+	repliesControl: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		gap: 7,
+		minHeight: 24,
 	},
 	replyComposer: {
 		marginTop: 2,

@@ -53,6 +53,7 @@ type CommentRow = {
   parent_kind: 'post' | 'article';
   parent_title: string | null;
   parent_comment_id?: string | null;
+  reply_count?: number;
 };
 
 // Upvoted, Reposts and Saved return posts and articles interleaved
@@ -87,6 +88,7 @@ function CommentItem({ comment }: { comment: CommentRow }) {
   const { state: votes, patch } = useContentInteraction('comment', comment.id, {
     upvotes: comment.upvotes ?? 0,
     downvotes: comment.downvotes ?? 0,
+    replyCount: comment.reply_count ?? 0,
     deleted: false,
   });
   const target = comment.parent_kind === 'article'
@@ -145,9 +147,21 @@ function CommentItem({ comment }: { comment: CommentRow }) {
           )}
         </ThemedView>
         <ThemedText style={styles.commentText} numberOfLines={3}>{comment.content}</ThemedText>
-        <ThemedText style={styles.commentMeta}>
-          ▲ {votes.upvotes ?? 0}   ▼ {votes.downvotes ?? 0}   ·   {timeAgo}
-        </ThemedText>
+        <ThemedView style={styles.commentMetaRow}>
+          <ThemedView style={styles.commentMetaItem}>
+            <IconSymbol name="arrowshape.up" size={14} color={c.muted} />
+            <ThemedText style={styles.commentMeta}>{votes.upvotes ?? 0}</ThemedText>
+          </ThemedView>
+          <ThemedView style={styles.commentMetaItem}>
+            <IconSymbol name="arrowshape.down" size={14} color={c.muted} />
+            <ThemedText style={styles.commentMeta}>{votes.downvotes ?? 0}</ThemedText>
+          </ThemedView>
+          <ThemedView style={styles.commentMetaItem}>
+            <IconSymbol name="bubble" size={14} color={c.muted} />
+            <ThemedText style={styles.commentMeta}>{votes.replyCount ?? 0}</ThemedText>
+          </ThemedView>
+          <ThemedText style={styles.commentMetaTime}>{timeAgo}</ThemedText>
+        </ThemedView>
       </ThemedView>
     </Pressable>
     </ContentLongPress>
@@ -915,8 +929,31 @@ const makeStyles = (c: Palette) => StyleSheet.create({
     fontSize: 15,
     lineHeight: 21,
   },
+  // Icons and gap spacing rather than glyphs padded with literal spaces, so the
+  // row lines up with the vote rows on posts and comments elsewhere.
+  commentMetaRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    marginTop: 6,
+  },
+  // Icon and its count stay tight; the 12pt row gap separates the groups.
+  commentMetaItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: 'transparent',
+  },
   commentMeta: {
     color: c.muted,
     fontSize: 13,
+    lineHeight: 18,
+  },
+  // The timestamp trails the counts, separated by space rather than a dot.
+  commentMetaTime: {
+    color: c.muted,
+    fontSize: 13,
+    lineHeight: 18,
+    marginLeft: 8,
   },
 });

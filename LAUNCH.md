@@ -244,10 +244,14 @@ was verified on July 31, 2026:
 - The permanent review URLs are
   `https://api.forumeveryside.com/support` and
   `https://api.forumeveryside.com/legal/privacy`; both return HTTP 200.
-- `WEB_APP_URL` is `https://mtan-forum.expo.app`, the validated EAS Hosting
-  production alias. Laptop and phone-width layouts render without console
-  errors. Attaching `forumeveryside.com` directly to EAS Hosting is optional and
-  requires a paid Expo plan.
+- The web app is served by **Cloudflare Pages**, project `forum-web`, with
+  `forumeveryside.com` attached as a custom domain (`forum-web-6tw.pages.dev` is
+  the platform alias). The project has no Git provider; deploys are direct
+  uploads from `wrangler`. See "Web deployment" below.
+- `https://mtan-forum.expo.app` is a **stale EAS Hosting deployment kept only as
+  a fallback**. It answers 200 but serves an older bundle under the previous
+  `forum` title, so it must not be treated as the live site or referenced in
+  store metadata. Redeploy or retire it before relying on it.
 - `PUBLIC_API_URL` is `https://api.forumeveryside.com`, so verification emails
   use the public HTTPS origin instead of Railway's internal HTTP request URL.
 - A disposable production signup received its verification message in the
@@ -277,6 +281,56 @@ The recovery API returning `{ "ok": true }` is not sufficient verification:
 request a reset for a controlled production account, receive the six-digit
 code, set a new password in the iOS app, and confirm the old password no longer
 works.
+
+### Web deployment
+
+The web build is an Expo web export uploaded straight to Cloudflare Pages. No
+Git integration runs, so nothing deploys until `wrangler` is invoked. Wrangler
+authenticates through a stored OAuth token; `npx wrangler whoami` confirms the
+account.
+
+```bash
+npm run web:export                      # writes dist/, then the postexport step
+npx wrangler pages deploy dist --project-name=forum-web --branch <preview-name>
+```
+
+Always deploy to a named preview branch first and open the returned
+`https://<hash>.forum-web-6tw.pages.dev` URL. **`main` is the production
+branch** — anything deployed there goes straight to `forumeveryside.com`.
+Promote only after the preview renders:
+
+```bash
+npx wrangler pages deploy dist --project-name=forum-web --branch main
+```
+
+`public/_headers` is load-bearing and must ship with every deploy. Cloudflare
+edge-caches the SPA shell by default; a cached `index.html` pointing at a bundle
+from a purged deployment makes the app fetch a missing script and mount nothing,
+which presents as a blank page on the custom domain while the identical build
+renders correctly on `*.pages.dev`. The file marks the shell
+`no-cache, must-revalidate` and leaves the content-hashed `/_expo/static/*` and
+`/assets/*` paths `immutable`. Confirm after deploying:
+
+```bash
+curl -sSI https://forumeveryside.com/ | grep -i 'cache-control\|cf-cache-status'
+# expect: cache-control: no-cache, must-revalidate   /   cf-cache-status: DYNAMIC
+```
+
+A `cf-cache-status` of `REVALIDATED` on the shell means the headers did not
+apply and the blank-page failure can recur.
+
+Verify the deployed bundle actually matches the build rather than trusting the
+page to look updated — the shell is client-rendered, so its HTML never
+references app assets:
+
+```bash
+grep -oE '/_expo/static/js/web/[A-Za-z0-9._-]+\.js' dist/index.html
+curl -sS https://forumeveryside.com/ | grep -oE 'entry-[a-f0-9]+\.js'
+```
+
+Check the landing page at desktop, tablet and phone widths. It breaks at 1100
+(two hero devices to one), 900 (feature sections stack) and 620 (single-column,
+sticky header hidden).
 
 ## 6. EAS and physical-iPhone QA
 

@@ -260,20 +260,15 @@ const makeStyles = (c: Palette) => StyleSheet.create({
     gap: 8,
     flexDirection: 'column',
   },
+  // Matches articleComponent: one continuous feed of hairline-split rows on
+  // both platforms, not detached cards on web.
   post: {
-    paddingHorizontal: Platform.OS === 'web' ? 12 : 16,
+    paddingHorizontal: 16,
   },
   postContent: {
     paddingVertical: 16,
     borderColor: c.border,
-    borderBottomWidth: Platform.OS === 'web' ? 0 : 1,
-    ...(Platform.OS === 'web' ? {
-      borderWidth: 1,
-      borderRadius: 18,
-      backgroundColor: c.background,
-      paddingHorizontal: 16,
-      marginBottom: 12,
-    } : {}),
+    borderBottomWidth: 1,
   },
   postDetailWeb: {
     paddingHorizontal: Platform.OS === 'web' ? 0 : 16,

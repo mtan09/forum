@@ -2,8 +2,9 @@ import { IconSymbol } from '@/components/ui/icon-symbol';
 import { type Palette } from '@/constants/theme';
 import { usePalette } from '@/hooks/use-palette';
 import type { ComponentProps } from 'react';
-import { forwardRef, useMemo } from 'react';
+import { forwardRef, useEffect, useImperativeHandle, useMemo, useRef, useState } from 'react';
 import {
+  Platform,
   Pressable,
   StyleSheet,
   type StyleProp,
@@ -17,6 +18,9 @@ import { ThemedView } from './themed-view';
 import { tapLight } from '@/lib/haptics';
 
 type IconName = ComponentProps<typeof IconSymbol>['name'];
+
+// RN's CursorValue only models 'auto' | 'pointer'; the caret is web-only.
+const WEB_TEXT_CURSOR = { cursor: 'text' } as unknown as ViewStyle;
 
 type AppTextInputProps = TextInputProps & {
   leadingIcon?: IconName;
@@ -56,8 +60,43 @@ const AppTextInput = forwardRef<TextInput, AppTextInputProps>(function AppTextIn
       ? inputProps.defaultValue
       : '';
 
+  const [focused, setFocused] = useState(false);
+  const shellRef = useRef<View | null>(null);
+  const inputRef = useRef<TextInput | null>(null);
+  useImperativeHandle(ref, () => inputRef.current as TextInput, []);
+
+  // The <input> only fills the shell's content box, so on web the ~9px of
+  // padding and the rounded corners were inert: the caret cursor flipped to an
+  // arrow and clicks near the edge of the box did nothing. Touch never showed
+  // this. Hand those clicks to the input so the whole rounded box is the field.
+  useEffect(() => {
+    if (Platform.OS !== 'web') return;
+    const shell = shellRef.current as unknown as HTMLElement | null;
+    if (!shell?.addEventListener) return;
+
+    const focusInput = (event: MouseEvent) => {
+      const target = event.target as HTMLElement | null;
+      // Accessory buttons own their own clicks.
+      if (!target || target.closest('[role="button"]')) return;
+      const node = inputRef.current as unknown as HTMLElement | null;
+      if (node && document.activeElement !== node) node.focus();
+    };
+
+    shell.addEventListener('click', focusInput);
+    return () => shell.removeEventListener('click', focusInput);
+  }, []);
+
   return (
-    <ThemedView style={[styles.shell, multiline && styles.shellMultiline, containerStyle]}>
+    <View
+      ref={shellRef}
+      style={[
+        styles.shell,
+        multiline && styles.shellMultiline,
+        focused && styles.shellFocused,
+        Platform.OS === 'web' && WEB_TEXT_CURSOR,
+        containerStyle,
+      ]}
+    >
       {leadingIcon ? (
         <ThemedView style={styles.accessory}>
           <IconSymbol name={leadingIcon} size={19} color={c.primary} />
@@ -75,7 +114,7 @@ const AppTextInput = forwardRef<TextInput, AppTextInputProps>(function AppTextIn
           </Text>
         ) : null}
         <TextInput
-          ref={ref}
+          ref={inputRef}
           multiline={multiline}
           scrollEnabled={scrollEnabled}
           onContentSizeChange={onContentSizeChange}
@@ -83,6 +122,8 @@ const AppTextInput = forwardRef<TextInput, AppTextInputProps>(function AppTextIn
           textAlignVertical="center"
           style={[styles.input, multiline && styles.inputMultiline, style]}
           {...inputProps}
+          onFocus={(event) => { setFocused(true); inputProps.onFocus?.(event); }}
+          onBlur={(event) => { setFocused(false); inputProps.onBlur?.(event); }}
         />
       </View>
       {actionIcon && onAction ? (
@@ -103,7 +144,7 @@ const AppTextInput = forwardRef<TextInput, AppTextInputProps>(function AppTextIn
           />
         </Pressable>
       ) : null}
-    </ThemedView>
+    </View>
   );
 });
 
@@ -125,6 +166,11 @@ const makeStyles = (c: Palette) => StyleSheet.create({
   },
   shellMultiline: {
     alignItems: 'flex-end',
+  },
+  // Stands in for the browser's focus ring, which global.css removes because it
+  // painted a blue rectangle inside this border.
+  shellFocused: {
+    borderColor: c.primary,
   },
   accessory: {
     width: 38,

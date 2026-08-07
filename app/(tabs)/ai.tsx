@@ -7,13 +7,12 @@ import { type Palette } from '@/constants/theme';
 import { usePalette } from '@/hooks/use-palette';
 import { requestAIConsent } from '@/lib/ai-consent';
 import { API_URL, getToken } from '@/lib/api';
-import { getPerspectiveTone } from '@/lib/perspective-colors';
 import { PerspectiveTag } from '@/components/perspectiveTag';
 import Markdown from '@ronradtke/react-native-markdown-display';
 import { useLocalSearchParams } from 'expo-router';
 import { fetch as expoFetch } from 'expo/fetch';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Animated, Keyboard, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, useWindowDimensions } from 'react-native';
+import { Animated, Keyboard, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet } from 'react-native';
 import { selectTick, tapLight } from '@/lib/haptics';
 
 type Message = {
@@ -99,8 +98,6 @@ export default function AI() {
   const { c } = usePalette();
   const styles = useMemo(() => makeStyles(c), [c]);
   const markdownStyles = useMemo(() => makeMarkdownStyles(c), [c]);
-  const { width: windowWidth } = useWindowDimensions();
-  const showWebComparison = Platform.OS === 'web' && windowWidth >= 1080;
 
   const [inputText, setInputText] = useState('');
   const [suggestedPrompts, setSuggestedPrompts] = useState(() => shuffledPrompts());
@@ -449,30 +446,6 @@ export default function AI() {
                       <ThemedView style={styles.answerBody}>
                         <ThemedText style={styles.aiErrorText}>{message.center || message.content}</ThemedText>
                       </ThemedView>
-                    ) : showWebComparison ? (
-                      <ThemedView style={styles.comparisonGrid}>
-                        {(['Left', 'Center', 'Right'] as const).map((lean) => {
-                          const tone = getPerspectiveTone(lean, c);
-                          const copy = lean === 'Left' ? message.left : lean === 'Center' ? message.center : message.right;
-                          return (
-                            <ThemedView key={lean} style={styles.comparisonColumn}>
-                              <ThemedView style={[styles.comparisonHeading, { borderTopColor: tone.color }]}>
-                                <PerspectiveTag label={lean} variant="solid" />
-                              </ThemedView>
-                              <ThemedView style={styles.comparisonBody}>
-                                {copy ? (
-                                  <Markdown style={markdownStyles}>{copy}</Markdown>
-                                ) : (
-                                  <ThemedView style={styles.loadingState}>
-                                    <AnimatedLoadingDots />
-                                    <ThemedText style={styles.loadingText}>Building this perspective…</ThemedText>
-                                  </ThemedView>
-                                )}
-                              </ThemedView>
-                            </ThemedView>
-                          );
-                        })}
-                      </ThemedView>
                     ) : (
                       <>
                         {renderLensTabs(true)}
@@ -562,10 +535,6 @@ const makeStyles = (c: Palette) => StyleSheet.create({
   lensTab: { flex: 1, minHeight: 34, borderRadius: 9, borderWidth: 1, borderColor: 'transparent', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6 },
   lensTag: { alignSelf: 'center' },
   answerBody: { minHeight: 116, paddingHorizontal: 15, paddingTop: 16, paddingBottom: 8, backgroundColor: 'transparent' },
-  comparisonGrid: { flexDirection: 'row', gap: 1, borderTopWidth: 1, borderTopColor: c.border, backgroundColor: c.border },
-  comparisonColumn: { flex: 1, minWidth: 0, backgroundColor: c.background },
-  comparisonHeading: { minHeight: 44, borderTopWidth: 4, paddingHorizontal: 13, flexDirection: 'row', alignItems: 'center', gap: 7, backgroundColor: c.surface },
-  comparisonBody: { flex: 1, minHeight: 190, paddingHorizontal: 14, paddingTop: 15, paddingBottom: 8, backgroundColor: c.background },
   aiErrorText: { color: c.danger, fontWeight: '700' },
   loadingState: { minHeight: 90, alignItems: 'center', justifyContent: 'center', backgroundColor: 'transparent' },
   loadingText: { color: c.muted, fontSize: 12, marginTop: 8 },

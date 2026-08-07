@@ -217,7 +217,7 @@ export default function DebateScreen() {
         style={styles.scroll}
         contentContainerStyle={styles.scrollContent}
       >
-        <WebPageFrame maxWidth={720}>
+        <WebPageFrame>
           <ThemedView style={styles.container}>
           <ThemedView style={[styles.kindChip, { backgroundColor: meta.bg }]}>
             <ThemedText style={[styles.kindChipText, { color: meta.color }]}>{meta.label}</ThemedText>

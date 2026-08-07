@@ -18,7 +18,7 @@ import {
 } from '@/lib/notifications';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import Constants from 'expo-constants';
-import * as WebBrowser from 'expo-web-browser';
+import { openExternalUrl } from '@/lib/open-external';
 import { useRouter } from 'expo-router';
 import { useEffect, useMemo, useState } from 'react';
 import { Alert, Platform, Pressable, ScrollView, StyleSheet } from 'react-native';
@@ -524,9 +524,9 @@ export default function Settings() {
           value={`${Constants.nativeAppVersion ?? Constants.expoConfig?.version ?? '1.0.0'} (${Constants.nativeBuildVersion ?? 'dev'})`}
         />
         <Row label="Send Feedback" chevron onPress={() => { tapLight(); router.push('/feedback'); }} />
-        <Row label="Support" chevron onPress={() => { tapLight(); WebBrowser.openBrowserAsync(`${API_URL}/support`); }} />
-        <Row label="Terms of Service" chevron onPress={() => { tapLight(); WebBrowser.openBrowserAsync(`${API_URL}/legal/terms`); }} />
-        <Row label="Privacy Policy" chevron onPress={() => { tapLight(); WebBrowser.openBrowserAsync(`${API_URL}/legal/privacy`); }} />
+        <Row label="Support" chevron onPress={() => { tapLight(); openExternalUrl(`${API_URL}/support`); }} />
+        <Row label="Terms of Service" chevron onPress={() => { tapLight(); openExternalUrl(`${API_URL}/legal/terms`); }} />
+        <Row label="Privacy Policy" chevron onPress={() => { tapLight(); openExternalUrl(`${API_URL}/legal/privacy`); }} />
       </Card>
 
       <Card>

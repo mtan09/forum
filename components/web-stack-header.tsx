@@ -1,5 +1,6 @@
 import { ThemedText } from '@/components/themed-text';
 import { IconSymbol } from '@/components/ui/icon-symbol';
+import { WEB_CONTENT_MAX_WIDTH } from '@/constants/layout';
 import { type Palette } from '@/constants/theme';
 import { usePalette } from '@/hooks/use-palette';
 import { Image } from 'expo-image';
@@ -13,7 +14,11 @@ import { tapLight } from '@/lib/haptics';
  * product-like: one compact back affordance and a brand home link, without
  * repeating generic route names such as "Post" or "Article".
  */
-export default function WebStackHeader() {
+export default function WebStackHeader({
+  maxWidth = WEB_CONTENT_MAX_WIDTH,
+  gutter = 20,
+  title,
+}: { maxWidth?: number; gutter?: number; title?: string }) {
   const router = useRouter();
   const { c } = usePalette();
   const styles = useMemo(() => makeStyles(c), [c]);
@@ -23,9 +28,29 @@ export default function WebStackHeader() {
     else router.replace('/');
   };
 
+  // Inside the shell the sidebar already carries the brand, so a titled header
+  // names the screen instead of repeating it: a back arrow and "Post".
+  if (title) {
+    return (
+      <View style={styles.bar}>
+        <View style={styles.titledInner}>
+          <Pressable
+            onPress={() => { tapLight(); goBack(); }}
+            accessibilityRole="button"
+            accessibilityLabel="Go back"
+            style={({ pressed }) => [styles.backCircle, pressed && styles.pressed]}
+          >
+            <IconSymbol name="chevron.left" size={19} color={c.text} />
+          </Pressable>
+          <ThemedText numberOfLines={1} style={styles.screenTitle}>{title}</ThemedText>
+        </View>
+      </View>
+    );
+  }
+
   return (
     <View style={styles.bar}>
-      <View style={styles.inner}>
+      <View style={[styles.inner, { maxWidth, paddingHorizontal: gutter }]}>
         <Pressable
           onPress={() => { tapLight(); goBack(); }}
           accessibilityRole="button"
@@ -63,13 +88,36 @@ const makeStyles = (c: Palette) => StyleSheet.create({
   },
   inner: {
     width: '100%',
-    maxWidth: 840,
     height: '100%',
     alignSelf: 'center',
-    paddingHorizontal: 20,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+  },
+  titledInner: {
+    width: '100%',
+    height: '100%',
+    paddingHorizontal: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 14,
+  },
+  backCircle: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginLeft: -6,
+    cursor: 'pointer',
+  },
+  screenTitle: {
+    flexShrink: 1,
+    color: c.text,
+    fontSize: 19,
+    lineHeight: 24,
+    fontWeight: '900',
+    letterSpacing: -0.3,
   },
   back: {
     minHeight: 36,

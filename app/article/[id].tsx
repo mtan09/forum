@@ -12,7 +12,7 @@ import { api } from '@/lib/api';
 import { queueFeedEvent, type FeedMode } from '@/lib/feed-events';
 import { tapLight, tapMedium } from '@/lib/haptics';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import * as WebBrowser from 'expo-web-browser';
+import { openExternalUrl } from '@/lib/open-external';
 import { useEffect, useMemo, useState } from 'react';
 import { Keyboard, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet } from 'react-native';
 
@@ -107,7 +107,7 @@ export default function ArticleScreen() {
         style={styles.scroll}
         contentContainerStyle={styles.scrollContent}
       >
-        <WebPageFrame maxWidth={760}>
+        <WebPageFrame>
           <Article
             article={article}
             variant="detail"
@@ -153,7 +153,7 @@ export default function ArticleScreen() {
                   eventType: 'outbound_open',
                 });
               }
-              try { await WebBrowser.openBrowserAsync(article.url); } catch {}
+              try { await openExternalUrl(article.url); } catch {}
             }}
             style={({ pressed }) => [styles.readButton, { opacity: pressed ? 0.7 : 1 }]}
           >
@@ -200,7 +200,9 @@ export default function ArticleScreen() {
 
 const makeStyles = (c: Palette) => StyleSheet.create({
   scroll: {
-    backgroundColor: Platform.OS === 'web' ? c.surface : c.background,
+    // The shell paints one background for the whole page; c.surface here showed
+    // as a second colour below the comments once the content ran short.
+    backgroundColor: c.background,
   },
   scrollContent: {
     paddingBottom: Platform.OS === 'web' ? 32 : 0,

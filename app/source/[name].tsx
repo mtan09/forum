@@ -104,7 +104,7 @@ export default function SourceScreen() {
       contentContainerStyle={styles.scrollContent}
       showsVerticalScrollIndicator={false}
     >
-      <WebPageFrame maxWidth={760}>
+      <WebPageFrame>
         <ThemedView style={styles.container}>
         {/* Outlet identity */}
         <ThemedView style={styles.headerRow}>

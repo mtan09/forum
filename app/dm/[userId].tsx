@@ -12,7 +12,7 @@ import { useAuth } from '@/context/authContext';
 import { usePalette } from '@/hooks/use-palette';
 import { api } from '@/lib/api';
 import { tapLight, tapMedium } from '@/lib/haptics';
-import * as WebBrowser from 'expo-web-browser';
+import { openExternalUrl } from '@/lib/open-external';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { FlatList, KeyboardAvoidingView, Platform, Pressable, StyleSheet, View } from 'react-native';
@@ -326,7 +326,7 @@ export default function DmThread() {
       router.push(`/article/${decodeURIComponent(forumArticle[1])}` as never);
       return;
     }
-    void WebBrowser.openBrowserAsync(url).catch((err) => {
+    void openExternalUrl(url).catch((err) => {
       console.log('Error opening shared link:', err?.message);
     });
   };

@@ -1,11 +1,12 @@
 import AppTextInput from '@/components/app-text-input';
 import ScalableImage from '@/components/scalable-image';
+import { AUTH_CONTENT_MAX_WIDTH } from '@/constants/layout';
 import { type Palette } from '@/constants/theme';
 import { useAuth } from '@/context/authContext';
 import { usePalette } from '@/hooks/use-palette';
 import { API_URL } from '@/lib/api';
 import { tapLight, tapMedium } from '@/lib/haptics';
-import * as WebBrowser from 'expo-web-browser';
+import { openExternalUrl } from '@/lib/open-external';
 import { useRouter } from 'expo-router';
 import React, { useMemo, useState } from 'react';
 import { ActivityIndicator, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
@@ -63,9 +64,23 @@ export default function CreateAccount() {
         dimension={112}
         style={styles.image}
       />
+      <Text style={styles.eyebrow}>JOIN THE CONVERSATION</Text>
       <Text style={styles.title}>Create account</Text>
+      <Text style={styles.subtitle}>
+        One account for the feed, the story summaries, The Floor, and forumAI.
+      </Text>
+      {/* Same left/center/right motif as login and the landing page. */}
+      <View style={styles.rule}>
+        <View style={[styles.ruleSegment, { backgroundColor: c.blue }]} />
+        <View style={[styles.ruleSegment, { backgroundColor: c.centerTag }]} />
+        <View style={[styles.ruleSegment, { backgroundColor: c.red }]} />
+      </View>
 
-      {!!err && <Text style={styles.error}>{err}</Text>}
+      {!!err && (
+        <View style={styles.errorBanner}>
+          <Text style={styles.error}>{err}</Text>
+        </View>
+      )}
 
       <AppTextInput
         placeholder="Username"
@@ -113,7 +128,7 @@ export default function CreateAccount() {
         </Text>
         <TouchableOpacity
           disabled={loading}
-          onPress={() => { tapLight(); WebBrowser.openBrowserAsync(`${API_URL}/legal/privacy`); }}
+          onPress={() => { tapLight(); openExternalUrl(`${API_URL}/legal/privacy`); }}
         >
           <Text style={styles.privacyLink}>Read the Privacy Policy</Text>
         </TouchableOpacity>
@@ -166,14 +181,14 @@ export default function CreateAccount() {
           I agree to the{' '}
           <Text
             style={styles.termsLink}
-            onPress={() => { tapLight(); WebBrowser.openBrowserAsync(`${API_URL}/legal/terms`); }}
+            onPress={() => { tapLight(); openExternalUrl(`${API_URL}/legal/terms`); }}
           >
             Terms
           </Text>{' '}
           and{' '}
           <Text
             style={styles.termsLink}
-            onPress={() => { tapLight(); WebBrowser.openBrowserAsync(`${API_URL}/legal/privacy`); }}
+            onPress={() => { tapLight(); openExternalUrl(`${API_URL}/legal/privacy`); }}
           >
             Privacy Policy
           </Text>
@@ -206,17 +221,55 @@ export default function CreateAccount() {
 
 const makeStyles = (c: Palette) => StyleSheet.create({
   scroll: { flex: 1, backgroundColor: c.background },
-  container: { flexGrow: 1, width: '100%', maxWidth: Platform.OS === 'web' ? 500 : undefined, alignSelf: 'center', padding: Platform.OS === 'web' ? 40 : 24, paddingVertical: 24, gap: 12, backgroundColor: c.background, justifyContent: 'flex-start' },
-  title: { 
-    fontSize: 28, 
-    fontWeight: '800', 
-    marginBottom: 8,
-    textAlign: 'center',
+  container: { flexGrow: 1, width: '100%', maxWidth: Platform.OS === 'web' ? AUTH_CONTENT_MAX_WIDTH : undefined, alignSelf: 'center', padding: Platform.OS === 'web' ? 40 : 24, paddingVertical: 24, gap: 12, backgroundColor: c.background, justifyContent: 'flex-start' },
+  eyebrow: {
     color: c.primary,
+    fontSize: 11,
+    fontWeight: '900',
+    letterSpacing: 1.4,
+    textAlign: 'center',
+  },
+  title: {
+    fontSize: 32,
+    lineHeight: 39,
+    fontWeight: '900',
+    letterSpacing: -0.8,
+    textAlign: 'center',
+    color: c.text,
+    marginTop: 6,
+  },
+  subtitle: {
+    color: c.subtle,
+    fontSize: 14,
+    lineHeight: 21,
+    textAlign: 'center',
+    marginTop: 8,
+    alignSelf: 'center',
+    maxWidth: 330,
+  },
+  rule: {
+    flexDirection: 'row',
+    width: 132,
+    height: 5,
+    borderRadius: 3,
+    overflow: 'hidden',
+    marginTop: 18,
+    marginBottom: 10,
+    alignSelf: 'center',
+  },
+  ruleSegment: { flex: 1 },
+  errorBanner: {
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: c.danger,
+    backgroundColor: c.redBg,
+    paddingHorizontal: 12,
+    paddingVertical: 9,
   },
   button: {
+    minHeight: 52,
+    justifyContent: 'center',
     backgroundColor: c.primary,
-    paddingVertical: 14,
     borderRadius: 16,
     alignItems: 'center',
     marginTop: 8,
@@ -230,8 +283,8 @@ const makeStyles = (c: Palette) => StyleSheet.create({
     elevation: 5,
   },
   buttonDisabled: { opacity: 0.6 },
-  buttonText: { color: c.onPrimary, fontWeight: '600' },
-  error: { color: c.danger, marginBottom: 4 },
+  buttonText: { color: c.onPrimary, fontSize: 15, lineHeight: 19, fontWeight: '900' },
+  error: { color: c.danger, fontSize: 13, lineHeight: 18, fontWeight: '600' },
   consentCard: {
     marginTop: 4,
     padding: 14,

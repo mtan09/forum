@@ -204,19 +204,16 @@ export default function FollowingFeed() {
 }
 
 const makeStyles = (c: ReturnType<typeof usePalette>['c']) => StyleSheet.create({
+  // The shell already supplies the centred column, background, and hairlines;
+  // framing again here nested a rounded card inside it.
   page: {
     flex: 1,
     alignItems: 'center',
-    padding: Platform.OS === 'web' ? 20 : 0,
-    backgroundColor: Platform.OS === 'web' ? c.surface : c.background,
+    backgroundColor: c.background,
   },
   screen: {
     flex: 1,
     width: '100%',
-    maxWidth: Platform.OS === 'web' ? 760 : undefined,
-    borderWidth: Platform.OS === 'web' ? 1 : 0,
-    borderColor: c.border,
-    borderRadius: Platform.OS === 'web' ? 20 : 0,
     backgroundColor: c.background,
     overflow: 'hidden',
   },

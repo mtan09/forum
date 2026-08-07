@@ -1,3 +1,4 @@
+import { IconSymbol } from '@/components/ui/icon-symbol';
 import { usePalette } from '@/hooks/use-palette';
 import React, { useMemo, useRef, useState } from 'react';
 import { tapLight } from '@/lib/haptics';
@@ -9,7 +10,6 @@ import {
   Platform,
   Pressable,
   StyleSheet,
-  Text,
   View,
   ViewStyle,
 } from 'react-native';
@@ -150,7 +150,7 @@ export default function Carousel<T>({
             onPress={() => { tapLight(); moveBy(-1); }}
             style={({ pressed }) => [styles.control, styles.controlPrevious, pressed && styles.controlPressed]}
           >
-            <Text style={styles.controlText}>‹</Text>
+            <IconSymbol name="chevron.left" size={15} color="#FFFFFF" />
           </Pressable>
           <Pressable
             accessibilityRole="button"
@@ -158,7 +158,7 @@ export default function Carousel<T>({
             onPress={() => { tapLight(); moveBy(1); }}
             style={({ pressed }) => [styles.control, styles.controlNext, pressed && styles.controlPressed]}
           >
-            <Text style={styles.controlText}>›</Text>
+            <IconSymbol name="chevron.right" size={15} color="#FFFFFF" />
           </Pressable>
         </>
       )}
@@ -202,14 +202,18 @@ const styles = StyleSheet.create({
   dot: {
     // sized dynamically
   },
+  // A translucent pill over the panel rather than a hard black puck — the
+  // chevrons should sit inside the design, not on top of it.
   control: {
     position: 'absolute',
     top: '50%',
-    width: 32,
-    height: 32,
-    marginTop: -16,
-    borderRadius: 16,
-    backgroundColor: 'rgba(0,0,0,0.46)',
+    width: 30,
+    height: 30,
+    marginTop: -15,
+    borderRadius: 15,
+    backgroundColor: 'rgba(255,255,255,0.14)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.22)',
     alignItems: 'center',
     justifyContent: 'center',
     zIndex: 4,
@@ -223,12 +227,5 @@ const styles = StyleSheet.create({
   },
   controlPressed: {
     opacity: 0.65,
-  },
-  controlText: {
-    color: '#FFFFFF',
-    fontSize: 27,
-    lineHeight: 28,
-    fontWeight: '600',
-    marginTop: -2,
   },
 });

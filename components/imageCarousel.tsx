@@ -1,6 +1,6 @@
 import { useMemo, useRef, useState } from 'react';
 import { Image } from 'expo-image';
-import * as WebBrowser from 'expo-web-browser';
+import { openExternalUrl } from '@/lib/open-external';
 import { FlatList, NativeScrollEvent, NativeSyntheticEvent, Platform, Pressable, StyleSheet, useWindowDimensions } from 'react-native';
 import { type Palette } from '@/constants/theme';
 import { usePalette } from '@/hooks/use-palette';
@@ -114,7 +114,7 @@ export default function ImageCarousel({ images: allImages, height = 300 }: Image
             accessibilityLabel={`Read the original reporting from ${item.source}`}
             onPress={async () => { tapLight();
               try {
-                await WebBrowser.openBrowserAsync(item.articleUrl);
+                await openExternalUrl(item.articleUrl);
               } catch {}
             }}
             style={({ pressed }) => [

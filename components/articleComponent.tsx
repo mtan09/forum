@@ -284,20 +284,16 @@ const makeStyles = (c: Palette) => StyleSheet.create({
   },
   repostAttribution: { paddingLeft: 4, flexDirection: 'row', alignItems: 'center', gap: 6 },
   repostAttributionText: { flex: 1, color: c.muted, fontSize: 12, lineHeight: 16, fontWeight: '800' },
+  // Web used to box each item in a bordered, rounded, detached card. iOS runs
+  // full-bleed rows split by a hairline, which reads as one continuous feed —
+  // keep both on the iOS treatment.
   post: {
-    paddingHorizontal: Platform.OS === 'web' ? 12 : 16,
+    paddingHorizontal: 16,
   },
   postContent: {
     paddingVertical: 16,
     borderColor: c.border,
-    borderBottomWidth: Platform.OS === 'web' ? 0 : 1,
-    ...(Platform.OS === 'web' ? {
-      borderWidth: 1,
-      borderRadius: 18,
-      backgroundColor: c.background,
-      paddingHorizontal: 16,
-      marginBottom: 12,
-    } : {}),
+    borderBottomWidth: 1,
   },
   postDetailWeb: {
     paddingHorizontal: Platform.OS === 'web' ? 0 : 16,

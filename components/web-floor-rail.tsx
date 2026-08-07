@@ -46,27 +46,30 @@ export default function WebFloorRail({ compact = false }: { compact?: boolean })
   return (
     <ThemedView style={[styles.rail, compact && styles.railCompact]}>
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.content}>
-        <View style={styles.headingRow}>
-          <View>
-            <ThemedText style={styles.eyebrow}>LIVE DISCUSSION</ThemedText>
-            <ThemedText style={styles.title}>The Floor</ThemedText>
+        {/* One panel listing every open room, in the shape of a trending list:
+            compact rows split by hairlines rather than a stack of loose cards,
+            so the rail can show all of them without running off the screen. */}
+        <ThemedView style={styles.panel}>
+          <View style={styles.panelHeader}>
+            <View style={styles.panelHeading}>
+              <ThemedText style={styles.eyebrow}>LIVE DISCUSSION</ThemedText>
+              <ThemedText style={styles.title}>The Floor</ThemedText>
+              <ThemedText style={styles.date}>{today}</ThemedText>
+            </View>
+            <View style={styles.livePill}>
+              <View style={styles.liveDot} />
+              <ThemedText style={styles.liveText}>Today</ThemedText>
+            </View>
           </View>
-          <View style={styles.livePill}>
-            <View style={styles.liveDot} />
-            <ThemedText style={styles.liveText}>Today</ThemedText>
-          </View>
-        </View>
-        <ThemedText style={styles.date}>{today} · take a stance alongside the feed</ThemedText>
 
-        {debates === null ? (
-          <ActivityIndicator style={styles.loader} color={c.muted} />
-        ) : debates.length === 0 ? (
-          <ThemedView style={styles.empty}>
-            <ThemedText style={styles.emptyText}>Today’s rooms will appear when enough stories cluster.</ThemedText>
-          </ThemedView>
-        ) : (
-          <View style={styles.rooms}>
-            {debates.slice(0, 2).map((debate) => {
+          {debates === null ? (
+            <ActivityIndicator style={styles.loader} color={c.muted} />
+          ) : debates.length === 0 ? (
+            <ThemedView style={styles.empty}>
+              <ThemedText style={styles.emptyText}>Today’s rooms will appear when enough stories cluster.</ThemedText>
+            </ThemedView>
+          ) : (
+            debates.map((debate) => {
               const meta = metaFor(debate.kind, c);
               const joined = debate.my_position != null;
               return (
@@ -76,40 +79,25 @@ export default function WebFloorRail({ compact = false }: { compact?: boolean })
                   style={({ pressed }) => [styles.room, pressed && styles.pressed]}
                   accessibilityRole="link"
                 >
-                  <View style={[styles.kind, { backgroundColor: meta.background }]}>
+                  <View style={styles.roomTop}>
                     <ThemedText style={[styles.kindText, { color: meta.color }]}>{meta.label}</ThemedText>
+                    {joined && <IconSymbol name="checkmark.circle.fill" size={13} color={c.success} />}
                   </View>
-                  <ThemedText numberOfLines={4} style={styles.roomTitle}>{debate.title}</ThemedText>
-                  <View style={styles.roomFooter}>
-                    <ThemedText style={styles.stats}>
-                      {debate.total_votes} voice{debate.total_votes === 1 ? '' : 's'} · {debate.comment_count} replies
-                    </ThemedText>
-                    <IconSymbol
-                      name={joined ? 'checkmark.circle.fill' : 'chevron.right'}
-                      size={16}
-                      color={joined ? c.success : c.primary}
-                    />
-                  </View>
+                  <ThemedText numberOfLines={2} style={styles.roomTitle}>{debate.title}</ThemedText>
+                  <ThemedText style={styles.stats}>
+                    {debate.total_votes} voice{debate.total_votes === 1 ? '' : 's'} · {debate.comment_count} replies
+                  </ThemedText>
                 </Pressable>
               );
-            })}
-          </View>
-        )}
+            })
+          )}
 
-        <Pressable
-          onPress={() => { tapLight(); router.push('/debate'); }}
-          style={({ pressed }) => [styles.allRooms, pressed && styles.pressed]}
-        >
-          <ThemedText style={styles.allRoomsText}>Open The Floor</ThemedText>
-          <IconSymbol name="chevron.right" size={17} color={c.primary} />
-        </Pressable>
-
-        <ThemedView style={styles.contextCard}>
-          <IconSymbol name="bubble.left.and.bubble.right.fill" size={20} color={c.primary} />
-          <ThemedText style={styles.contextTitle}>Read, then weigh in</ThemedText>
-          <ThemedText style={styles.contextText}>
-            The Floor stays beside the mixed feed so discussion remains connected to the coverage shaping it.
-          </ThemedText>
+          <Pressable
+            onPress={() => { tapLight(); router.push('/debate'); }}
+            style={({ pressed }) => [styles.allRooms, pressed && styles.pressed]}
+          >
+            <ThemedText style={styles.allRoomsText}>Open The Floor</ThemedText>
+          </Pressable>
         </ThemedView>
       </ScrollView>
     </ThemedView>
@@ -117,14 +105,12 @@ export default function WebFloorRail({ compact = false }: { compact?: boolean })
 }
 
 const makeStyles = (c: Palette) => StyleSheet.create({
+  // A flush column, not a floating rounded panel — the feed's right hairline
+  // is the only separator it needs.
   rail: {
-    width: 296,
+    width: 316,
     flexShrink: 0,
     alignSelf: 'stretch',
-    marginVertical: 20,
-    borderRadius: 22,
-    borderWidth: 1,
-    borderColor: c.border,
     backgroundColor: c.background,
     overflow: 'hidden',
   },
@@ -134,11 +120,6 @@ const makeStyles = (c: Palette) => StyleSheet.create({
   content: {
     padding: 18,
     gap: 14,
-  },
-  headingRow: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    justifyContent: 'space-between',
   },
   eyebrow: {
     color: c.primary,
@@ -196,76 +177,70 @@ const makeStyles = (c: Palette) => StyleSheet.create({
     fontSize: 12,
     lineHeight: 18,
   },
-  rooms: {
-    gap: 10,
-  },
-  room: {
-    borderRadius: 18,
+  panel: {
+    borderRadius: 16,
     borderWidth: 1,
     borderColor: c.cardBorder,
     backgroundColor: c.card,
-    padding: 14,
-    gap: 10,
+    overflow: 'hidden',
   },
-  kind: {
-    alignSelf: 'flex-start',
-    borderRadius: 9,
-    paddingHorizontal: 8,
-    paddingVertical: 3,
+  panelHeader: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    justifyContent: 'space-between',
+    paddingHorizontal: 15,
+    paddingTop: 14,
+    paddingBottom: 12,
   },
-  kindText: {
-    fontSize: 9,
-    lineHeight: 12,
-    fontWeight: '900',
-    letterSpacing: 0.2,
+  panelHeading: {
+    flex: 1,
+    minWidth: 0,
   },
-  roomTitle: {
-    fontSize: 15,
-    lineHeight: 21,
-    fontWeight: '900',
+  room: {
+    paddingHorizontal: 15,
+    paddingVertical: 11,
+    gap: 3,
+    borderTopWidth: 1,
+    borderTopColor: c.cardBorder,
+    cursor: 'pointer',
   },
-  roomFooter: {
+  roomTop: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+    gap: 6,
+  },
+  kindText: {
+    fontSize: 10,
+    lineHeight: 14,
+    fontWeight: '900',
+    letterSpacing: 0.3,
+    textTransform: 'uppercase',
+  },
+  roomTitle: {
+    fontSize: 14,
+    lineHeight: 19,
+    fontWeight: '800',
   },
   stats: {
     color: c.muted,
-    fontSize: 10,
-    lineHeight: 14,
+    fontSize: 11,
+    lineHeight: 15,
   },
+  // A flush footer row of the panel, like the "show more" that closes a
+  // trending list — not a separate bordered button floating beneath it.
   allRooms: {
     minHeight: 42,
-    borderRadius: 13,
-    borderWidth: 1,
-    borderColor: c.cardBorder,
-    flexDirection: 'row',
-    alignItems: 'center',
     justifyContent: 'center',
-    gap: 5,
+    paddingHorizontal: 15,
+    borderTopWidth: 1,
+    borderTopColor: c.cardBorder,
     cursor: 'pointer',
   },
   allRoomsText: {
     color: c.primary,
     fontSize: 12,
     fontWeight: '900',
-  },
-  contextCard: {
-    marginTop: 4,
-    borderRadius: 18,
-    backgroundColor: c.surface,
-    padding: 15,
-    gap: 6,
-  },
-  contextTitle: {
-    fontSize: 13,
-    lineHeight: 17,
-    fontWeight: '900',
-  },
-  contextText: {
-    color: c.muted,
-    fontSize: 11,
-    lineHeight: 17,
   },
   pressed: {
     opacity: 0.65,

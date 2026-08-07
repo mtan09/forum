@@ -181,7 +181,7 @@ export default function PublicProfile() {
       contentContainerStyle={styles.scrollContent}
       showsVerticalScrollIndicator={false}
     >
-      <WebPageFrame maxWidth={760}>
+      <WebPageFrame>
         <ScalableImage
         source={
           user.header_url

@@ -1,11 +1,12 @@
 import AppTextInput from '@/components/app-text-input';
+import { AUTH_CONTENT_MAX_WIDTH } from '@/constants/layout';
 import { type Palette } from '@/constants/theme';
 import { usePalette } from '@/hooks/use-palette';
 import { API_URL } from '@/lib/api';
 import { notifySuccess, tapMedium } from '@/lib/haptics';
 import { useRouter } from 'expo-router';
 import React, { useMemo, useState } from 'react';
-import { ActivityIndicator, KeyboardAvoidingView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, KeyboardAvoidingView, Platform, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 // Two-step reset: request a 6-digit code by email, then enter it with a new
 // password. Codes expire after an hour and lock after 5 attempts (server).
@@ -73,18 +74,20 @@ export default function ForgotPassword() {
 
   if (done) {
     return (
-      <View style={styles.container}>
-        <Text style={styles.title}>Password reset ✓</Text>
-        <Text style={styles.subtitle}>You can sign in with your new password now.</Text>
-        <TouchableOpacity onPress={() => router.back()} style={styles.button}>
-          <Text style={styles.buttonText}>Back to sign in</Text>
-        </TouchableOpacity>
+      <View style={styles.screen}>
+        <View style={styles.container}>
+          <Text style={styles.title}>Password reset ✓</Text>
+          <Text style={styles.subtitle}>You can sign in with your new password now.</Text>
+          <TouchableOpacity onPress={() => router.back()} style={styles.button}>
+            <Text style={styles.buttonText}>Back to sign in</Text>
+          </TouchableOpacity>
+        </View>
       </View>
     );
   }
 
   return (
-    <KeyboardAvoidingView behavior="padding" style={{ flex: 1 }}>
+    <KeyboardAvoidingView behavior="padding" style={styles.screen}>
       <View style={styles.container}>
         <Text style={styles.title}>Reset password</Text>
         <Text style={styles.subtitle}>
@@ -148,17 +151,33 @@ export default function ForgotPassword() {
 }
 
 const makeStyles = (c: Palette) => StyleSheet.create({
-  container: { flex: 1, padding: 24, gap: 12, backgroundColor: c.background, justifyContent: 'center' },
+  // The canvas has to span the viewport; only the column inside it is capped,
+  // or the narrower c.background column reads as a stripe over c.surface.
+  screen: { flex: 1, backgroundColor: c.background },
+  container: {
+    flex: 1,
+    width: '100%',
+    maxWidth: Platform.OS === 'web' ? AUTH_CONTENT_MAX_WIDTH : undefined,
+    alignSelf: 'center',
+    padding: Platform.OS === 'web' ? 40 : 24,
+    gap: 12,
+    justifyContent: 'center',
+  },
   title: {
-    fontSize: 28,
-    fontWeight: '800',
+    fontSize: 32,
+    lineHeight: 39,
+    fontWeight: '900',
+    letterSpacing: -0.8,
     textAlign: 'center',
-    color: c.primary,
+    color: c.text,
   },
   subtitle: {
     textAlign: 'center',
     color: c.subtle,
-    lineHeight: 20,
+    fontSize: 14,
+    lineHeight: 21,
+    alignSelf: 'center',
+    maxWidth: 330,
     marginBottom: 8,
   },
   codeInput: {
@@ -168,14 +187,20 @@ const makeStyles = (c: Palette) => StyleSheet.create({
     letterSpacing: 8,
   },
   button: {
+    minHeight: 52,
     backgroundColor: c.primary,
-    paddingVertical: 14,
     borderRadius: 16,
     alignItems: 'center',
+    justifyContent: 'center',
     marginTop: 8,
+    shadowColor: c.shadow,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.4,
+    shadowRadius: 3,
+    elevation: 5,
   },
   buttonDisabled: { opacity: 0.6 },
-  buttonText: { color: c.onPrimary, fontWeight: '600' },
+  buttonText: { color: c.onPrimary, fontSize: 15, lineHeight: 19, fontWeight: '900' },
   error: { color: c.danger, textAlign: 'center' },
   link: { color: c.primary, fontWeight: '600', textAlign: 'center', marginTop: 8 },
 });

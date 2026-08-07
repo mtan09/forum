@@ -1,10 +1,14 @@
+import '../global.css';
+
 import { DarkTheme, DefaultTheme, ThemeProvider } from 'expo-router/react-navigation';
 import { Stack, usePathname, useRouter } from "expo-router";
 import { StatusBar } from 'expo-status-bar';
 
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { AppErrorBoundary } from '@/components/app-error-boundary';
+import WebShell from '@/components/web-shell';
 import WebStackHeader from '@/components/web-stack-header';
+import { AUTH_CONTENT_MAX_WIDTH } from '@/constants/layout';
 
 import { usePalette } from '@/hooks/use-palette';
 
@@ -149,16 +153,35 @@ function AppNavigator() {
     () => ({
       headerTintColor: c.primary,
       contentStyle: {
-        backgroundColor: Platform.OS === 'web' ? c.surface : c.background,
+        backgroundColor: c.background,
       },
       ...(Platform.OS === 'web'
         ? {
-            header: () => <WebStackHeader />,
+            // Inside the shell the header sits at the top of the content
+            // column, so it names the screen instead of repeating the brand.
+            header: ({ options }: { options: { title?: string } }) => (
+              <WebStackHeader title={options?.title} />
+            ),
           }
         : {}),
       headerLeft,
     }),
-    [c.background, c.primary, c.surface, headerLeft]
+    [c.background, c.primary, headerLeft]
+  );
+
+  // Auth screens run a much narrower column than post/article detail, so the
+  // header has to be told about it — otherwise Back and the brand sit at the
+  // edges of an 840px band with a 500px form floating between them.
+  const authScreenOptions = useMemo(
+    () =>
+      Platform.OS === 'web'
+        ? {
+            header: () => (
+              <WebStackHeader maxWidth={AUTH_CONTENT_MAX_WIDTH} gutter={40} />
+            ),
+          }
+        : {},
+    []
   );
 
   if (loading) {
@@ -169,7 +192,7 @@ function AppNavigator() {
     );
   }
 
-  return (
+  const stack = (
         <Stack
           screenOptions={stackScreenOptions}
         >
@@ -182,6 +205,7 @@ function AppNavigator() {
             options={{
               title: 'Login',
               headerBackTitle: "Back",
+              ...authScreenOptions,
             }}
           />
           <Stack.Screen
@@ -189,6 +213,7 @@ function AppNavigator() {
             options={{
               title: 'Sign Up',
               headerBackTitle: "Back",
+              ...authScreenOptions,
             }}
           />
           <Stack.Screen
@@ -196,6 +221,7 @@ function AppNavigator() {
             options={{
               title: 'Reset Password',
               headerBackTitle: "Back",
+              ...authScreenOptions,
             }}
           />
 
@@ -214,7 +240,12 @@ function AppNavigator() {
               sheetGrabberVisible: false,
               sheetCornerRadius: 24,
               sheetLargestUndimmedDetentIndex: 'none',
-              contentStyle: { backgroundColor: c.background },
+              // Transparent on web: the composer's own scrim does the dimming,
+              // and an opaque screen background here would hide the page the
+              // modal is supposed to be floating over.
+              contentStyle: {
+                backgroundColor: Platform.OS === 'web' ? 'transparent' : c.background,
+              },
             }}
           />
           <Stack.Screen
@@ -334,4 +365,19 @@ function AppNavigator() {
           />
         </Stack>
   );
+
+  // Auth and onboarding are full-bleed by design. The opaque modals opt out
+  // too — they cover the viewport anyway, so the shell behind them is wasted
+  // work. The composer stays in, so its scrim dims the page you came from.
+  const chromeless =
+    pathname.startsWith('/auth') ||
+    pathname === '/onboarding' ||
+    pathname === '/editprofile' ||
+    pathname === '/changepassword';
+
+  if (Platform.OS === 'web' && session && !chromeless) {
+    return <WebShell>{stack}</WebShell>;
+  }
+
+  return stack;
 }

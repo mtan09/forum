@@ -6,7 +6,7 @@ import { type Palette } from '@/constants/theme';
 import { usePalette } from '@/hooks/use-palette';
 import { api } from '@/lib/api';
 import { notifySuccess, tapLight } from '@/lib/haptics';
-import * as WebBrowser from 'expo-web-browser';
+import { openExternalUrl } from '@/lib/open-external';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet } from 'react-native';
 
@@ -55,7 +55,7 @@ function FeedbackCard({ item, onDone }: { item: Feedback; onDone: (id: string) =
   const openScreenshot = async () => {
     try {
       const result = await api<{ url: string }>(`/admin/feedback/${item.id}/screenshot`);
-      await WebBrowser.openBrowserAsync(result.url);
+      await openExternalUrl(result.url);
     } catch (err: any) {
       Alert.alert('Could not open screenshot', err?.message ?? 'Please try again.');
     }

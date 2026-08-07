@@ -7,7 +7,7 @@ import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Animated, Easing, Pressable, ScrollView, StyleSheet, useWindowDimensions, View } from 'react-native';
-import * as WebBrowser from 'expo-web-browser';
+import { openExternalUrl } from '@/lib/open-external';
 
 // Marketing screenshots are the finished 6.9-inch App Store captures, resized
 // and converted to WebP (2.2MB of PNG became 375KB). They already have the
@@ -99,7 +99,7 @@ export default function WebLanding() {
   }, [scrolledPastHero, barSlide]);
 
   const openLegal = (path: string) => {
-    WebBrowser.openBrowserAsync(`${API_URL}${path}`).catch(() => {});
+    openExternalUrl(`${API_URL}${path}`).catch(() => {});
   };
 
   const ctaPair = (variant: 'hero' | 'closing') => (

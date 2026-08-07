@@ -8,7 +8,7 @@ import { tapLight } from '@/lib/haptics';
 import { api } from '@/lib/api';
 import { publicArticleUrl } from '@/lib/public-links';
 import { useState } from 'react';
-import { Pressable, StyleSheet } from 'react-native';
+import { Platform, Pressable, StyleSheet } from 'react-native';
 import { type ArticleType } from './articleComponent';
 import RepostSheet from '@/components/repost-sheet';
 
@@ -167,6 +167,9 @@ const styles = StyleSheet.create({
   container: {
     flexDirection: 'row',
     width: '100%',
+    // iOS spreads these across a ~358pt column. Let them spread across a 600px
+    // web column and the row reads as six stranded icons, so cap it.
+    maxWidth: Platform.OS === 'web' ? 400 : undefined,
   },
   reactions: {
     flexDirection: 'row',

@@ -8,7 +8,7 @@ import { useContentInteraction } from '@/context/interactionContext';
 import { usePostVote } from '@/context/postContext';
 import { api } from '@/lib/api';
 import { publicPostUrl } from '@/lib/public-links';
-import { Pressable, StyleSheet } from 'react-native';
+import { Platform, Pressable, StyleSheet } from 'react-native';
 import { useState } from 'react';
 import { type PostType, type UserType } from './postComponent';
 import RepostSheet from '@/components/repost-sheet';
@@ -159,6 +159,9 @@ const styles = StyleSheet.create({
   container: {
     flexDirection: 'row',
     width: '100%',
+    // iOS spreads these across a ~358pt column. Let them spread across a 600px
+    // web column and the row reads as six stranded icons, so cap it.
+    maxWidth: Platform.OS === 'web' ? 400 : undefined,
   },
   reactions: {
     flexDirection: 'row',

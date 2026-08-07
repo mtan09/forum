@@ -72,7 +72,7 @@ export default function PostScreen() {
         style={styles.scroll}
         contentContainerStyle={styles.scrollContent}
       >
-        <WebPageFrame maxWidth={760}>
+        <WebPageFrame>
           <Post
             post={post}
             variant="detail"
@@ -131,7 +131,9 @@ export default function PostScreen() {
 
 const makeStyles = (c: Palette) => StyleSheet.create({
   scroll: {
-    backgroundColor: Platform.OS === 'web' ? c.surface : c.background,
+    // The shell paints one background for the whole page; c.surface here showed
+    // as a second colour below the comments once the content ran short.
+    backgroundColor: c.background,
   },
   scrollContent: {
     paddingBottom: Platform.OS === 'web' ? 32 : 0,

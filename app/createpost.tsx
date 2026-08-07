@@ -86,6 +86,17 @@ export default function CreatePost() {
     };
   }, []);
 
+  // Web renders multiline as a <textarea>, which keeps a fixed height and
+  // scrolls internally no matter what scrollEnabled says. Drive the height from
+  // the content so the composer grows the way it does on iOS.
+  useEffect(() => {
+    if (Platform.OS !== 'web') return;
+    const node = inputRef.current as unknown as HTMLTextAreaElement | null;
+    if (!node?.style) return;
+    node.style.height = 'auto';
+    node.style.height = `${node.scrollHeight}px`;
+  }, [content, quotedContent, pickedImage]);
+
   // Bring a freshly attached photo into view. Picking one refocuses the input,
   // so the keyboard stays up and the preview would otherwise land off-screen.
   useEffect(() => {
@@ -471,6 +482,12 @@ const makeStyles = (c: Palette) => StyleSheet.create({
     justifyContent: Platform.OS === 'web' ? 'center' : 'flex-start',
     padding: Platform.OS === 'web' ? 24 : 0,
     backgroundColor: Platform.OS === 'web' ? c.scrim : c.background,
+    // The navigator renders inside the shell's content column, so a modal laid
+    // out in flow would be trapped there. Pin it to the viewport so the scrim
+    // dims the nav, the feed, and the rail together.
+    ...(Platform.OS === 'web'
+      ? ({ position: 'fixed', top: 0, right: 0, bottom: 0, left: 0 } as object)
+      : {}),
   },
   safeArea: {
     flex: Platform.OS === 'web' ? undefined : 1,
@@ -540,6 +557,7 @@ const makeStyles = (c: Palette) => StyleSheet.create({
   editor: {
     flexGrow: 1,
     minHeight: 260,
+    ...(Platform.OS === 'web' ? { overflow: 'hidden' as const } : {}),
     paddingTop: 12,
     paddingHorizontal: 0,
     paddingBottom: 20,

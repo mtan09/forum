@@ -60,6 +60,7 @@ export default function CreatePost() {
   const [pickerLoading, setPickerLoading] = useState(false);
   const [loading, setLoading] = useState(false);
   const [keyboardHeight, setKeyboardHeight] = useState(0);
+  const scrollRef = useRef<ScrollView>(null);
   const [err, setErr] = useState<string | null>(null);
 
   useFocusEffect(
@@ -84,6 +85,14 @@ export default function CreatePost() {
       hide.remove();
     };
   }, []);
+
+  // Bring a freshly attached photo into view. Picking one refocuses the input,
+  // so the keyboard stays up and the preview would otherwise land off-screen.
+  useEffect(() => {
+    if (!pickedImage) return;
+    const frame = requestAnimationFrame(() => scrollRef.current?.scrollToEnd({ animated: true }));
+    return () => cancelAnimationFrame(frame);
+  }, [pickedImage]);
 
   const initialQuoteKey = `${routeParams.quote_kind ?? ''}:${routeParams.quote_id ?? ''}`;
   useEffect(() => {
@@ -310,8 +319,12 @@ export default function CreatePost() {
           </View>
 
           <ScrollView
+            ref={scrollRef}
             style={styles.editorScroll}
-            contentContainerStyle={styles.editorContent}
+            // The media bar is pinned above the keyboard, so the scrollable
+            // area has to clear both — otherwise an attached photo renders
+            // underneath the keyboard with no way to scroll it into view.
+            contentContainerStyle={[styles.editorContent, { paddingBottom: 104 + keyboardHeight }]}
             keyboardDismissMode="interactive"
             keyboardShouldPersistTaps="handled"
             showsVerticalScrollIndicator={false}
@@ -391,7 +404,7 @@ export default function CreatePost() {
       </SafeAreaView>
 
       <Modal visible={quotePickerOpen} transparent animationType="fade" onRequestClose={closeQuotePicker}>
-        <Pressable style={styles.pickerBackdrop} onPress={closeQuotePicker}>
+        <Pressable style={styles.pickerBackdrop} onPress={() => { tapLight(); closeQuotePicker(); }}>
           <Pressable style={styles.pickerSheet} onPress={(event) => event.stopPropagation()}>
             <View style={styles.pickerHandle} />
             <View style={styles.pickerHeader}>
@@ -399,7 +412,7 @@ export default function CreatePost() {
                 <ThemedText style={styles.pickerTitle}>Choose a post or article to quote</ThemedText>
                 <ThemedText style={styles.pickerSubtitle}>Posts and articles you already know.</ThemedText>
               </View>
-              <Pressable accessibilityRole="button" accessibilityLabel="Close quote picker" hitSlop={8} onPress={closeQuotePicker}>
+              <Pressable accessibilityRole="button" accessibilityLabel="Close quote picker" hitSlop={8} onPress={() => { tapLight(); closeQuotePicker(); }}>
                 <IconSymbol name="xmark" size={22} color={c.text} />
               </Pressable>
             </View>

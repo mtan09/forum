@@ -12,6 +12,7 @@ import { onTabRefresh } from '@/lib/tabRefresh';
 import { useRouter } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Keyboard, Platform, Pressable, ScrollView, StyleSheet, TextInput } from 'react-native';
+import { selectTick, tapLight } from '@/lib/haptics';
 
 type SearchResults = {
   topics: SearchTopic[];
@@ -246,7 +247,7 @@ export default function SearchTab() {
                   return (
                     <Pressable
                       key={topic.title}
-                      onPress={() => chooseTopic(topic)}
+                      onPress={() => { selectTick(); chooseTopic(topic); }}
                       style={({ pressed }) => [
                         styles.topicChip,
                         index === 0 && styles.topicChipFeatured,
@@ -282,7 +283,7 @@ export default function SearchTab() {
                 return (
                   <Pressable
                     key={filter.label}
-                    onPress={() => setActiveFilter(filter.label)}
+                    onPress={() => { selectTick(); setActiveFilter(filter.label); }}
                     style={[styles.filterChip, selected && styles.filterChipSelected]}
                   >
                     <ThemedText style={[styles.filterText, selected && styles.filterTextSelected]}>{filter.label}</ThemedText>
@@ -297,13 +298,15 @@ export default function SearchTab() {
             </ThemedView>
 
             <ThemedView style={styles.resultSummary}>
-              <ThemedView>
+              {/* The spinner sits with the status line it belongs to. Pinned to
+                  the far right it read as unrelated and crowded the edge. */}
+              <ThemedView style={styles.resultEyebrowRow}>
                 <ThemedText style={styles.resultEyebrow}>
                   {loading ? 'SEARCHING FOR' : `${filteredCount} MATCHING ${activeFilter.toUpperCase()}`}
                 </ThemedText>
-                <ThemedText style={styles.resultQuery}>“{trimmedQuery}”</ThemedText>
+                {loading && <ActivityIndicator size="small" color={c.primary} />}
               </ThemedView>
-              {loading && <ActivityIndicator color={c.primary} />}
+              <ThemedText style={styles.resultQuery}>“{trimmedQuery}”</ThemedText>
             </ThemedView>
 
             {!loading && filteredCount === 0 && (
@@ -328,7 +331,7 @@ export default function SearchTab() {
                   {results.topics.map((topic, index) => (
                     <Pressable
                       key={topic.id}
-                      onPress={() => router.push(`/summary/${topic.id}`)}
+                      onPress={() => { tapLight(); router.push(`/summary/${topic.id}`); }}
                       style={({ pressed }) => [
                         styles.clusterRow,
                         index > 0 && styles.resultRowDivider,
@@ -371,7 +374,7 @@ export default function SearchTab() {
                     return (
                       <Pressable
                         key={post.id}
-                        onPress={() => router.push(`/post/${post.id}`)}
+                        onPress={() => { tapLight(); router.push(`/post/${post.id}`); }}
                         style={({ pressed }) => [styles.storyResult, { opacity: pressed ? 0.6 : 1 }]}
                       >
                         <Post post={post} />
@@ -396,7 +399,7 @@ export default function SearchTab() {
                   {results.articles.map((article) => (
                     <Pressable
                       key={article.id}
-                      onPress={() => router.push(`/article/${article.id}`)}
+                      onPress={() => { tapLight(); router.push(`/article/${article.id}`); }}
                       style={({ pressed }) => [styles.storyResult, { opacity: pressed ? 0.6 : 1 }]}
                     >
                       <Article article={article} />
@@ -468,9 +471,10 @@ const makeStyles = (c: Palette) => StyleSheet.create({
   filterCountSelected: { backgroundColor: c.onPrimaryOverlay },
   filterCountText: { color: c.muted, fontSize: 9, lineHeight: 12, fontWeight: '900' },
   filterCountTextSelected: { color: c.onPrimary },
-  resultSummary: { minHeight: 69, marginHorizontal: IS_WEB ? 28 : 16, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', borderBottomWidth: 1, borderBottomColor: c.border, backgroundColor: 'transparent' },
+  resultSummary: { marginHorizontal: IS_WEB ? 28 : 16, marginTop: 20, paddingBottom: 16, borderBottomWidth: 1, borderBottomColor: c.border, backgroundColor: 'transparent' },
+  resultEyebrowRow: { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: 'transparent' },
   resultEyebrow: { color: c.muted, fontSize: 8, lineHeight: 11, fontWeight: '900', letterSpacing: 0.8 },
-  resultQuery: { fontSize: 18, lineHeight: 23, fontWeight: '900', marginTop: 3 },
+  resultQuery: { fontSize: 18, lineHeight: 23, fontWeight: '900', marginTop: 7 },
   emptyCard: { marginHorizontal: IS_WEB ? 28 : 16, marginTop: 20, borderRadius: 20, borderWidth: 1, borderColor: c.cardBorder, backgroundColor: c.card, paddingHorizontal: 26, paddingVertical: 30, alignItems: 'center' },
   emptyMark: { width: 52, height: 52, borderRadius: 17, backgroundColor: c.accentSoftBg, alignItems: 'center', justifyContent: 'center' },
   emptyTitle: { fontSize: 17, lineHeight: 22, fontWeight: '900', marginTop: 13 },

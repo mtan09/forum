@@ -1,0 +1,16 @@
+# The SPA shell must never be cached at the edge. Cloudflare was serving a
+# stale index.html against a newly deployed bundle whose predecessor had been
+# purged, so the app fetched a missing script and mounted nothing — a blank
+# page on the custom domain while the same build rendered fine on *.pages.dev.
+#
+# Everything under /_expo/static and /assets is content-hashed, so those are
+# safe to cache forever.
+
+/*
+  Cache-Control: no-cache, must-revalidate
+
+/_expo/static/*
+  Cache-Control: public, max-age=31536000, immutable
+
+/assets/*
+  Cache-Control: public, max-age=31536000, immutable

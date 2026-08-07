@@ -8,7 +8,7 @@ import { type Palette } from '@/constants/theme';
 import { usePalette } from '@/hooks/use-palette';
 import { getPerspectiveToneForPosition } from '@/lib/perspective-colors';
 import type { RecommendationContext } from '@/lib/feed-events';
-import { tapMedium } from '@/lib/haptics';
+import { tapLight, tapMedium } from '@/lib/haptics';
 import { BlurView } from 'expo-blur';
 import { Image } from 'expo-image';
 import { useCallback, useMemo, useState, type ReactNode } from 'react';
@@ -109,7 +109,7 @@ export default function ContentLongPress({
           <Pressable
             accessibilityRole="button"
             accessibilityLabel="Close preview"
-            onPress={close}
+            onPress={() => { tapLight(); close(); }}
             style={[styles.backdrop, { paddingTop: Math.max(insets.top, 20), paddingBottom: Math.max(insets.bottom, 20) }]}
           >
             <Pressable style={styles.previewStack} onPress={(event) => event.stopPropagation()}>

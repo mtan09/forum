@@ -14,6 +14,7 @@ import { useLocalSearchParams } from 'expo-router';
 import { fetch as expoFetch } from 'expo/fetch';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Animated, Keyboard, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, useWindowDimensions } from 'react-native';
+import { selectTick, tapLight } from '@/lib/haptics';
 
 type Message = {
   id: string;
@@ -301,7 +302,7 @@ export default function AI() {
           <ThemedText numberOfLines={1} style={styles.subjectChipText}>
             {subject.kind === 'article' ? 'Article' : 'Post'} · {subject.title}
           </ThemedText>
-          <Pressable onPress={() => setSubject(null)} hitSlop={8}>
+          <Pressable onPress={() => { tapLight(); setSubject(null); }} hitSlop={8}>
             <IconSymbol name="x.circle.fill" size={17} color={c.primary} />
           </Pressable>
         </ThemedView>
@@ -343,7 +344,7 @@ export default function AI() {
           <Pressable
             key={lean}
             disabled={!interactive}
-            onPress={() => setActiveLean(lean)}
+            onPress={() => { selectTick(); setActiveLean(lean); }}
             style={[
               styles.lensTab,
               interactive && selected && { backgroundColor: c.background, borderColor: c.cardBorder },
@@ -377,7 +378,7 @@ export default function AI() {
                 <ThemedView style={styles.sectionHeadingRow}>
                   <ThemedText style={styles.sectionHeading}>Questions to explore</ThemedText>
                   <Pressable
-                    onPress={() => setSuggestedPrompts(shuffledPrompts())}
+                    onPress={() => { tapLight(); setSuggestedPrompts(shuffledPrompts()); }}
                     hitSlop={8}
                     accessibilityRole="button"
                     accessibilityLabel="Show different questions"
@@ -388,7 +389,7 @@ export default function AI() {
                 {suggestedPrompts.map((prompt) => (
                   <Pressable
                     key={prompt}
-                    onPress={() => setInputText(prompt)}
+                    onPress={() => { tapLight(); setInputText(prompt); }}
                     style={({ pressed }) => [styles.suggestion, pressed && styles.suggestionPressed]}
                   >
                     <ThemedText style={styles.suggestionText}>{prompt}</ThemedText>
@@ -409,7 +410,7 @@ export default function AI() {
                 </ThemedView>
               </ThemedView>
               <Pressable
-                onPress={handleEndChat}
+                onPress={() => { tapLight(); handleEndChat(); }}
                 hitSlop={8}
                 style={styles.closeChatButton}
                 accessibilityRole="button"

@@ -11,7 +11,7 @@ import { type Palette } from '@/constants/theme';
 import { useAuth } from '@/context/authContext';
 import { usePalette } from '@/hooks/use-palette';
 import { api } from '@/lib/api';
-import { tapMedium } from '@/lib/haptics';
+import { tapLight, tapMedium } from '@/lib/haptics';
 import * as WebBrowser from 'expo-web-browser';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -175,7 +175,7 @@ function MessageRow({
                   <ThemedText
                     key={`${message.id}-url-${index}`}
                     accessibilityRole="link"
-                    onPress={() => openMessageUrl(part)}
+                    onPress={() => { tapLight(); openMessageUrl(part); }}
                     style={[mine ? styles.mineText : styles.theirsText, styles.messageLink]}
                   >
                     {part}
@@ -339,7 +339,7 @@ export default function DmThread() {
     <Pressable
       accessibilityRole="button"
       accessibilityLabel={`Open ${otherName} profile`}
-      onPress={openProfile}
+      onPress={() => { tapLight(); openProfile(); }}
       style={({ pressed }) => [styles.headerIdentity, pressed && styles.headerIdentityPressed]}
     >
       {otherId ? (
@@ -370,7 +370,7 @@ export default function DmThread() {
               accessibilityRole="button"
               accessibilityLabel="Back"
               hitSlop={12}
-              onPress={() => router.back()}
+              onPress={() => { tapLight(); router.back(); }}
               style={({ pressed }) => [styles.headerBack, pressed && styles.headerIdentityPressed]}
             >
               <IconSymbol name="chevron.left" size={24} color={c.primary} />
@@ -383,7 +383,7 @@ export default function DmThread() {
           <Pressable
             accessibilityRole="button"
             accessibilityLabel={`Open ${otherName} profile`}
-            onPress={openProfile}
+            onPress={() => { tapLight(); openProfile(); }}
             style={({ pressed }) => [styles.webIdentity, pressed && styles.headerIdentityPressed]}
           >
             <AvatarVisual

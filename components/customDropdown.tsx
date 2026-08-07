@@ -6,6 +6,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ThemedText } from './themed-text';
 import { ThemedView } from './themed-view';
 import { IconSymbol } from './ui/icon-symbol';
+import { selectTick, tapLight } from '@/lib/haptics';
 
 interface CustomDropdownProps {
   options: string[];
@@ -33,7 +34,7 @@ export function CustomDropdown({
     <ThemedView style={[styles.container, containerStyle]}>
       <Pressable 
         style={styles.trigger}
-        onPress={() => setIsOpen(!isOpen)}
+        onPress={() => { tapLight(); setIsOpen(!isOpen); }}
         accessibilityRole="button"
         accessibilityState={{ expanded: isOpen }}
       >
@@ -72,6 +73,8 @@ export function CustomDropdown({
                   pressed && styles.pressedOption,
                 ]}
                 onPress={() => {
+                  // Picking among options is a selection, not a plain tap.
+                  selectTick();
                   onValueChange(option);
                   setIsOpen(false);
                 }}

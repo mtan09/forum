@@ -14,6 +14,7 @@ import {
   type ViewStyle,
 } from 'react-native';
 import { ThemedView } from './themed-view';
+import { tapLight } from '@/lib/haptics';
 
 type IconName = ComponentProps<typeof IconSymbol>['name'];
 
@@ -89,7 +90,7 @@ const AppTextInput = forwardRef<TextInput, AppTextInputProps>(function AppTextIn
           accessibilityRole="button"
           accessibilityLabel={actionLabel}
           disabled={actionDisabled}
-          onPress={onAction}
+          onPress={() => { tapLight(); onAction(); }}
           style={[
             styles.action,
             { backgroundColor: actionDisabled ? c.surfaceMuted : c.primary },

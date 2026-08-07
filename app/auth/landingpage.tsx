@@ -5,6 +5,7 @@ import { usePalette } from '@/hooks/use-palette';
 import { useRouter } from 'expo-router';
 import { useMemo } from 'react';
 import { Dimensions, Image, Pressable, StyleSheet } from 'react-native';
+import { tapLight } from '@/lib/haptics';
 
 const screenWidth = Dimensions.get('window').width;
 
@@ -22,7 +23,7 @@ export default function Landing() {
 
       <ThemedView style={styles.buttonContainer}>
         <Pressable
-          onPress={() => {
+          onPress={() => { tapLight();
             router.push(`./createaccount`);
           }}
           style={({ pressed }) => [
@@ -35,7 +36,7 @@ export default function Landing() {
           </ThemedText>
         </Pressable>
         <Pressable
-          onPress={() =>{
+          onPress={() =>{ tapLight();
             router.push(`./login`);
           }}
           style={{

@@ -2,7 +2,7 @@ import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { type Palette } from '@/constants/theme';
 import { usePalette } from '@/hooks/use-palette';
-import { tapMedium } from '@/lib/haptics';
+import { tapLight, tapMedium } from '@/lib/haptics';
 import { useMemo, useRef } from 'react';
 import { Alert, Modal, Platform, Pressable, StyleSheet, View } from 'react-native';
 import { captureRef } from 'react-native-view-shot';
@@ -39,7 +39,7 @@ export default function ShareCardModal({ visible, onClose, children, hint }: Pro
 
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
-      <Pressable style={styles.backdrop} onPress={onClose}>
+      <Pressable style={styles.backdrop} onPress={() => onClose()}>
         <Pressable style={styles.sheet} onPress={(e) => e.stopPropagation()}>
           <ThemedView style={styles.handle} />
 
@@ -53,7 +53,7 @@ export default function ShareCardModal({ visible, onClose, children, hint }: Pro
           <Pressable style={styles.shareBtn} onPress={share}>
             <ThemedText style={styles.shareText}>Share</ThemedText>
           </Pressable>
-          <Pressable style={styles.cancelBtn} onPress={onClose}>
+          <Pressable style={styles.cancelBtn} onPress={() => { tapLight(); onClose(); }}>
             <ThemedText style={styles.cancelText}>Close</ThemedText>
           </Pressable>
         </Pressable>

@@ -1,5 +1,6 @@
 import { usePalette } from '@/hooks/use-palette';
 import React, { useMemo, useRef, useState } from 'react';
+import { tapLight } from '@/lib/haptics';
 import {
   Dimensions,
   FlatList,
@@ -146,7 +147,7 @@ export default function Carousel<T>({
           <Pressable
             accessibilityRole="button"
             accessibilityLabel="Previous topic"
-            onPress={() => moveBy(-1)}
+            onPress={() => { tapLight(); moveBy(-1); }}
             style={({ pressed }) => [styles.control, styles.controlPrevious, pressed && styles.controlPressed]}
           >
             <Text style={styles.controlText}>‹</Text>
@@ -154,7 +155,7 @@ export default function Carousel<T>({
           <Pressable
             accessibilityRole="button"
             accessibilityLabel="Next topic"
-            onPress={() => moveBy(1)}
+            onPress={() => { tapLight(); moveBy(1); }}
             style={({ pressed }) => [styles.control, styles.controlNext, pressed && styles.controlPressed]}
           >
             <Text style={styles.controlText}>›</Text>

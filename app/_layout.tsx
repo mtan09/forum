@@ -25,6 +25,7 @@ import { useCallback, useEffect, useMemo, useRef } from 'react';
 import { attachNotificationRouter } from '@/lib/notifications';
 import { initSentry } from '@/lib/sentry';
 import { rememberProductRoute } from '@/lib/route-context';
+import { tapLight } from '@/lib/haptics';
 
 initSentry();
 
@@ -128,7 +129,7 @@ function AppNavigator() {
     ({ canGoBack }: { canGoBack?: boolean }) =>
       canGoBack ? (
         <Pressable
-          onPress={() => router.back()}
+          onPress={() => { tapLight(); router.back(); }}
           hitSlop={12}
           style={({ pressed }) => ({
             flexDirection: 'row',

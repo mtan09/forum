@@ -7,6 +7,7 @@ import { api } from '@/lib/api';
 import { useRouter } from 'expo-router';
 import { useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { tapLight } from '@/lib/haptics';
 
 type Debate = {
   id: string;
@@ -71,7 +72,7 @@ export default function WebFloorRail({ compact = false }: { compact?: boolean })
               return (
                 <Pressable
                   key={debate.id}
-                  onPress={() => router.push(`/debate/${debate.id}`)}
+                  onPress={() => { tapLight(); router.push(`/debate/${debate.id}`); }}
                   style={({ pressed }) => [styles.room, pressed && styles.pressed]}
                   accessibilityRole="link"
                 >
@@ -96,7 +97,7 @@ export default function WebFloorRail({ compact = false }: { compact?: boolean })
         )}
 
         <Pressable
-          onPress={() => router.push('/debate')}
+          onPress={() => { tapLight(); router.push('/debate'); }}
           style={({ pressed }) => [styles.allRooms, pressed && styles.pressed]}
         >
           <ThemedText style={styles.allRoomsText}>Open The Floor</ThemedText>

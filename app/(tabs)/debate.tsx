@@ -9,6 +9,7 @@ import { onTabRefresh } from '@/lib/tabRefresh';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Platform, Pressable, ScrollView, StyleSheet, useWindowDimensions } from 'react-native';
+import { tapLight } from '@/lib/haptics';
 
 // The Floor: the app's live rooms. One debate per daily pick — the
 // biggest story and the most divided one — each with a shared thread.
@@ -129,7 +130,7 @@ export default function DebateTab() {
           return (
             <Pressable
               key={debate.id}
-              onPress={() => router.push(`/debate/${debate.id}`)}
+              onPress={() => { tapLight(); router.push(`/debate/${debate.id}`); }}
               style={({ pressed }) => [styles.roomPressable, compactWeb && styles.roomPressableCompact, { opacity: pressed ? 0.7 : 1 }]}
             >
               <ThemedView style={styles.card}>
@@ -167,7 +168,7 @@ export default function DebateTab() {
           {recap.map((room) => (
             <Pressable
               key={room.id}
-              onPress={() => router.push(`/debate/${room.id}`)}
+              onPress={() => { tapLight(); router.push(`/debate/${room.id}`); }}
               style={({ pressed }) => [{ opacity: pressed ? 0.7 : 1 }]}
             >
               <RecapCard room={room} />

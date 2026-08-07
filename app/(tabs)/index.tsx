@@ -60,7 +60,7 @@ const FeedRow = memo(function FeedRow({ item }: { item: FeedItem }) {
   if (item.kind === 'post') {
     return (
       <Pressable
-        onPress={() => {
+        onPress={() => { tapLight();
           queueFeedEvent({
             ...item.recommendationContext,
             itemType: 'post',
@@ -77,7 +77,7 @@ const FeedRow = memo(function FeedRow({ item }: { item: FeedItem }) {
   }
   return (
     <Pressable
-      onPress={() => {
+      onPress={() => { tapLight();
         queueFeedEvent({
           ...item.recommendationContext,
           itemType: 'article',
@@ -496,7 +496,7 @@ export default function Feed() {
                         : 'The Random feed keeps every perspective in the mix.'}
                   </ThemedText>
                   {activeTab !== 'Random' && (
-                    <Pressable onPress={() => setActiveTab('Random')} style={styles.emptyFeedButton}>
+                    <Pressable onPress={() => { selectTick(); setActiveTab('Random'); }} style={styles.emptyFeedButton}>
                       <ThemedText style={styles.emptyFeedButtonText}>Open Random</ThemedText>
                     </Pressable>
                   )}
@@ -520,7 +520,7 @@ export default function Feed() {
               onIndexChange={setHotIndex}
               renderItem={({ item }) => (
                 <Pressable
-                  onPress={() => router.push(`/summary/${item.id}`)}
+                  onPress={() => { tapLight(); router.push(`/summary/${item.id}`); }}
                   style={({ pressed }) => [
                     styles.hotCard,
                     isWeb && styles.hotCardWeb,

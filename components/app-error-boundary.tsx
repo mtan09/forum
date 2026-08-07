@@ -1,6 +1,7 @@
 import { captureAppException } from '@/lib/sentry';
 import React from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { tapLight } from '@/lib/haptics';
 
 type State = { error: Error | null };
 
@@ -25,7 +26,7 @@ export class AppErrorBoundary extends React.Component<React.PropsWithChildren, S
           The error was recorded with the app version and build number. You can retry without signing out.
         </Text>
         <Pressable
-          onPress={() => this.setState({ error: null })}
+          onPress={() => { tapLight(); this.setState({ error: null }); }}
           style={({ pressed }) => [styles.button, pressed && { opacity: 0.72 }]}
         >
           <Text style={styles.buttonText}>Try again</Text>

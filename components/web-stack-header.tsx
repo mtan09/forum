@@ -6,6 +6,7 @@ import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
 import { useMemo } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
+import { tapLight } from '@/lib/haptics';
 
 /**
  * Web detail routes live outside the tab shell. Keep their chrome quiet and
@@ -26,7 +27,7 @@ export default function WebStackHeader() {
     <View style={styles.bar}>
       <View style={styles.inner}>
         <Pressable
-          onPress={goBack}
+          onPress={() => { tapLight(); goBack(); }}
           accessibilityRole="button"
           accessibilityLabel="Go back"
           style={({ pressed }) => [styles.back, pressed && styles.pressed]}
@@ -36,7 +37,7 @@ export default function WebStackHeader() {
         </Pressable>
 
         <Pressable
-          onPress={() => router.replace('/')}
+          onPress={() => { tapLight(); router.replace('/'); }}
           accessibilityRole="link"
           accessibilityLabel="forum home"
           style={({ pressed }) => [styles.brand, pressed && styles.pressed]}

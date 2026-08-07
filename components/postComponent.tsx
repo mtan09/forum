@@ -21,6 +21,7 @@ import ScorerReceipts from './scorerReceipts';
 import Spectrum from './spectrum';
 import QuotedContentCard from './quoted-content-card';
 import type { QuotedContent, RepostAttribution } from '@/types/quoted-content';
+import { tapLight } from '@/lib/haptics';
 
 export type PostType = {
   id: string;
@@ -136,7 +137,7 @@ function Post({ post, variant = 'feed', recommendationContext, onDeleted, repost
             <Pressable
               accessibilityRole="button"
               accessibilityLabel={`Open ${repostAttribution.username}'s profile`}
-              onPress={() => router.push(`/user/${repostAttribution.userId}`)}
+              onPress={() => { tapLight(); router.push(`/user/${repostAttribution.userId}`); }}
               style={({ pressed }) => [styles.repostAttribution, pressed && { opacity: 0.6 }]}
             >
               <IconSymbol name="arrow.2.squarepath" size={14} color={c.muted} />
@@ -224,7 +225,7 @@ function Post({ post, variant = 'feed', recommendationContext, onDeleted, repost
         {/* Spectrum Bar — tap to see the scorer's receipts for this placement */}
         {typeof post.position === 'number' && (
           <Pressable
-            onPress={() => setReceiptsOpen(true)}
+            onPress={() => { tapLight(); setReceiptsOpen(true); }}
             style={({ pressed }) => ({ opacity: pressed ? 0.6 : 1 })}
             accessibilityRole="button"
             accessibilityLabel="Why this placement? Show scoring receipts"

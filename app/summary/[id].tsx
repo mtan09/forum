@@ -16,6 +16,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Platform, Pressable, ScrollView, StyleSheet, useWindowDimensions } from 'react-native';
+import { tapLight } from '@/lib/haptics';
 
 const MAX_IMAGES = 6;
 const MAX_ARTICLES = 12;
@@ -161,7 +162,7 @@ export default function SummaryScreen() {
         <IconSymbol name="newspaper.fill" size={30} color={c.primary} />
         <ThemedText style={styles.unavailableTitle}>Story updated</ThemedText>
         <ThemedText style={styles.unavailableText}>{loadError}</ThemedText>
-        <Pressable onPress={() => router.replace('/(tabs)/search')} style={styles.unavailableButton}>
+        <Pressable onPress={() => { tapLight(); router.replace('/(tabs)/search'); }} style={styles.unavailableButton}>
           <ThemedText style={styles.unavailableButtonText}>Open Discover</ThemedText>
         </Pressable>
       </ThemedView>
@@ -176,7 +177,7 @@ export default function SummaryScreen() {
           <Pressable
             accessibilityRole="link"
             accessibilityLabel="Back"
-            onPress={() => {
+            onPress={() => { tapLight();
               if (router.canGoBack()) router.back();
               else router.replace('/');
             }}
@@ -257,7 +258,7 @@ export default function SummaryScreen() {
                       ? `Open ${p.source} article: ${p.coverage}`
                       : undefined}
                     disabled={!perspectiveArticle}
-                    onPress={() => {
+                    onPress={() => { tapLight();
                       if (perspectiveArticle) router.push(`/article/${perspectiveArticle.id}`);
                     }}
                     style={({ pressed }) => [
@@ -343,7 +344,7 @@ export default function SummaryScreen() {
                   <Pressable
                     accessibilityRole="button"
                     accessibilityLabel="Previous coverage"
-                    onPress={() => {
+                    onPress={() => { tapLight();
                       const next = Math.max(0, coverageOffsetRef.current - articleCardWidth - 12);
                       coverageOffsetRef.current = next;
                       coverageRef.current?.scrollTo({ x: next, animated: true });
@@ -355,7 +356,7 @@ export default function SummaryScreen() {
                   <Pressable
                     accessibilityRole="button"
                     accessibilityLabel="Next coverage"
-                    onPress={() => {
+                    onPress={() => { tapLight();
                       const next = coverageOffsetRef.current + articleCardWidth + 12;
                       coverageOffsetRef.current = next;
                       coverageRef.current?.scrollTo({ x: next, animated: true });
@@ -405,7 +406,7 @@ export default function SummaryScreen() {
                   }}
                 >
                 <Pressable
-                  onPress={() => router.push(`/article/${item.id}`)}
+                  onPress={() => { tapLight(); router.push(`/article/${item.id}`); }}
                   style={({ pressed }) => ({ opacity: pressed ? 0.7 : 1.0 })}
                 >
                   <ThemedView style={[styles.articleCard, { width: articleCardWidth }]}>

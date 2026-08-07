@@ -138,7 +138,7 @@ export default function FeedbackScreen() {
       {screenshotUri ? (
         <ThemedView style={styles.screenshotCard}>
           <Image source={{ uri: screenshotUri }} style={styles.screenshot} />
-          <Pressable onPress={() => setScreenshotUri(null)} style={styles.removeButton}>
+          <Pressable onPress={() => { tapLight(); setScreenshotUri(null); }} style={styles.removeButton}>
             <IconSymbol name="xmark" size={15} color={c.onPrimary} />
           </Pressable>
         </ThemedView>

@@ -12,6 +12,7 @@ import type { RepostAttribution } from '@/types/quoted-content';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { memo, useCallback, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, FlatList, type ListRenderItemInfo, Platform, Pressable, StyleSheet } from 'react-native';
+import { tapLight } from '@/lib/haptics';
 
 // The feed carries posts the followed accounts wrote plus posts and articles
 // they reposted, so rows are mixed and keyed by kind as well as id.
@@ -32,7 +33,7 @@ const FollowingPostRow = memo(function FollowingPostRow({
   const router = useRouter();
   return (
     <Pressable
-      onPress={() => router.push(`/post/${post.id}`)}
+      onPress={() => { tapLight(); router.push(`/post/${post.id}`); }}
       style={({ pressed }) => ({ opacity: pressed ? 0.65 : 1 })}
     >
       <Post post={post} repostAttribution={repostAttribution} />
@@ -50,7 +51,7 @@ const FollowingArticleRow = memo(function FollowingArticleRow({
   const router = useRouter();
   return (
     <Pressable
-      onPress={() => router.push(`/article/${article.id}`)}
+      onPress={() => { tapLight(); router.push(`/article/${article.id}`); }}
       style={({ pressed }) => ({ opacity: pressed ? 0.65 : 1 })}
     >
       <Article article={article} repostAttribution={repostAttribution} />

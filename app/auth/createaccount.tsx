@@ -4,7 +4,7 @@ import { type Palette } from '@/constants/theme';
 import { useAuth } from '@/context/authContext';
 import { usePalette } from '@/hooks/use-palette';
 import { API_URL } from '@/lib/api';
-import { tapMedium } from '@/lib/haptics';
+import { tapLight, tapMedium } from '@/lib/haptics';
 import * as WebBrowser from 'expo-web-browser';
 import { useRouter } from 'expo-router';
 import React, { useMemo, useState } from 'react';
@@ -113,13 +113,13 @@ export default function CreateAccount() {
         </Text>
         <TouchableOpacity
           disabled={loading}
-          onPress={() => WebBrowser.openBrowserAsync(`${API_URL}/legal/privacy`)}
+          onPress={() => { tapLight(); WebBrowser.openBrowserAsync(`${API_URL}/legal/privacy`); }}
         >
           <Text style={styles.privacyLink}>Read the Privacy Policy</Text>
         </TouchableOpacity>
         <TouchableOpacity
           disabled={loading}
-          onPress={() => setAIConsent(true)}
+          onPress={() => { tapLight(); setAIConsent(true); }}
           accessibilityRole="radio"
           accessibilityState={{ checked: aiConsent === true }}
           style={[styles.consentOption, aiConsent === true && styles.consentOptionSelected]}
@@ -134,7 +134,7 @@ export default function CreateAccount() {
         </TouchableOpacity>
         <TouchableOpacity
           disabled={loading}
-          onPress={() => setAIConsent(false)}
+          onPress={() => { tapLight(); setAIConsent(false); }}
           accessibilityRole="radio"
           accessibilityState={{ checked: aiConsent === false }}
           style={[styles.consentOption, aiConsent === false && styles.consentOptionSelected]}
@@ -154,7 +154,7 @@ export default function CreateAccount() {
       <View style={styles.termsRow}>
         <TouchableOpacity
           disabled={loading}
-          onPress={() => setAcceptedTerms((current) => !current)}
+          onPress={() => { tapLight(); setAcceptedTerms((current) => !current); }}
           accessibilityRole="checkbox"
           accessibilityState={{ checked: acceptedTerms }}
           accessibilityLabel="I agree to the Terms and Privacy Policy"
@@ -166,14 +166,14 @@ export default function CreateAccount() {
           I agree to the{' '}
           <Text
             style={styles.termsLink}
-            onPress={() => WebBrowser.openBrowserAsync(`${API_URL}/legal/terms`)}
+            onPress={() => { tapLight(); WebBrowser.openBrowserAsync(`${API_URL}/legal/terms`); }}
           >
             Terms
           </Text>{' '}
           and{' '}
           <Text
             style={styles.termsLink}
-            onPress={() => WebBrowser.openBrowserAsync(`${API_URL}/legal/privacy`)}
+            onPress={() => { tapLight(); WebBrowser.openBrowserAsync(`${API_URL}/legal/privacy`); }}
           >
             Privacy Policy
           </Text>
@@ -192,7 +192,7 @@ export default function CreateAccount() {
       <View style={styles.footer}>
         <Text style={styles.footerText}>Already have an account?</Text>
         <TouchableOpacity
-          onPress={() => {
+          onPress={() => { tapLight();
             router.push(`./login`);
           }}
         >

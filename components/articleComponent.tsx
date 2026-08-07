@@ -19,6 +19,7 @@ import ContentLongPress from './content-long-press';
 import ContentActions from './contentActions';
 import ScorerReceipts from './scorerReceipts';
 import type { RepostAttribution } from '@/types/quoted-content';
+import { tapLight } from '@/lib/haptics';
 
 export type ArticleType = {
   id: string;
@@ -141,7 +142,7 @@ function Article({ article, variant = 'feed', recommendationContext, repostAttri
             <Pressable
               accessibilityRole="button"
               accessibilityLabel={`Open ${repostAttribution.username}'s profile`}
-              onPress={() => router.push(`/user/${repostAttribution.userId}`)}
+              onPress={() => { tapLight(); router.push(`/user/${repostAttribution.userId}`); }}
               style={({ pressed }) => [styles.repostAttribution, pressed && { opacity: 0.6 }]}
             >
               <IconSymbol name="arrow.2.squarepath" size={14} color={c.muted} />
@@ -153,7 +154,7 @@ function Article({ article, variant = 'feed', recommendationContext, repostAttri
           <ThemedView style={styles.header}>
             {/* Outlet mark opens the source's detail page. */}
             <Pressable
-              onPress={() => router.push(`/source/${encodeURIComponent(article.source)}`)}
+              onPress={() => { tapLight(); router.push(`/source/${encodeURIComponent(article.source)}`); }}
               style={({ pressed }) => ({ opacity: pressed ? 0.6 : 1.0 })}
             >
               {logo && !logoFailed ? (
@@ -183,7 +184,7 @@ function Article({ article, variant = 'feed', recommendationContext, repostAttri
                 </ThemedText>
                 {leanTag && (
                   <Pressable
-                    onPress={() => receiptPosition != null && setReceiptsOpen(true)}
+                    onPress={() => { tapLight(); receiptPosition != null && setReceiptsOpen(true); }}
                     style={({ pressed }) => ({ opacity: pressed ? 0.6 : 1 })}
                   >
                     <PerspectiveTag label={leanTag.label} />

@@ -68,7 +68,7 @@ export default function RepostSheet({
 
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
-      <Pressable style={styles.backdrop} onPress={onClose}>
+      <Pressable style={styles.backdrop} onPress={() => onClose()}>
         <Pressable style={styles.sheet} onPress={(event) => event.stopPropagation()}>
           <View style={styles.handle} />
           <Pressable style={({ pressed }) => [styles.action, pressed && styles.pressed]} onPress={toggleRepost}>
@@ -89,7 +89,7 @@ export default function RepostSheet({
               <ThemedText style={styles.subtitle}>Add your own perspective before sharing.</ThemedText>
             </View>
           </Pressable>
-          <Pressable style={({ pressed }) => [styles.cancel, pressed && styles.pressed]} onPress={onClose}>
+          <Pressable style={({ pressed }) => [styles.cancel, pressed && styles.pressed]} onPress={() => { tapLight(); onClose(); }}>
             <ThemedText style={styles.cancelText}>Cancel</ThemedText>
           </Pressable>
         </Pressable>

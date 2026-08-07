@@ -140,7 +140,7 @@ export default function CommentList({
 					{!loading && hasMore && (
 						<Pressable
 							accessibilityRole="button"
-							onPress={loadMore}
+							onPress={() => { tapLight(); loadMore(); }}
 							style={styles.button}
 						>
 							<ThemedText type="defaultSemiBold" style={styles.buttonText}>Load more</ThemedText>
@@ -344,7 +344,7 @@ function CommentItem({
 							<IconSymbol name={isDownvoted ? 'arrowshape.down.fill' : 'arrowshape.down'} size={16} color={isDownvoted ? c.voteDown : c.textMuted} />
 							<ThemedText style={[styles.voteCount, isDownvoted && { color: c.voteDown }]}>{votes.downvotes ?? 0}</ThemedText>
 						</Pressable>
-						<Pressable onPress={() => setReplyOpen((open) => !open)} style={styles.actionButton} hitSlop={7}>
+						<Pressable onPress={() => { tapLight(); setReplyOpen((open) => !open); }} style={styles.actionButton} hitSlop={7}>
 							<IconSymbol name="bubble" size={15} color={c.muted} />
 							<ThemedText style={styles.replyLabel}>Reply</ThemedText>
 						</Pressable>
@@ -370,7 +370,7 @@ function CommentItem({
 						<View style={styles.repliesControl}>
 							<Pressable
 								style={styles.repliesButton}
-								onPress={() => setShowReplies((shown) => !shown)}
+								onPress={() => { tapLight(); setShowReplies((shown) => !shown); }}
 								hitSlop={6}
 							>
 								<ThemedText style={styles.repliesToggle}>

@@ -74,7 +74,7 @@ function FeedbackCard({ item, onDone }: { item: Feedback; onDone: (id: string) =
           .join(' · ')}
       </ThemedText>
       {item.screenshot_key ? (
-        <Pressable onPress={openScreenshot} style={styles.screenshotButton}>
+        <Pressable onPress={() => { tapLight(); openScreenshot(); }} style={styles.screenshotButton}>
           <ThemedText style={styles.screenshotText}>Open private screenshot</ThemedText>
         </Pressable>
       ) : null}

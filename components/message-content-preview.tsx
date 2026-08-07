@@ -12,6 +12,7 @@ import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
 import { useEffect, useMemo, useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
+import { tapLight } from '@/lib/haptics';
 
 export type SharedPostPreview = {
   kind: 'post';
@@ -86,7 +87,7 @@ export default function MessageContentPreview({ shared }: Props) {
       <Pressable
         accessibilityRole="link"
         accessibilityLabel={`Open post by ${shared.author_name}`}
-        onPress={open}
+        onPress={() => { tapLight(); open(); }}
         style={({ pressed }) => [styles.card, pressed && styles.pressed]}
       >
         <View style={styles.postHeader}>
@@ -147,7 +148,7 @@ export default function MessageContentPreview({ shared }: Props) {
     <Pressable
       accessibilityRole="link"
       accessibilityLabel={`Open article from ${shared.source || 'publisher'}`}
-      onPress={open}
+      onPress={() => { tapLight(); open(); }}
       style={({ pressed }) => [styles.card, pressed && styles.pressed]}
     >
       {!!shared.media_url && !mediaFailed ? (

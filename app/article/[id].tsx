@@ -10,7 +10,7 @@ import { useInteractionController } from '@/context/interactionContext';
 import { usePalette } from '@/hooks/use-palette';
 import { api } from '@/lib/api';
 import { queueFeedEvent, type FeedMode } from '@/lib/feed-events';
-import { tapMedium } from '@/lib/haptics';
+import { tapLight, tapMedium } from '@/lib/haptics';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import * as WebBrowser from 'expo-web-browser';
 import { useEffect, useMemo, useState } from 'react';
@@ -118,8 +118,7 @@ export default function ArticleScreen() {
           {/* Publisher-policy eligibility is enforced again by the API. */}
           {article.ai_context_allowed && (
             <Pressable
-              onPress={() =>
-                router.push({
+              onPress={() => { tapLight(); router.push({
                   pathname: '/(tabs)/ai',
                   params: {
                     subjectKind: 'article',
@@ -127,8 +126,7 @@ export default function ArticleScreen() {
                     subjectTitle: article.title?.slice(0, 80) ?? 'Article',
                     subjectTs: String(Date.now()),
                   },
-                })
-              }
+                }); }}
               style={({ pressed }) => [styles.aiButton, { opacity: pressed ? 0.7 : 1 }]}
             >
               <IconSymbol name="sparkles" size={18} color={c.onPrimary} />
@@ -137,7 +135,7 @@ export default function ArticleScreen() {
           )}
 
           <Pressable
-            onPress={async () => {
+            onPress={async () => { tapLight();
               const sessionId = Array.isArray(feed_session) ? feed_session[0] : feed_session;
               const algorithmVersion = Array.isArray(feed_algorithm) ? feed_algorithm[0] : feed_algorithm;
               const mode = Array.isArray(feed_mode) ? feed_mode[0] : feed_mode;

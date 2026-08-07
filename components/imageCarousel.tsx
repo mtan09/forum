@@ -8,6 +8,7 @@ import { ThemedText } from './themed-text';
 import { ThemedView } from './themed-view';
 import { IconSymbol } from './ui/icon-symbol';
 import ContentLongPress from './content-long-press';
+import { tapLight } from '@/lib/haptics';
 
 type ImageCarouselProps = {
   images: CarouselImage[];
@@ -111,7 +112,7 @@ export default function ImageCarousel({ images: allImages, height = 300 }: Image
           <Pressable
             accessibilityRole="link"
             accessibilityLabel={`Read the original reporting from ${item.source}`}
-            onPress={async () => {
+            onPress={async () => { tapLight();
               try {
                 await WebBrowser.openBrowserAsync(item.articleUrl);
               } catch {}
@@ -160,7 +161,7 @@ export default function ImageCarousel({ images: allImages, height = 300 }: Image
               <Pressable
                 accessibilityRole="button"
                 accessibilityLabel="Previous image"
-                onPress={() => moveBy(-1)}
+                onPress={() => { tapLight(); moveBy(-1); }}
                 style={({ pressed }) => [styles.control, styles.previous, pressed && styles.pressed]}
               >
                 <IconSymbol name="chevron.left" size={20} color={c.onImage} />
@@ -168,7 +169,7 @@ export default function ImageCarousel({ images: allImages, height = 300 }: Image
               <Pressable
                 accessibilityRole="button"
                 accessibilityLabel="Next image"
-                onPress={() => moveBy(1)}
+                onPress={() => { tapLight(); moveBy(1); }}
                 style={({ pressed }) => [styles.control, styles.next, pressed && styles.pressed]}
               >
                 <IconSymbol name="chevron.right" size={20} color={c.onImage} />

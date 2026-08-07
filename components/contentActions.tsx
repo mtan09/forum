@@ -8,6 +8,7 @@ import { api } from '@/lib/api';
 import type { RecommendationContext } from '@/lib/feed-events';
 import { useMemo, useState } from 'react';
 import { Alert, Modal, Platform, Pressable, StyleSheet, View } from 'react-native';
+import { notifyWarning, tapLight } from '@/lib/haptics';
 
 // A small "•••" overflow menu for user-generated content. Report works on
 // any target; Block appears only when an author is known and it isn't the
@@ -172,7 +173,7 @@ export default function ContentActions({
       {canHideRecommendation && (
         <Pressable
           style={({ pressed }) => [styles.action, pressed && styles.actionPressed]}
-          onPress={markNotInterested}
+          onPress={() => { tapLight(); markNotInterested(); }}
         >
           <IconSymbol name="eye.slash" size={20} color={c.text} />
           <ThemedText style={styles.actionText}>Not interested</ThemedText>
@@ -180,7 +181,7 @@ export default function ContentActions({
       )}
       <Pressable
         style={({ pressed }) => [styles.action, pressed && styles.actionPressed]}
-        onPress={() => { setMenuOpen(false); setReasonOpen(true); }}
+        onPress={() => { notifyWarning(); setMenuOpen(false); setReasonOpen(true); }}
       >
         <IconSymbol name="flag" size={20} color={c.red} />
         <ThemedText style={styles.actionText}>Report</ThemedText>
@@ -188,7 +189,7 @@ export default function ContentActions({
       {canBlock && (
         <Pressable
           style={({ pressed }) => [styles.action, pressed && styles.actionPressed]}
-          onPress={confirmBlock}
+          onPress={() => { notifyWarning(); confirmBlock(); }}
         >
           <IconSymbol name="hand.raised" size={20} color={c.red} />
           <ThemedText style={styles.actionText}>Block {authorName ?? 'user'}</ThemedText>
@@ -198,7 +199,7 @@ export default function ContentActions({
         <Pressable
           disabled={deleting}
           style={({ pressed }) => [styles.action, pressed && styles.actionPressed]}
-          onPress={confirmDelete}
+          onPress={() => { notifyWarning(); confirmDelete(); }}
         >
           <IconSymbol name="trash" size={20} color={c.danger} />
           <ThemedText style={[styles.actionText, { color: c.danger }]}>Delete</ThemedText>
@@ -213,7 +214,7 @@ export default function ContentActions({
         <View style={styles.inlinePanel}>{actionRows}</View>
       ) : (
         <Pressable
-          onPress={() => setMenuOpen(true)}
+          onPress={() => { tapLight(); setMenuOpen(true); }}
           hitSlop={10}
           accessibilityRole="button"
           accessibilityLabel="More options"
@@ -232,7 +233,7 @@ export default function ContentActions({
               {actionRows}
               <Pressable
                 style={({ pressed }) => [styles.action, styles.cancel, pressed && styles.actionPressed]}
-                onPress={dismissMenu}
+                onPress={() => { tapLight(); dismissMenu(); }}
               >
                 <ThemedText style={styles.cancelText}>Cancel</ThemedText>
               </Pressable>
@@ -252,14 +253,14 @@ export default function ContentActions({
                 <Pressable
                   key={r.key}
                   style={({ pressed }) => [styles.action, pressed && styles.actionPressed]}
-                  onPress={() => submitReport(r.key)}
+                  onPress={() => { notifyWarning(); submitReport(r.key); }}
                 >
                   <ThemedText style={styles.actionText}>{r.label}</ThemedText>
                 </Pressable>
               ))}
               <Pressable
                 style={({ pressed }) => [styles.action, styles.cancel, pressed && styles.actionPressed]}
-                onPress={() => setReasonOpen(false)}
+                onPress={() => { tapLight(); setReasonOpen(false); }}
               >
                 <ThemedText style={styles.cancelText}>Cancel</ThemedText>
               </Pressable>

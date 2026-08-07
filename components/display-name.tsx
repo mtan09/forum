@@ -2,6 +2,7 @@ import { ThemedText } from '@/components/themed-text';
 import { usePalette } from '@/hooks/use-palette';
 import type { StyleProp, TextStyle, ViewStyle } from 'react-native';
 import { Pressable, View } from 'react-native';
+import { tapLight } from '@/lib/haptics';
 
 type Props = {
   username?: string | null;
@@ -40,7 +41,7 @@ export default function DisplayName({
         <Pressable
           accessibilityRole="button"
           accessibilityLabel={`Open ${username || 'Anonymous'}'s profile`}
-          onPress={onUsernamePress}
+          onPress={() => { tapLight(); onUsernamePress(); }}
           style={({ pressed }) => ({ opacity: pressed ? 0.6 : 1 })}
         >
           {name}

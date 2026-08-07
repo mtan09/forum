@@ -9,6 +9,7 @@ import { api } from '@/lib/api';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useMemo, useState } from 'react';
 import { Image, Platform, Pressable, ScrollView, StyleSheet, useWindowDimensions } from 'react-native';
+import { tapLight } from '@/lib/haptics';
 
 type SourceInfo = {
   name: string;
@@ -193,7 +194,7 @@ export default function SourceScreen() {
       {info.articles.map((article) => (
         <Pressable
           key={article.id}
-          onPress={() => router.push(`/article/${article.id}`)}
+          onPress={() => { tapLight(); router.push(`/article/${article.id}`); }}
           style={({ pressed }) => ({ opacity: pressed ? 0.6 : 1.0 })}
         >
           <Article article={article} />

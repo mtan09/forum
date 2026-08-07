@@ -10,6 +10,7 @@ import { api } from '@/lib/api';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useCallback, useMemo, useState } from 'react';
 import { ActivityIndicator, Platform, Pressable, ScrollView, StyleSheet } from 'react-native';
+import { tapLight } from '@/lib/haptics';
 
 type Conversation = {
   conversation_id: string;
@@ -38,7 +39,7 @@ function ConversationRow({ conv }: { conv: Conversation }) {
         accessibilityLabel={`Open ${conv.username} profile`}
       />
       <Pressable
-        onPress={() => router.push(`/dm/${conv.user_id}`)}
+        onPress={() => { tapLight(); router.push(`/dm/${conv.user_id}`); }}
         style={({ pressed }) => [styles.rowBody, pressed && styles.rowBodyPressed]}
       >
         <ThemedView style={styles.rowTop}>

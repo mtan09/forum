@@ -8,7 +8,7 @@ import { type FeedContentPreference, useFeedPreference } from '@/context/feedPre
 import { useThemeMode, type ThemePreference } from '@/context/themeContext';
 import { usePalette } from '@/hooks/use-palette';
 import { api, API_URL } from '@/lib/api';
-import { selectTick, tapLight } from '@/lib/haptics';
+import { notifyWarning, selectTick, tapLight } from '@/lib/haptics';
 import {
   disableFloorReminder,
   enableFloorReminder,
@@ -426,15 +426,15 @@ export default function Settings() {
     >
       <SectionHeader title="Account" />
       <Card>
-        <Row label="Edit Profile" chevron onPress={() => router.push('/editprofile')} />
-        <Row label="Change Password" chevron onPress={() => router.push('/changepassword')} />
+        <Row label="Edit Profile" chevron onPress={() => { tapLight(); router.push('/editprofile'); }} />
+        <Row label="Change Password" chevron onPress={() => { tapLight(); router.push('/changepassword'); }} />
         <Row label="Email" value={user?.email ?? '—'} />
         {user?.email_verified === false && (
           <Row
             label="Verify email"
             value="Unverified"
             chevron
-            onPress={async () => {
+            onPress={async () => { tapLight();
               try {
                 await api('/auth/resend-verification', { body: {} });
                 Alert.alert('Verification sent', 'Check your inbox for the verification link.');
@@ -463,7 +463,7 @@ export default function Settings() {
         />
         <ToggleRow label="Email notifications" value={prefs.emailNotifications} onChange={setPref('emailNotifications')} />
         {prefs.pushNotifications && !devicePushReady && (
-          <Row label="Enable push on this iPhone" chevron onPress={explainAndEnablePush} />
+          <Row label="Enable push on this iPhone" chevron onPress={() => { tapLight(); explainAndEnablePush(); }} />
         )}
       </Card>
 
@@ -488,31 +488,31 @@ export default function Settings() {
       <Card>
         <ToggleRow label="Private account" value={prefs.privateAccount} onChange={setPref('privateAccount')} />
         {prefs.privateAccount && (
-          <Row label="Follow requests" chevron onPress={() => router.push('/follow-requests')} />
+          <Row label="Follow requests" chevron onPress={() => { tapLight(); router.push('/follow-requests'); }} />
         )}
-        <Row label="Blocked accounts" chevron onPress={() => router.push('/blocked')} />
+        <Row label="Blocked accounts" chevron onPress={() => { tapLight(); router.push('/blocked'); }} />
         <Row
           label="OpenAI processing"
           value={aiConsentCurrent ? 'Allowed' : 'Not allowed'}
           chevron
-          onPress={manageAIConsent}
+          onPress={() => { tapLight(); manageAIConsent(); }}
         />
       </Card>
 
       <SectionHeader title="Content" />
       <Card>
         <FeedContentRow />
-        <Row label="Reset feed personalization" onPress={resetFeedPersonalization} />
+        <Row label="Reset feed personalization" onPress={() => { tapLight(); resetFeedPersonalization(); }} />
       </Card>
 
       {user?.is_admin && (
         <>
           <SectionHeader title="Moderation" />
           <Card>
-            <Row label="Review reports" chevron onPress={() => router.push('/admin')} />
-            <Row label="Feedback" chevron onPress={() => router.push('/admin-feedback')} />
-            <Row label="Moderation audit" chevron onPress={() => router.push('/admin-moderation')} />
-            <Row label="Ingest status" chevron onPress={() => router.push('/admin-ingest')} />
+            <Row label="Review reports" chevron onPress={() => { tapLight(); router.push('/admin'); }} />
+            <Row label="Feedback" chevron onPress={() => { tapLight(); router.push('/admin-feedback'); }} />
+            <Row label="Moderation audit" chevron onPress={() => { tapLight(); router.push('/admin-moderation'); }} />
+            <Row label="Ingest status" chevron onPress={() => { tapLight(); router.push('/admin-ingest'); }} />
           </Card>
         </>
       )}
@@ -523,15 +523,15 @@ export default function Settings() {
           label="Version"
           value={`${Constants.nativeAppVersion ?? Constants.expoConfig?.version ?? '1.0.0'} (${Constants.nativeBuildVersion ?? 'dev'})`}
         />
-        <Row label="Send Feedback" chevron onPress={() => router.push('/feedback')} />
-        <Row label="Support" chevron onPress={() => WebBrowser.openBrowserAsync(`${API_URL}/support`)} />
-        <Row label="Terms of Service" chevron onPress={() => WebBrowser.openBrowserAsync(`${API_URL}/legal/terms`)} />
-        <Row label="Privacy Policy" chevron onPress={() => WebBrowser.openBrowserAsync(`${API_URL}/legal/privacy`)} />
+        <Row label="Send Feedback" chevron onPress={() => { tapLight(); router.push('/feedback'); }} />
+        <Row label="Support" chevron onPress={() => { tapLight(); WebBrowser.openBrowserAsync(`${API_URL}/support`); }} />
+        <Row label="Terms of Service" chevron onPress={() => { tapLight(); WebBrowser.openBrowserAsync(`${API_URL}/legal/terms`); }} />
+        <Row label="Privacy Policy" chevron onPress={() => { tapLight(); WebBrowser.openBrowserAsync(`${API_URL}/legal/privacy`); }} />
       </Card>
 
       <Card>
-        <Row label="Log Out" danger onPress={handleLogout} />
-        <Row label="Delete Account" danger onPress={handleDeleteAccount} />
+        <Row label="Log Out" danger onPress={() => { tapLight(); handleLogout(); }} />
+        <Row label="Delete Account" danger onPress={() => { notifyWarning(); handleDeleteAccount(); }} />
       </Card>
     </ScrollView>
   );

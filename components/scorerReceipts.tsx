@@ -5,6 +5,7 @@ import { type Palette } from '@/constants/theme';
 import { usePalette } from '@/hooks/use-palette';
 import { useMemo } from 'react';
 import { Modal, Platform, Pressable, ScrollView, StyleSheet, useWindowDimensions, View } from 'react-native';
+import { tapLight } from '@/lib/haptics';
 
 // The deterministic scorer records every signal that produced a
 // placement (posts.position_signals / articles.lean_signals). This modal
@@ -126,7 +127,7 @@ export default function ScorerReceipts({ visible, onClose, position, signals, ki
 
   return (
     <Modal visible={visible} animationType="fade" transparent onRequestClose={onClose}>
-      <Pressable style={styles.backdrop} onPress={onClose}>
+      <Pressable style={styles.backdrop} onPress={() => onClose()}>
         <Pressable style={styles.sheet} onPress={(e) => e.stopPropagation()}>
           <View style={styles.handle} />
           <ScrollView showsVerticalScrollIndicator={false}>
@@ -249,7 +250,7 @@ export default function ScorerReceipts({ visible, onClose, position, signals, ki
               No post text is sent to third-party AI for this placement, and the same text always produces the same result.
             </ThemedText>
 
-            <Pressable style={styles.closeBtn} onPress={onClose}>
+            <Pressable style={styles.closeBtn} onPress={() => { tapLight(); onClose(); }}>
               <ThemedText style={styles.closeText}>Got it</ThemedText>
             </Pressable>
           </ScrollView>

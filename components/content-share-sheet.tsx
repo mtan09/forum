@@ -250,7 +250,7 @@ export default function ContentShareSheet({
 
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
-      <Pressable style={styles.backdrop} onPress={onClose}>
+      <Pressable style={styles.backdrop} onPress={() => onClose()}>
         <Pressable
           accessibilityViewIsModal
           style={[styles.sheet, { paddingBottom: Math.max(insets.bottom, 20) }]}
@@ -263,7 +263,7 @@ export default function ContentShareSheet({
               accessibilityRole="button"
               accessibilityLabel="Close share options"
               hitSlop={8}
-              onPress={onClose}
+              onPress={() => { tapLight(); onClose(); }}
               style={({ pressed }) => [styles.close, pressed && styles.pressed]}
             >
               <IconSymbol name="xmark" size={18} color={c.text} />

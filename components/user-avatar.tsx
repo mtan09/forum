@@ -1,6 +1,7 @@
 import { useRouter } from 'expo-router';
 import { Pressable, StyleSheet, type StyleProp, type ViewStyle } from 'react-native';
 import AvatarVisual from './avatar-visual';
+import { tapLight } from '@/lib/haptics';
 
 type UserAvatarProps = {
   userId: string;
@@ -29,7 +30,7 @@ export default function UserAvatar({
       accessibilityRole="button"
       accessibilityLabel={accessibilityLabel}
       hitSlop={4}
-      onPress={() => router.push(`/user/${userId}` as never)}
+      onPress={() => { tapLight(); router.push(`/user/${userId}` as never); }}
       style={({ pressed }) => [containerStyle, pressed && styles.pressed]}
     >
       <AvatarVisual userId={userId} avatarUrl={avatarUrl} isDemo={isDemo} size={size} />

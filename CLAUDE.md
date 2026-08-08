@@ -43,6 +43,29 @@ npx expo-doctor          # required, not optional
 eas env:list             # confirm EAS env before an EAS build
 ```
 
+### Known-failing expo-doctor check — deliberate, do not "fix"
+
+`expo-doctor` reports six packages at patch drift (`expo`, `expo-notifications`,
+`expo-router`, `expo-image-picker`, `expo-sharing`, `expo-symbols`). **Held on
+purpose through build 8**, in particular `expo-notifications` at 57.0.8 rather
+than 57.0.9.
+
+57.0.9's only two changes are an Android notification-tap crash fix and a web
+`SecurityError` fix. Neither can reach this app: it is iPhone-only, and
+`lib/notifications.web.ts` is a no-op shim, so expo-notifications is absent from
+the web bundle entirely (verified by grepping `dist/_expo/static/js/web/`).
+There is no iOS change in it. `expo-router` 57.0.10 → 57.0.11 is likewise "no
+user-facing changes."
+
+Build 7 shipped on 57.0.8, so holding keeps build 8's native notification code
+identical to build 7's — which is the point, since build 8 exists to verify a
+notification fix and a second variable would muddy it.
+
+The declared range is `~57.0.8`, which already *permits* 57.0.9; the committed
+lockfile is what pins it. **Don't run a bare `npm install` that regenerates the
+lockfile before an EAS build.** Upgrade all six together with
+`npx expo install --check` once build 8 is verified, as its own commit.
+
 ## Notifications
 
 Every notification carries an in-app path in `data.url`, and the tap handler in

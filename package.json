@@ -11,7 +11,8 @@
     "web:export": "expo export --platform web",
     "postweb:export": "node scripts/prepare-web-export.mjs",
     "typecheck": "tsc --noEmit",
-    "lint": "expo lint"
+    "lint": "expo lint",
+    "check:deep-links": "node scripts/check-deep-links.mjs"
   },
   "dependencies": {
     "@expo/metro-runtime": "~57.0.8",

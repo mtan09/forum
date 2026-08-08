@@ -26,9 +26,14 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 
 import { useCallback, useEffect, useMemo, useRef } from 'react';
 
-import { attachNotificationRouter } from '@/lib/notifications';
+import { attachNotificationRouter, ensureFloorReminderCurrent } from '@/lib/notifications';
 import { initSentry } from '@/lib/sentry';
-import { rememberProductRoute } from '@/lib/route-context';
+import {
+  clearPendingRoute,
+  peekPendingRoute,
+  rememberPendingRoute,
+  rememberProductRoute,
+} from '@/lib/route-context';
 import { tapLight } from '@/lib/haptics';
 
 initSentry();
@@ -92,6 +97,11 @@ function AppNavigator() {
   const { c } = usePalette();
   const lastRedirectRef = useRef<string | null>(null);
 
+  // Where an email link wanted to go before sign-in intercepted it. Read, not
+  // consumed, so this stays safe to call during render.
+  const pendingRoute = peekPendingRoute();
+  const afterAuth = pendingRoute ?? '/';
+
   const redirectTarget = loading
     ? null
     : session === null && !pathname.startsWith('/auth')
@@ -99,19 +109,29 @@ function AppNavigator() {
       : session && needsOnboarding && pathname !== '/onboarding'
         ? '/onboarding'
         : session && !needsOnboarding && pathname === '/onboarding'
-          ? '/'
+          ? afterAuth
         : session && pathname.startsWith('/auth')
-          ? '/'
+          ? afterAuth
           : null;
 
   useEffect(() => {
     rememberProductRoute(pathname);
   }, [pathname]);
 
+  // Hold the destination a signed-out visitor asked for. Declared above the
+  // redirect effect so it records the path in the same commit that redirects
+  // away from it.
+  useEffect(() => {
+    if (loading || session !== null) return;
+    if (!pathname.startsWith('/auth')) rememberPendingRoute(pathname);
+  }, [loading, session, pathname]);
+
   // Route notification taps once signed in. Permission and device-token
   // registration happen contextually from Settings, never right after login.
   useEffect(() => {
     if (!session) return;
+    // Repairs installs still holding the pre-deep-link Floor reminder.
+    ensureFloorReminderCurrent().catch(() => {});
     return attachNotificationRouter();
   }, [session]);
 
@@ -126,8 +146,14 @@ function AppNavigator() {
     }
     if (lastRedirectRef.current === redirectTarget) return;
     lastRedirectRef.current = redirectTarget;
-    router.replace(redirectTarget);
-  }, [redirectTarget, router]);
+    // Consume it only once it is actually being navigated to, so a failed or
+    // abandoned sign-in doesn't silently lose the destination.
+    if (pendingRoute && redirectTarget === pendingRoute) clearPendingRoute();
+    // A held route is a runtime string, so the target is no longer one of
+    // expo-router's literals. isReturnable has already rejected anything that
+    // could leave the app; the same cast is used for notification deep links.
+    router.replace(redirectTarget as never);
+  }, [redirectTarget, router, pendingRoute]);
 
   const headerLeft = useCallback(
     ({ canGoBack }: { canGoBack?: boolean }) =>

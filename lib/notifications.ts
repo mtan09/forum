@@ -19,8 +19,16 @@ Notifications.setNotificationHandler({
 // schedules one repeating local notification (no server/push infra needed)
 // and remembers its id so toggling off cancels exactly that one — never
 // anyone else's scheduled notifications.
-const FLOOR_NOTIF_ID_KEY = 'forum.floorReminderId';
+const FLOOR_NOTIF_ID_KEY = 'forum.floorReminderId.v2';
+// v1 scheduled the reminder with no data payload, so tapping it only
+// foregrounded the app. The schedule lives in iOS rather than being rebuilt on
+// launch, so those installs need one forced reschedule — see
+// ensureFloorReminderCurrent below.
+const LEGACY_FLOOR_NOTIF_ID_KEY = 'forum.floorReminderId';
 const REMINDER_HOUR = 9; // 9am local
+// The reminder repeats daily and cannot know tomorrow's debate id, so it opens
+// the Floor tab, which lists that day's rooms.
+const FLOOR_ROUTE = '/debate';
 
 export async function enableFloorReminder(): Promise<boolean> {
   const settings = await Notifications.getPermissionsAsync();
@@ -38,6 +46,7 @@ export async function enableFloorReminder(): Promise<boolean> {
     content: {
       title: 'The Floor is live 🏛️',
       body: "Today's debate rooms are open. Take a stance before you see where everyone lands.",
+      data: { url: FLOOR_ROUTE },
     },
     trigger: {
       type: Notifications.SchedulableTriggerInputTypes.DAILY,
@@ -50,11 +59,25 @@ export async function enableFloorReminder(): Promise<boolean> {
 }
 
 export async function disableFloorReminder(): Promise<void> {
-  const existing = await AsyncStorage.getItem(FLOOR_NOTIF_ID_KEY);
-  if (existing) {
-    await Notifications.cancelScheduledNotificationAsync(existing).catch(() => {});
-    await AsyncStorage.removeItem(FLOOR_NOTIF_ID_KEY);
+  // Both keys, so toggling off part-way through the v1 migration cannot strand
+  // the old notification with nothing left pointing at it.
+  for (const key of [FLOOR_NOTIF_ID_KEY, LEGACY_FLOOR_NOTIF_ID_KEY]) {
+    const existing = await AsyncStorage.getItem(key);
+    if (existing) {
+      await Notifications.cancelScheduledNotificationAsync(existing).catch(() => {});
+      await AsyncStorage.removeItem(key);
+    }
   }
+}
+
+// One-time repair for installs that scheduled the payload-less v1 reminder.
+// No-op once migrated, so it is safe to call on every launch.
+export async function ensureFloorReminderCurrent(): Promise<void> {
+  const legacy = await AsyncStorage.getItem(LEGACY_FLOOR_NOTIF_ID_KEY).catch(() => null);
+  if (!legacy) return;
+  await Notifications.cancelScheduledNotificationAsync(legacy).catch(() => {});
+  await AsyncStorage.removeItem(LEGACY_FLOOR_NOTIF_ID_KEY).catch(() => {});
+  await enableFloorReminder();
 }
 
 // ---------- Remote push (replies, upvotes, DMs) ----------
@@ -126,13 +149,35 @@ export async function unregisterPush(): Promise<void> {
 }
 
 // Tapping a notification routes to the content it's about (the server puts
-// an in-app path in data.url).
+// an in-app path in data.url; the Floor reminder sets its own).
+function routeToNotification(response: Notifications.NotificationResponse): boolean {
+  // A dismissal or a custom action is not a request to navigate.
+  if (response.actionIdentifier !== Notifications.DEFAULT_ACTION_IDENTIFIER) return false;
+  const url = response.notification.request.content.data?.url;
+  if (typeof url !== 'string' || !url.startsWith('/')) return false;
+  router.push(url as never);
+  return true;
+}
+
 export function attachNotificationRouter(): () => void {
-  const sub = Notifications.addNotificationResponseReceivedListener((response) => {
-    const url = response.notification.request.content.data?.url;
-    if (typeof url === 'string' && url.startsWith('/')) {
-      router.push(url as never);
+  // A tap that launches the app from a terminated state is delivered to native
+  // before this listener can exist — expo-notifications does not replay it, so
+  // the pending response has to be drained explicitly. This is the usual case
+  // for the 9am reminder.
+  try {
+    const pending = Notifications.getLastNotificationResponse();
+    if (pending && routeToNotification(pending)) {
+      // Only clear once handled. While signed out the caller never attaches,
+      // and leaving the response set is what lets the deep link survive until
+      // auth finishes; clearing it here stops a later re-attach from
+      // re-navigating.
+      Notifications.clearLastNotificationResponse();
     }
-  });
+  } catch {
+    // Both APIs throw UnavailabilityError where the native module is missing
+    // (Expo Go). Live taps still route through the listener below.
+  }
+
+  const sub = Notifications.addNotificationResponseReceivedListener(routeToNotification);
   return () => sub.remove();
 }

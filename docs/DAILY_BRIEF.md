@@ -13,11 +13,35 @@ Each edition has four intentionally separate sections:
 - **Across forum:** three public hot-story clusters selected from articles
   published inside the edition window.
 - **Worth hearing:** up to two posts from the existing first-party `For You`
-  ranker. Quiet days are intentionally shorter rather than padded.
+  ranker, restricted to posts authored inside the edition window. Quiet days are
+  intentionally shorter rather than padded. **Known issue — see below; this
+  section is empty on most editions today.**
 - **On The Floor:** today's leading rooms and yesterday's featured Floor recap.
 - **Around you:** nonzero counts for replies, comments on the user's posts,
   upvotes on posts/comments, reposts, quotes, followers/requests, and unread
   DMs. DM text is never copied into the brief or email.
+
+### Known issue: "Worth hearing" is usually empty — sidelined, 2026-08-08
+
+`generateDailyBrief` asks `personalizedFeed` for the top **20** posts by
+relevance, **then** discards any authored outside the 24-hour window, **then**
+takes 2 (`src/lib/daily-brief.ts`, `post_ids`). The ranker has no recency bias,
+so the two filters rarely intersect.
+
+Measured 2026-08-08: 10 posts existed platform-wide in the last 24 hours, 66 in
+the last 7 days, 178 in total. Two of a relevance-ranked top-20 landing inside a
+10-post window is unlikely, so the section renders empty for most users on most
+days.
+
+This is **not** the "quiet day" behaviour described above — it is filtering
+after ranking. More volume makes it less visible without making it correct: the
+window belongs inside the ranking query, not applied to 20 candidates after the
+fact. Fixing it means having `personalizedFeed` constrain on `created_at`, or
+dropping the window and letting the brief surface a good post of any age (which
+changes what "daily" means in this section).
+
+Deliberately deferred. Do not "fix" it by widening the slice — that just trades
+an empty section for a stale one.
 
 Story and Floor selection is shared rather than personalized. Post selection
 and personal activity are user-specific. The brief references existing content

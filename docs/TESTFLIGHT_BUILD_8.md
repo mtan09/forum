@@ -9,8 +9,13 @@ one away.
 | | |
 |---|---|
 | Last TestFlight build | **7** — `a0e7f7a`, production/STORE, 2026-08-06 16:13 EDT |
-| Build 8 contains | everything after `a0e7f7a` on `master`, plus the uncommitted notification work |
-| Verified how | typecheck, lint and 220 API tests pass; **no iOS runtime verification has happened for any of it** |
+| Build 8 contains | everything after `a0e7f7a` on `master`, including the Daily Brief, Universal Links, and the rebuilt post scorer |
+| Verified how | typecheck, lint, expo-doctor 20/20, 259 API tests pass; **no iOS runtime verification has happened for any of it** |
+
+Sections **G**, **H** and **I** were added 2026-08-08 and cover work that did
+not exist when this list was first written. All backend pieces are already
+deployed, so G and I are testable on build 7 *before* build 8 exists — H is not,
+because it depends on an entitlement that only a new binary carries.
 
 Build 7 is what's on the phone now. Everything below is the delta.
 
@@ -251,6 +256,101 @@ Listed so you don't go looking. Verify on forumeveryside.com instead.
 
 ---
 
+## G. Daily Brief — new, backend already live
+
+Opt-in daily edition. The API, the `forum-daily-brief` cron and the web client
+are deployed, so most of this works on build 7 already.
+
+**Don't wait for 07:00.** Trigger a delivery pass on demand from `../forum-api`:
+
+```
+npm run daily-briefs        # runs one pass against production
+```
+
+It only selects users whose local time is past 07:00 and who have opted in, so
+set your timezone by opening the app first, then enable the toggles.
+
+### G1. Opting in
+
+- [ ] Settings → **Push reminder** and **Email Daily Brief** both toggle on
+- [ ] With an unverified email, enabling the email brief shows **one** alert
+      ("Verify your email first"), not two, and both toggles revert
+- [ ] Enabling push when push is off enables push first, then the brief
+
+### G2. The brief itself
+
+- [ ] The sheet opens automatically once after sign-in, and **not again** the
+      same day
+- [ ] Sections render: Across forum (3 stories), On The Floor, Around you
+- [ ] Story lines read `N outlets · N articles` with **window-scoped** counts —
+      a long-running story should not claim 180 articles inside a daily brief
+- [ ] **"Worth hearing" will usually be empty.** Known and deliberate — see
+      `docs/DAILY_BRIEF.md`. Not a bug to file.
+- [ ] Date chips let you page back through earlier editions
+- [ ] Dismissing and reopening from the same day shows the same edition
+
+### G3. Delivery — the part with the most new code
+
+- [ ] Push arrives, and tapping it opens **that date's brief**, not the feed
+- [ ] Force-quit, then tap → cold-launches onto the brief
+- [ ] Email arrives; the button opens the brief; story links open summaries
+- [ ] **Run `npm run daily-briefs` twice in a row → exactly one email and one
+      push.** This is the dedupe fix; a second copy means the claim failed.
+- [ ] Turn both toggles off, run the pass → nothing arrives
+
+### G4. Unsubscribe
+
+- [ ] The email footer link opens a confirmation page
+- [ ] Confirming turns **Email Daily Brief** off in Settings, and leaves the
+      in-app brief working
+- [ ] Gmail's own list-unsubscribe control also works (it POSTs, and should
+      silently succeed)
+
+### G5. Timezone
+
+- [ ] Change the device timezone, reopen the app, request a brief → **On The
+      Floor** shows rooms for *your* current date, not US Eastern's
+
+---
+
+## H. Universal Links — build 8 only, cannot work before it
+
+`associatedDomains` is an entitlement compiled into the binary. Build 7 does not
+have it, so **every check here fails on build 7 and that is expected.** The
+association file is already live and correct.
+
+- [ ] After installing build 8, tap a `forumeveryside.com/post/...` link in
+      Messages or Notes → opens **the app**, not Safari
+- [ ] Same for `/article/...`, `/summary/...`, `/debate/...`, `/brief/...`
+- [ ] A link to a signed-out route still behaves sensibly
+- [ ] Long-press a link → the share sheet offers "Open in forum"
+
+If links open Safari on build 8, check `apple-app-site-association` is served
+from `https://forumeveryside.com/.well-known/` as `application/json` before
+suspecting the app — and note Apple's CDN caches it, so a bad version can
+persist after the fix.
+
+---
+
+## I. Post spectrum — rebuilt scorer, already live
+
+`claims-4.0.0` replaced `stance-3.0.0`, and all 178 posts were re-scored. This
+changes which posts show a spectrum bar and where the marker sits.
+
+- [ ] Spectrum bars appear on posts that clearly argue a position
+- [ ] A post that *opposes* something is placed on the opposing side, not left
+      blank — this was the largest bug fixed
+- [ ] Posts that state no position (questions, observations, "both parties…")
+      show **no** spectrum rather than a centre marker
+- [ ] Nothing obviously backwards. Placements that look wrong are worth
+      reporting with the post text — there is no labelled test set yet, so your
+      eyes are currently the only check.
+
+Caveat: about 65 of 154 visible posts are deliberately unplaced. Blank is a
+valid outcome, not a missing feature.
+
+---
+
 ## Known gaps — not fixed, don't file these
 
 - **Post spectrum coverage is ~40% unclassified.** Known, and a larger design
@@ -265,10 +365,18 @@ Listed so you don't go looking. Verify on forumeveryside.com instead.
 ```
 npm run typecheck
 npm run lint
-npm run check:deep-links     # notification paths still resolve to screens
-npx expo-doctor              # 1 check WILL fail — see below, that's expected
-eas env:list                 # confirm EAS env
+npm run check:deep-links        # notification paths still resolve to screens
+npm run check:universal-links   # AASA matches app.json, _headers and the routes
+npx expo-doctor                 # now 20/20 — the old drift failure is gone
+eas env:list                    # confirm EAS env
 ```
+
+All six pass as of 2026-08-08. `expo-doctor` reporting a failure is now
+meaningful again — it used to be expected noise.
+
+**Do not skip `check:universal-links`.** Section H depends on the association
+file matching the entitlement, and a mismatch is invisible until you are holding
+the phone.
 
 ### Dependency versions — hold lifted, all six upgraded (2026-08-08)
 

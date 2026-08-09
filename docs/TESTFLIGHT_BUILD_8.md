@@ -1,16 +1,29 @@
 # TestFlight build 8 — what to test
 
 **Running doc.** Add to it as work lands; check items off on the device. When
-build 8 ships and is verified, start a build 9 section rather than editing this
-one away.
+this ships and is verified, start a new section rather than editing this one
+away.
+
+> ### ⚠️ "Build 8" arrives in TestFlight as **build number 9**
+>
+> `eas.json` sets `autoIncrement: true` with `appVersionSource: "remote"`, so
+> EAS assigns the number and consumes one per *attempt*, not per success. The
+> first attempt (`d9aa5ebb`) took number **8** and failed at signing — the
+> provisioning profile predated the Associated Domains entitlement and had to be
+> regenerated. The retry (`61108292`) succeeded and took number **9**.
+>
+> Number 8 does not exist in TestFlight and never will. Everywhere this document
+> says "build 8" it means **the artifact labelled 1.0.0 (9)**. Look for 9 on the
+> phone.
 
 ## Baseline
 
 | | |
 |---|---|
 | Last TestFlight build | **7** — `a0e7f7a`, production/STORE, 2026-08-06 16:13 EDT |
-| Build 8 contains | everything after `a0e7f7a` on `master`, including the Daily Brief, Universal Links, and the rebuilt post scorer |
-| Verified how | typecheck, lint, expo-doctor 20/20, 259 API tests pass; **no iOS runtime verification has happened for any of it** |
+| This build | **1.0.0 (9)** — `61108292-1ef7-48f7-9175-89e09b92d6fe`, built 2026-08-09 02:48 UTC, from `81a4646` |
+| Contents | everything after `a0e7f7a` on `master`, including the Daily Brief, Universal Links, and the rebuilt post scorer |
+| Verified how | typecheck, lint, expo-doctor 20/20, 259 API tests, CI green; **no iOS runtime verification has happened for any of it** |
 
 Sections **G**, **H** and **I** were added 2026-08-08 and cover work that did
 not exist when this list was first written. All backend pieces are already

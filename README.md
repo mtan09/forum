@@ -24,7 +24,7 @@ A political discussion social media app built with Expo / React Native. The feed
 - **Moderation and OpenAI permission** — forum's deterministic hard stops run first. Signup usernames use only forum's on-server rules. Before profile text, a post, comment, DM, forumAI prompt, or uploaded image is sent to OpenAI for additional safety processing or generation, the user receives a clear versioned allow/decline choice. Declining preserves text-based social features as well as browsing, voting, saving, and following; Settings allows later permission or withdrawal. Report/block tools remain available and admins get separate report and pre-publication review queues
 - **Onboarding** — immediately after signup, new accounts can pick interests and follow suggested active users. Topics save when Step 1 advances and follows save immediately; onboarding is a one-session welcome flow, so a cold relaunch opens the signed-in home feed rather than forcing an unfinished flow to resume
 - **Private accounts** — private profiles expose only their basic identity and spectrum until a follow request is accepted; requests can be approved, declined, cancelled, and removed, while individually encountered posts remain in feeds, search, and threads. Messaging a private account requires that account to follow the sender
-- **Notifications** — Push and Email are independently configurable for replies, upvotes, DMs, and follow activity. Push permission is requested contextually from Settings; a granted OS permission is not mistaken for device registration, and Settings repairs stale registration without reopening the system prompt. The backend checks Expo's final delivery receipts and removes dead tokens. Replies/DM emails are immediate, and opted-in upvote email is coalesced
+- **Notifications + Daily Brief** — Push and Email are independently configurable for replies, upvotes, DMs, and follow activity. A persisted 7:00 AM local Daily Brief opens once in-app, remains available for seven days from Profile, and combines shared hot stories/Floor rooms with personalized posts and grouped account activity. Its email and push reminder are separate opt-ins. Push permission is requested contextually from Settings; the backend checks Expo's final delivery receipts and removes dead tokens. Replies/DM emails are immediate, and opted-in upvote email is coalesced. See [Daily Brief](docs/DAILY_BRIEF.md)
 - **Feedback** — authenticated structured feedback captures category, route, theme, version/build, device metadata, and an optional privately stored screenshot; admins can triage it as open, planned, resolved, or dismissed, and account deletion removes the feedback record before its private screenshot is cleaned up asynchronously
 - **Posting**: the create action opens a distraction-free three-quarter-height composer, focuses the writing surface immediately, and keeps a Photo Library control attached above the keyboard. Inline `#hashtags` remain supported; uploaded images are moderated, server-resized, and EXIF-stripped. The app does not request camera access
 - **Article media** — the backend prefers publisher RSS/Atom media and may fall back to publisher page image metadata, then stores that remote URL. The app loads it directly with its normal device cache, rejects obvious video/HLS assets and malformed article-URL-as-image values, and falls back cleanly when a publisher image is unavailable. Summary carousels label every image with its publisher and tap through to the original article
@@ -71,6 +71,7 @@ app/               screens (expo-router file-based routing)
   source/[name]    news source detail page
   messages, dm/    direct-message inbox and conversation threads
   following        posts from accounts the current user follows
+  brief/[date]     persisted Daily Brief sheet and seven-day archive
   onboarding       interests, suggested follows, and email-verification prompt
   admin-*          reports, pre-publication moderation, feedback, ingest status
   feedback         structured feedback + optional private screenshot
@@ -165,6 +166,8 @@ npm run web          # browser development server
 npm run web:export   # production static export in dist/
 npm run lint         # eslint
 npx tsc --noEmit     # typecheck
+npm run check:deep-links
+npm run check:universal-links
 ```
 
 The EAS `production` environment points TestFlight/App Store builds at
@@ -189,6 +192,12 @@ Shared user posts and articles use canonical
 `https://forumeveryside.com/article/<article-id>` links. Set
 `EXPO_PUBLIC_WEB_URL` only when a development or preview build needs a different
 public web origin; production defaults to the permanent domain.
+Eligible post, article, Floor, profile, DM, and follow-request paths are also
+configured as iOS Universal Links. They open a newly built installed iOS app
+when Apple selects it, and remain ordinary web URLs when the app is absent or
+the visitor is on desktop. See
+**[Universal Links](docs/UNIVERSAL_LINKS.md)** for the exact path scope,
+Cloudflare/AASA deployment, validation command, and physical-device test.
 The permanent support and privacy pages live at
 **https://api.forumeveryside.com/support** and
 **https://api.forumeveryside.com/legal/privacy**.

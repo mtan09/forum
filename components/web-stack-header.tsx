@@ -1,9 +1,9 @@
 import { ThemedText } from '@/components/themed-text';
+import ForumLogo from '@/components/forum-logo';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { WEB_CONTENT_MAX_WIDTH } from '@/constants/layout';
 import { type Palette } from '@/constants/theme';
 import { usePalette } from '@/hooks/use-palette';
-import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
 import { useMemo } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
@@ -67,11 +67,7 @@ export default function WebStackHeader({
           accessibilityLabel="forum home"
           style={({ pressed }) => [styles.brand, pressed && styles.pressed]}
         >
-          <Image
-            source={require('@/assets/images/forumlogo.png')}
-            style={styles.logo}
-            contentFit="contain"
-          />
+          <ForumLogo size={23} style={styles.logo} />
           <ThemedText style={styles.brandText}>forum</ThemedText>
         </Pressable>
       </View>

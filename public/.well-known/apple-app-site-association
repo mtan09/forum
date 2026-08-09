@@ -1,0 +1,45 @@
+{
+  "applinks": {
+    "details": [
+      {
+        "appIDs": [
+          "93TVYH2DU3.com.michaeltan.forum"
+        ],
+        "components": [
+          {
+            "/": "/post/*",
+            "comment": "Open a forum community post."
+          },
+          {
+            "/": "/article/*",
+            "comment": "Open an attributed publisher article."
+          },
+          {
+            "/": "/summary/*",
+            "comment": "Open a multi-outlet story summary."
+          },
+          {
+            "/": "/debate/*",
+            "comment": "Open a discussion on The Floor."
+          },
+          {
+            "/": "/user/*",
+            "comment": "Open a forum profile."
+          },
+          {
+            "/": "/dm/*",
+            "comment": "Open an authenticated direct-message conversation."
+          },
+          {
+            "/": "/follow-requests",
+            "comment": "Open authenticated follow requests."
+          },
+          {
+            "/": "/brief/*",
+            "comment": "Open an authenticated forum Daily Brief."
+          }
+        ]
+      }
+    ]
+  }
+}

@@ -7,6 +7,7 @@ import { ThemedView } from '@/components/themed-view';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { type Palette } from '@/constants/theme';
 import { useFeedPreference } from '@/context/feedPreferenceContext';
+import { useAuth } from '@/context/authContext';
 import { mapPost, reusePostSnapshot, usePosts } from '@/context/postContext';
 import { usePalette } from '@/hooks/use-palette';
 import { api } from '@/lib/api';
@@ -15,6 +16,7 @@ import { mapRepostAttribution } from '@/lib/quoted-content';
 import type { RepostAttribution } from '@/types/quoted-content';
 import {
   createFeedSessionId,
+  discardFeedEvents,
   flushFeedEvents,
   queueFeedEvent,
   type FeedMode,
@@ -138,6 +140,7 @@ export default function Feed() {
   const [feedWidth, setFeedWidth] = useState(0);
 
   const { preference: feedContentPreference } = useFeedPreference();
+  const { session } = useAuth();
   const { posts, setPosts } = usePosts();
 
   const scrollY = useRef(new Animated.Value(0)).current;
@@ -188,6 +191,10 @@ export default function Feed() {
   const feedGeneration = useRef(0);
 
   const loadFeed = useCallback(async (tab: FeedTab, reset: boolean) => {
+    // The tab tree can mount for one frame while the root navigator redirects
+    // a clean install to authentication. Do not issue a protected feed request
+    // until the auth provider has a session.
+    if (!session) return;
     const generation = feedGeneration.current;
     if (loadingTabs.current.get(tab) === generation) return;
     const current = tabFeedsRef.current[tab];
@@ -271,7 +278,7 @@ export default function Feed() {
     } finally {
       if (loadingTabs.current.get(tab) === generation) loadingTabs.current.delete(tab);
     }
-  }, [feedContentPreference, setPosts]);
+  }, [feedContentPreference, session, setPosts]);
 
   useEffect(() => {
     if (!tabFeeds[activeTab].loaded) void loadFeed(activeTab, true);
@@ -390,8 +397,9 @@ export default function Feed() {
       }
     }
     visibleStarted.current.clear();
-    void flushFeedEvents();
-  }, []);
+    if (session) void flushFeedEvents();
+    else discardFeedEvents();
+  }, [session]);
 
   const listRef = useRef<FlatList<FeedItem>>(null);
 

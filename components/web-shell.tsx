@@ -1,5 +1,6 @@
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
+import ForumLogo from '@/components/forum-logo';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import WebFloorRail from '@/components/web-floor-rail';
 import { type Palette } from '@/constants/theme';
@@ -56,7 +57,7 @@ export default function WebShell({ children }: PropsWithChildren) {
         <ThemedView style={styles.sidebar}>
           <View>
             <View style={styles.brand}>
-              <Image source={require('@/assets/images/forumlogo.png')} style={styles.logo} contentFit="contain" />
+              <ForumLogo size={30} style={styles.logo} />
               <ThemedText style={styles.brandText}>forum</ThemedText>
             </View>
 
@@ -126,7 +127,7 @@ export default function WebShell({ children }: PropsWithChildren) {
         {compact && (
           <ThemedView style={[styles.mobileHeader, phone && styles.phoneHeader]}>
             <View style={styles.mobileBrand}>
-              <Image source={require('@/assets/images/forumlogo.png')} style={styles.mobileLogo} contentFit="contain" />
+              <ForumLogo size={27} style={styles.mobileLogo} />
               <ThemedText style={styles.mobileBrandText}>forum</ThemedText>
             </View>
             {!phone ? (

@@ -1,5 +1,5 @@
 import AppTextInput from '@/components/app-text-input';
-import ScalableImage from '@/components/scalable-image';
+import ForumLogo from '@/components/forum-logo';
 import { AUTH_CONTENT_MAX_WIDTH } from '@/constants/layout';
 import { type Palette } from '@/constants/theme';
 import { useAuth } from '@/context/authContext';
@@ -58,12 +58,7 @@ export default function CreateAccount() {
       keyboardShouldPersistTaps="handled"
       showsVerticalScrollIndicator={false}
     >
-      <ScalableImage 
-        source={require('@/assets/images/forumlogo.png')}
-        type='width' 
-        dimension={112}
-        style={styles.image}
-      />
+      <ForumLogo size={112} style={styles.image} />
       <Text style={styles.eyebrow}>JOIN THE CONVERSATION</Text>
       <Text style={styles.title}>Create account</Text>
       <Text style={styles.subtitle}>

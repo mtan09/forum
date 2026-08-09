@@ -72,6 +72,13 @@ live, and App Review must receive a functioning non-admin account with access to
 the complete experience. Remove placeholder content. Test on a physical
 supported iPhone using production services.
 
+The optional Daily Brief is ordinary first-party product functionality, not an
+App Review requirement. It persists seven days of selected existing content IDs
+and aggregate account-activity counts, uses no OpenAI processing, auto-presents
+once after 7:00 AM local, and offers separate email/push opt-ins. Its email
+contains no publisher images or article bodies; its links open the same
+authenticated brief route on web or an installed associated iOS build.
+
 ### 2.2 — Beta testing
 
 Use TestFlight for beta distribution. A TestFlight build intended for external
@@ -404,6 +411,11 @@ particular typeface.
   is deployed through Cloudflare Pages at `https://forumeveryside.com`;
   `https://forum-web-6tw.pages.dev` is the generated Pages hostname and
   `https://mtan-forum.expo.app` remains an EAS Hosting fallback.
+- Eligible HTTPS content and notification routes use Apple Universal Links in
+  the next compiled iOS candidate, with the same Cloudflare web routes as the
+  install-free and desktop fallback. Verification/reset and legal/support URLs
+  remain web-only. The AASA scope and test record are documented in
+  `docs/UNIVERSAL_LINKS.md`.
 - Signup allow/decline, existing-user just-in-time OpenAI permission, withdrawal,
   and re-consent work; no affected request reaches OpenAI before current consent.
 - Reviewer credentials are non-admin, stable, and stored only in App Store

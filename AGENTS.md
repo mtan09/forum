@@ -21,3 +21,24 @@ official Apple sources and update the document. Never hide functionality from
 App Review or provide inaccurate Content Rights, privacy, age-rating, or review
 information.
 
+## Production secrets
+
+Never run a command or API operation that prints live environment-variable
+values, full service configurations containing variables, credentials, tokens,
+connection strings, or private keys. In particular, do not use Railway
+configuration or variable-listing commands when their output includes values.
+
+For production diagnostics:
+
+- inspect only sanitized `.env.example` files or variable names;
+- use provider and Railway dashboards for write-only secret entry;
+- ask the user to paste replacement secrets directly into the provider or
+  Railway UI, never into chat or an agent-controlled terminal command;
+- prefer sealed/shared Railway variables and redacted health checks;
+- verify rotations through service health, functional checks, and redacted logs;
+  and
+- if a tool cannot guarantee redacted output, do not call it.
+
+Never reproduce a secret found in prior output. If accidental exposure occurs,
+stop querying configuration, identify only the affected variable names, and
+recommend rotation without repeating their values.

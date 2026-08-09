@@ -6,6 +6,7 @@ import { StatusBar } from 'expo-status-bar';
 
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { AppErrorBoundary } from '@/components/app-error-boundary';
+import DailyBriefGate from '@/components/daily-brief-gate';
 import WebShell from '@/components/web-shell';
 import WebStackHeader from '@/components/web-stack-header';
 import { AUTH_CONTENT_MAX_WIDTH } from '@/constants/layout';
@@ -275,6 +276,19 @@ function AppNavigator() {
             }}
           />
           <Stack.Screen
+            name="brief/[date]"
+            options={{
+              presentation: Platform.OS === 'web' ? 'transparentModal' : 'formSheet',
+              headerShown: false,
+              sheetAllowedDetents: Platform.OS === 'web' ? undefined : [0.9],
+              sheetInitialDetentIndex: Platform.OS === 'web' ? undefined : 0,
+              sheetGrabberVisible: false,
+              sheetCornerRadius: 24,
+              sheetLargestUndimmedDetentIndex: 'none',
+              contentStyle: { backgroundColor: Platform.OS === 'web' ? 'transparent' : c.surfaceRaised },
+            }}
+          />
+          <Stack.Screen
             name="editprofile"
             options={{
               presentation: 'modal',
@@ -402,8 +416,8 @@ function AppNavigator() {
     pathname === '/changepassword';
 
   if (Platform.OS === 'web' && session && !chromeless) {
-    return <WebShell>{stack}</WebShell>;
+    return <><WebShell>{stack}</WebShell><DailyBriefGate /></>;
   }
 
-  return stack;
+  return <>{stack}<DailyBriefGate /></>;
 }

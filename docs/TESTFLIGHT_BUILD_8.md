@@ -270,37 +270,30 @@ npx expo-doctor              # 1 check WILL fail — see below, that's expected
 eas env:list                 # confirm EAS env
 ```
 
-### Dependency versions are pinned on purpose
+### Dependency versions — hold lifted, all six upgraded (2026-08-08)
 
-`expo-doctor` fails one check: six packages at patch drift (`expo`,
-`expo-notifications`, `expo-router`, `expo-image-picker`, `expo-sharing`,
-`expo-symbols`). **Decision: hold all six for build 8.**
+The earlier plan was to hold six packages at their build-7 patch versions
+through build 8. **That was reversed: all six are upgraded**, including
+`expo-notifications` 57.0.8 → 57.0.9.
 
-The one that looked like it mattered was `expo-notifications` 57.0.8 → 57.0.9,
-since the notification fix depends on that package. It doesn't matter:
+| package | build 7 | build 8 |
+|---|---|---|
+| `expo` | 57.0.10 | 57.0.11 |
+| **`expo-notifications`** | **57.0.8** | **57.0.9** |
+| `expo-router` | 57.0.10 | 57.0.11 |
+| `expo-image-picker` | 57.0.7 | 57.0.8 |
+| `expo-sharing` | 57.0.8 | 57.0.10 |
+| `expo-symbols` | 57.0.1 | 57.0.2 |
 
-| 57.0.9 change | Reaches this app? |
-|---|---|
-| `[Android]` crash on notification tap on some manufacturer ROMs | No — iPhone-only |
-| `[web]` crash when browser storage is blocked (`SecurityError`) | No — `lib/notifications.web.ts` is a no-op shim, and expo-notifications is absent from the shipped web bundle |
+**Consequence for section A.** Build 8's native notification code is no longer
+identical to build 7's, so a notification failure has two possible causes: the
+fix, or the bump. 57.0.9 contains only an Android notification-tap crash fix and
+a web `SecurityError` fix — neither should reach an iPhone-only app whose
+`lib/notifications.web.ts` is a no-op shim — so the bump is the less likely
+explanation, but it is no longer excluded by construction.
 
-There is no iOS change in 57.0.9. 57.0.8 itself was "no user-facing
-modifications," and `expo-router` 57.0.10 → 57.0.11 is likewise "no user-facing
-changes" — so nothing in the drift touches the redirect work in C3 either.
-
-The deciding factor: **build 7 also shipped on 57.0.8.** Holding keeps build 8's
-native notification code identical to build 7's, so any change in notification
-behaviour is attributable to the fix rather than to a dependency bump. That is
-worth more than a patch version in the one build whose purpose is verifying
-notifications.
-
-⚠️ The declared range is `~57.0.8`, which already permits 57.0.9 — the committed
-lockfile is the only thing pinning it. **Do not run a bare `npm install` before
-building.** Use `npm ci` if you need a clean install.
-
-Once build 8 is verified, upgrade all six together via
-`npx expo install --check` as its own commit, so a patch-bump regression is
-isolated from product changes.
+If A1–A3 fail, check 57.0.9's changelog before concluding the routing fix is
+wrong. If they pass, nothing to do.
 
 `npm run notify:test` runs locally and calls `deliver()` in-process against the
 production database, so it works without a deploy. The API refactor produces

@@ -73,6 +73,7 @@ const iconMarkup = [
   `<link rel="manifest" href="/${manifestName}" />`,
   '<meta name="theme-color" content="#B647FF" />',
   '<meta name="apple-mobile-web-app-title" content="forum" />',
+  '<meta name="apple-itunes-app" content="app-id=6795639287" />',
 ].join('\n    ');
 
 const shareDescription =

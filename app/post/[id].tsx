@@ -20,23 +20,54 @@ export default function PostScreen() {
   const { c } = usePalette();
   const styles = useMemo(() => makeStyles(c), [c]);
   const { id } = useLocalSearchParams();
+  const postId = useMemo(() => (Array.isArray(id) ? id[0] : id), [id]);
   const { posts, refresh, ensurePost } = usePosts();
   const interactions = useInteractionController();
 
-  const post = posts.find(p => p.id === id);
+  const post = posts.find(p => p.id === postId);
+  const [linkLoading, setLinkLoading] = useState(!post);
+  const [linkError, setLinkError] = useState<string | null>(null);
 
   // With a paged feed, posts opened from search/profile/deep links may not
   // be loaded yet — pull this one in on demand.
   useEffect(() => {
-    if (!post && typeof id === 'string') ensurePost(id);
-  }, [post, id, ensurePost]);
+    let active = true;
+    if (post) {
+      setLinkLoading(false);
+      setLinkError(null);
+      return () => { active = false; };
+    }
+    if (typeof postId !== 'string' || !postId) {
+      setLinkLoading(false);
+      setLinkError('This post link is invalid.');
+      return () => { active = false; };
+    }
+    setLinkLoading(true);
+    setLinkError(null);
+    ensurePost(postId)
+      .catch((err: any) => {
+        if (active) setLinkError(err?.message ?? 'This post is unavailable.');
+      })
+      .finally(() => {
+        if (active) setLinkLoading(false);
+      });
+    return () => { active = false; };
+  }, [post, postId, ensurePost]);
 
   const [commentText, setCommentText] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [commentError, setCommentError] = useState<string | null>(null);
   const [refreshKey, setRefreshKey] = useState(0);
 
-  if (!post) return null;
+  if (!post) {
+    return (
+      <ThemedView style={styles.routeState}>
+        <ThemedText>
+          {linkLoading ? 'Loading post…' : linkError ?? 'This post is unavailable.'}
+        </ThemedText>
+      </ThemedView>
+    );
+  }
 
   const handleSubmitComment = async () => {
     const content = commentText.trim();
@@ -130,6 +161,13 @@ export default function PostScreen() {
 }
 
 const makeStyles = (c: Palette) => StyleSheet.create({
+  routeState: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 24,
+    backgroundColor: c.background,
+  },
   scroll: {
     // The shell paints one background for the whole page; c.surface here showed
     // as a second colour below the comments once the content ran short.

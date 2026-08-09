@@ -319,6 +319,21 @@ curl -sSI https://forumeveryside.com/ | grep -i 'cache-control\|cf-cache-status'
 A `cf-cache-status` of `REVALIDATED` on the shell means the headers did not
 apply and the blank-page failure can recur.
 
+The same deployment must serve the iOS association file as JSON. Run the local
+configuration check before deploying, then verify the canonical apex URL
+without a redirect:
+
+```bash
+npm run check:universal-links
+curl -sS -D - \
+  https://forumeveryside.com/.well-known/apple-app-site-association
+```
+
+Expect HTTP `200` and `content-type: application/json`. Apple may cache an old
+failure for approximately an hour after the first deployment. The complete
+implementation record and physical-iPhone checklist are in
+`docs/UNIVERSAL_LINKS.md`.
+
 Verify the deployed bundle actually matches the build rather than trusting the
 page to look updated — the shell is client-rendered, so its HTML never
 references app assets:
@@ -395,6 +410,14 @@ available after decline. The hosted privacy policy must match actual Railway,
 Neon, R2, Expo, OpenAI, Sentry, and Resend behavior.
 
 ## 8. Internal TestFlight
+
+Before installing the next candidate, confirm Apple's associated-domains CDN
+returns the current Forum AASA JSON. The candidate must be a newly compiled
+binary: the associated-domain entitlement cannot be added to an existing
+TestFlight build by a website deployment. On a physical iPhone, tap real HTTPS
+links from Mail or Notes while signed in and signed out, then repeat after
+deleting the app to verify the web fallback. Typing a URL into Safari's address
+bar is not a valid direct-open test.
 
 Build and submit:
 

@@ -43,28 +43,27 @@ npx expo-doctor          # required, not optional
 eas env:list             # confirm EAS env before an EAS build
 ```
 
-### Known-failing expo-doctor check — deliberate, do not "fix"
+### Dependency patch versions — the hold was lifted (2026-08-08)
 
-`expo-doctor` reports six packages at patch drift (`expo`, `expo-notifications`,
-`expo-router`, `expo-image-picker`, `expo-sharing`, `expo-symbols`). **Held on
-purpose through build 8**, in particular `expo-notifications` at 57.0.8 rather
-than 57.0.9.
+Six packages were previously held at older patch versions through build 8
+(`expo`, `expo-notifications`, `expo-router`, `expo-image-picker`,
+`expo-sharing`, `expo-symbols`). **All six are now upgraded and that is
+deliberate** — `expo-notifications` sits at 57.0.9, not 57.0.8.
 
-57.0.9's only two changes are an Android notification-tap crash fix and a web
-`SecurityError` fix. Neither can reach this app: it is iPhone-only, and
-`lib/notifications.web.ts` is a no-op shim, so expo-notifications is absent from
-the web bundle entirely (verified by grepping `dist/_expo/static/js/web/`).
-There is no iOS change in it. `expo-router` 57.0.10 → 57.0.11 is likewise "no
-user-facing changes."
+The original reason for holding was that build 8 exists to verify a
+notification fix, and bumping the package the fix depends on would add a second
+variable. That was judged an acceptable trade and the upgrade was kept.
 
-Build 7 shipped on 57.0.8, so holding keeps build 8's native notification code
-identical to build 7's — which is the point, since build 8 exists to verify a
-notification fix and a second variable would muddy it.
+What this means when build 8 is tested: **if a notification misbehaves, the
+dependency bump is a live suspect alongside the fix itself.** 57.0.9's two
+changes are an Android notification-tap crash fix and a web `SecurityError`
+fix, neither of which should reach an iPhone-only app whose
+`lib/notifications.web.ts` is a no-op shim — so the bump is unlikely to be the
+cause, but it is no longer ruled out by construction. Check `expo-notifications`
+57.0.9's changelog before concluding the fix failed.
 
-The declared range is `~57.0.8`, which already *permits* 57.0.9; the committed
-lockfile is what pins it. **Don't run a bare `npm install` that regenerates the
-lockfile before an EAS build.** Upgrade all six together with
-`npx expo install --check` once build 8 is verified, as its own commit.
+`expo-doctor` should now be clean on version drift. A *new* drift warning is
+worth reading rather than assuming it is this one.
 
 ## Notifications
 
@@ -150,6 +149,18 @@ Icons for web and Android. **SF Symbols are Apple-licensed and cannot ship on
 the web** — the mapping is the only lever. If a web icon looks wrong, fix the
 mapping rather than reaching for a new icon library; the mapping is typed
 against MCI's names, so `tsc` validates any change.
+
+## Post volume in the review environment
+
+Almost all posts, comments and votes in production are written by 31 scheduled
+demo personas — ~5 accounts are real. Posts run ~1:125 against articles right
+now purely because a cron job paces the personas to ~20/day.
+
+**Don't design screens around that ratio.** The target is a userbase where
+posts match or outnumber articles. Feed density, empty states, and any
+"there's not much here" affordance should hold up at both extremes, and a
+community feature is not disqualified by today's volume. Full numbers and the
+reasoning: `../forum-api/CLAUDE.md`, "Content volume is a launch artifact."
 
 ## Gotchas
 

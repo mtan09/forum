@@ -1,7 +1,7 @@
 import { Image } from 'expo-image';
-import { useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import type { StyleProp, ViewStyle } from 'react-native';
-import { View } from 'react-native';
+import { Image as NativeImage, View } from 'react-native';
 
 const DEMO_COLORS = [
   '#7C3AED',
@@ -31,10 +31,15 @@ type Props = {
 };
 
 export default function AvatarVisual({ userId, avatarUrl, isDemo = false, size = 44, style }: Props) {
+  const [remoteFailed, setRemoteFailed] = useState(false);
   const circleStyle = useMemo(
     () => ({ width: size, height: size, borderRadius: size / 2 }),
     [size],
   );
+
+  useEffect(() => {
+    setRemoteFailed(false);
+  }, [avatarUrl]);
 
   if (isDemo) {
     return (
@@ -61,13 +66,22 @@ export default function AvatarVisual({ userId, avatarUrl, isDemo = false, size =
 
   return (
     <View style={[circleStyle, { overflow: 'hidden' }, style]}>
-      <Image
-        source={avatarUrl ? { uri: avatarUrl } : require('@/assets/images/Default_pfp.jpg')}
-        style={{ width: '100%', height: '100%' }}
-        contentFit="cover"
-        cachePolicy="memory-disk"
-        recyclingKey={avatarUrl ?? `avatar:${userId}`}
-      />
+      {avatarUrl && !remoteFailed ? (
+        <Image
+          source={{ uri: avatarUrl }}
+          style={{ width: '100%', height: '100%' }}
+          contentFit="cover"
+          cachePolicy="memory-disk"
+          recyclingKey={avatarUrl}
+          onError={() => setRemoteFailed(true)}
+        />
+      ) : (
+        <NativeImage
+          source={require('@/assets/images/Default_pfp.jpg')}
+          style={{ width: '100%', height: '100%' }}
+          resizeMode="cover"
+        />
+      )}
     </View>
   );
 }

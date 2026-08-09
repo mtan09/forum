@@ -34,6 +34,8 @@ type Prefs = {
   emailUpvotes: boolean;
   emailDms: boolean;
   emailFollows: boolean;
+  pushDailyBrief: boolean;
+  emailDailyBrief: boolean;
   floorReminder: boolean;
   privateAccount: boolean;
 };
@@ -49,6 +51,8 @@ const DEFAULT_PREFS: Prefs = {
   emailUpvotes: false,
   emailDms: true,
   emailFollows: false,
+  pushDailyBrief: false,
+  emailDailyBrief: false,
   floorReminder: false,
   privateAccount: false,
 };
@@ -224,6 +228,8 @@ export default function Settings() {
       email_upvotes: boolean;
       email_dms: boolean;
       email_follows: boolean;
+      push_daily_brief: boolean;
+      email_daily_brief: boolean;
     }>('/users/me/notification-prefs')
       .then((server) => {
         setPrefs((prev) => ({
@@ -238,6 +244,8 @@ export default function Settings() {
           emailUpvotes: server.email_upvotes,
           emailDms: server.email_dms,
           emailFollows: server.email_follows,
+          pushDailyBrief: server.push_daily_brief,
+          emailDailyBrief: server.email_daily_brief,
           privateAccount: !!user?.is_private,
         }));
         // Repair a stale/missing server registration only when iOS permission
@@ -268,9 +276,14 @@ export default function Settings() {
     emailUpvotes: 'email_upvotes',
     emailDms: 'email_dms',
     emailFollows: 'email_follows',
+    pushDailyBrief: 'push_daily_brief',
+    emailDailyBrief: 'email_daily_brief',
   };
 
-  const setPref = (key: keyof Prefs) => async (value: boolean) => {
+  // Resolves true when the change was saved. Callers that enable a
+  // prerequisite toggle first must check it — this swallows its own error and
+  // alerts, so an unchecked caller stacks a second alert on the same failure.
+  const setPref = (key: keyof Prefs) => async (value: boolean): Promise<boolean> => {
     const previous = prefs[key];
     setPrefs((current) => ({ ...current, [key]: value }));
     try {
@@ -291,12 +304,14 @@ export default function Settings() {
         AsyncStorage.setItem(PREFS_KEY, JSON.stringify(next)).catch(() => {});
         return next;
       });
+      return true;
     } catch (e: any) {
       setPrefs((current) => ({ ...current, [key]: previous }));
       Alert.alert(
         e?.code === 'EMAIL_NOT_VERIFIED' ? 'Verify your email first' : 'Could not save setting',
         e?.message ?? 'Please try again.'
       );
+      return false;
     }
   };
 
@@ -482,6 +497,40 @@ export default function Settings() {
         <ToggleRow label="Upvote digest" value={prefs.emailUpvotes} onChange={setPref('emailUpvotes')} />
         <ToggleRow label="Direct messages" value={prefs.emailDms} onChange={setPref('emailDms')} />
         <ToggleRow label="Follow activity" value={prefs.emailFollows} onChange={setPref('emailFollows')} />
+      </Card>
+
+      <SectionHeader title="Daily Brief" />
+      <Card>
+        <ThemedView style={styles.preferenceBlock}>
+          <ThemedText style={styles.rowLabel}>Your 7:00 AM briefing</ThemedText>
+          <ThemedText style={styles.preferenceHint}>
+            Today’s top stories, posts selected for you, The Floor, and meaningful activity around your account.
+          </ThemedText>
+        </ThemedView>
+        <ToggleRow
+          label="Push reminder"
+          value={prefs.pushDailyBrief}
+          onChange={async (value) => {
+            if (value && !prefs.pushNotifications) {
+              if (!(await setPref('pushNotifications')(true))) return;
+            }
+            await setPref('pushDailyBrief')(value);
+            if (value && !devicePushReady) explainAndEnablePush();
+          }}
+        />
+        <ToggleRow
+          label="Email Daily Brief"
+          value={prefs.emailDailyBrief}
+          onChange={async (value) => {
+            // Stop if the prerequisite failed. Without this an unverified
+            // address alerted "Verify your email first", then attempted the
+            // brief anyway and alerted a second time for the same cause.
+            if (value && !prefs.emailNotifications) {
+              if (!(await setPref('emailNotifications')(true))) return;
+            }
+            await setPref('emailDailyBrief')(value);
+          }}
+        />
       </Card>
 
       <SectionHeader title="Privacy" />

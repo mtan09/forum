@@ -1,5 +1,6 @@
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
+import ForumLogo from '@/components/forum-logo';
 import { type Palette } from '@/constants/theme';
 import { usePalette } from '@/hooks/use-palette';
 import { API_URL } from '@/lib/api';
@@ -149,11 +150,7 @@ export default function WebLanding() {
           ]}
         >
           <View style={styles.brand}>
-            <Image
-              source={require('@/assets/images/forumlogoInverse.png')}
-              style={styles.stickyLogo}
-              contentFit="contain"
-            />
+            <ForumLogo variant="inverse" size={34} style={styles.stickyLogo} />
             <ThemedText style={styles.stickyWordmark}>forum</ThemedText>
           </View>
           <View style={styles.navActions}>
@@ -188,11 +185,7 @@ export default function WebLanding() {
         <View style={[styles.hero, compact && styles.heroCompact]}>
           <View style={[styles.navBar, narrow && styles.navBarNarrow]}>
             <View style={styles.brand}>
-              <Image
-                source={require('@/assets/images/forumlogoInverse.png')}
-                style={styles.logo}
-                contentFit="contain"
-              />
+              <ForumLogo variant="inverse" size={44} style={styles.logo} />
               <ThemedText style={styles.wordmark}>forum</ThemedText>
             </View>
             {/* The hero already carries both calls to action, so the header

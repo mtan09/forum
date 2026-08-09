@@ -10,7 +10,7 @@ import { notifySuccess, tapLight, tapMedium } from '@/lib/haptics';
 import * as ImagePicker from 'expo-image-picker';
 import { useRouter } from 'expo-router';
 import { useMemo, useState } from 'react';
-import { Dimensions, Image, ImageBackground, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet } from 'react-native';
+import { Dimensions, Image, ImageBackground, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 
 const screenWidth = Dimensions.get('window').width;
 
@@ -25,6 +25,8 @@ export default function EditProfile() {
   // Local picks preview immediately; upload happens on save
   const [pickedAvatar, setPickedAvatar] = useState<string | null>(null);
   const [pickedHeader, setPickedHeader] = useState<string | null>(null);
+  const [useDefaultAvatar, setUseDefaultAvatar] = useState(false);
+  const [useDefaultHeader, setUseDefaultHeader] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -53,7 +55,9 @@ export default function EditProfile() {
       if (trimmed !== user?.username) body.username = trimmed;
       if (bio !== (user?.bio ?? '')) body.bio = bio.trim() || null;
       if (pickedAvatar) body.avatar_url = await uploadImage(pickedAvatar);
+      else if (useDefaultAvatar && user?.avatar_url) body.avatar_url = null;
       if (pickedHeader) body.header_url = await uploadImage(pickedHeader);
+      else if (useDefaultHeader && user?.header_url) body.header_url = null;
 
       if (Object.keys(body).length > 0) {
         await api('/users/me', { method: 'PATCH', body });
@@ -70,12 +74,12 @@ export default function EditProfile() {
 
   const headerSource = pickedHeader
     ? { uri: pickedHeader }
-    : user?.header_url
+    : user?.header_url && !useDefaultHeader
       ? { uri: user.header_url }
       : require('@/assets/images/solid-color-image.png');
   const avatarSource = pickedAvatar
     ? { uri: pickedAvatar }
-    : user?.avatar_url
+    : user?.avatar_url && !useDefaultAvatar
       ? { uri: user.avatar_url }
       : require('@/assets/images/Default_pfp.jpg');
 
@@ -97,7 +101,10 @@ export default function EditProfile() {
 
         <ScrollView keyboardShouldPersistTaps="handled">
           {/* Header image — tap to change */}
-          <Pressable onPress={() => pick(setPickedHeader)}>
+          <Pressable onPress={() => pick((uri) => {
+            setPickedHeader(uri);
+            setUseDefaultHeader(false);
+          })}>
             <ImageBackground source={headerSource} style={styles.header}>
               <ThemedView style={styles.imageHint}>
                 <IconSymbol name="camera.fill" size={16} color={c.onImage} />
@@ -106,7 +113,10 @@ export default function EditProfile() {
           </Pressable>
 
           {/* Avatar — tap to change */}
-          <Pressable onPress={() => pick(setPickedAvatar)} style={styles.avatarWrap}>
+          <Pressable onPress={() => pick((uri) => {
+            setPickedAvatar(uri);
+            setUseDefaultAvatar(false);
+          })} style={styles.avatarWrap}>
             <Image source={avatarSource} style={styles.avatar} />
             <ThemedView style={[styles.imageHint, styles.avatarHint]}>
               <IconSymbol name="camera.fill" size={14} color={c.onImage} />
@@ -114,6 +124,33 @@ export default function EditProfile() {
           </Pressable>
 
           <ThemedView style={styles.form}>
+            <View style={styles.mediaResetRow}>
+              {(user?.header_url || pickedHeader) && (
+                <Pressable
+                  onPress={() => {
+                    tapLight();
+                    setPickedHeader(null);
+                    setUseDefaultHeader(true);
+                  }}
+                  style={({ pressed }) => [styles.mediaResetButton, pressed && styles.mediaResetPressed]}
+                >
+                  <ThemedText style={styles.mediaResetText}>Use default background</ThemedText>
+                </Pressable>
+              )}
+              {(user?.avatar_url || pickedAvatar) && (
+                <Pressable
+                  onPress={() => {
+                    tapLight();
+                    setPickedAvatar(null);
+                    setUseDefaultAvatar(true);
+                  }}
+                  style={({ pressed }) => [styles.mediaResetButton, pressed && styles.mediaResetPressed]}
+                >
+                  <ThemedText style={styles.mediaResetText}>Use default avatar</ThemedText>
+                </Pressable>
+              )}
+            </View>
+
             <ThemedText style={styles.label}>Username</ThemedText>
             <AppTextInput
               value={username}
@@ -201,6 +238,28 @@ const makeStyles = (c: Palette) => StyleSheet.create({
   form: {
     padding: 16,
     gap: 6,
+  },
+  mediaResetRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginBottom: 2,
+  },
+  mediaResetButton: {
+    borderWidth: 1,
+    borderColor: c.border,
+    backgroundColor: c.card,
+    borderRadius: 999,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+  },
+  mediaResetPressed: {
+    opacity: 0.65,
+  },
+  mediaResetText: {
+    color: c.primary,
+    fontWeight: '700',
+    fontSize: 12,
   },
   label: {
     fontWeight: '700',

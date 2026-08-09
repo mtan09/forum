@@ -25,6 +25,7 @@ import { onTabRefresh } from '@/lib/tabRefresh';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Alert, Platform, Pressable, ScrollView, StyleSheet, useWindowDimensions } from 'react-native';
+import type { DailyBrief } from '@/types/daily-brief';
 
 // The single computed placement — see the API's /users/me/spectrum:
 // scored posts weigh 3× their position, upvotes weigh 1× the content's
@@ -179,6 +180,11 @@ export default function Profile() {
 
   // profile data comes from the auth session (/users/me)
   const { user: profile, refreshUser } = useAuth();
+  const [headerFailed, setHeaderFailed] = useState(false);
+
+  useEffect(() => {
+    setHeaderFailed(false);
+  }, [profile?.header_url]);
   const interactionController = useInteractionController();
   const interactionRevision = useInteractionRevision();
 
@@ -210,6 +216,7 @@ export default function Profile() {
   const [trail, setTrail] = useState<TrailPoint[]>([]);
   const [followCounts, setFollowCounts] = useState<{ followers: number; following: number } | null>(null);
   const [unreadDms, setUnreadDms] = useState(0);
+  const [latestBrief, setLatestBrief] = useState<DailyBrief | null>(null);
   const [shareOpen, setShareOpen] = useState(false);
   const [spectrumWidth, setSpectrumWidth] = useState(0);
 
@@ -301,6 +308,9 @@ export default function Profile() {
       api<{ unread: number }>('/messages/unread-count')
         .then((data) => { if (active) setUnreadDms(data.unread ?? 0); })
         .catch(() => {});
+      api<DailyBrief[]>('/briefs?limit=1')
+        .then((items) => { if (active) setLatestBrief(items[0] ?? null); })
+        .catch(() => {});
       if (profile?.id) {
         api<{ follower_count?: number; following_count?: number }>(`/users/${profile.id}`)
           .then((u) => {
@@ -358,6 +368,23 @@ export default function Profile() {
   const joined = profile?.created_at
     ? new Date(profile.created_at).toLocaleDateString(undefined, { month: 'long', year: 'numeric' })
     : null;
+
+  const openDailyBrief = async () => {
+    try {
+      const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone || 'America/New_York';
+      const today = await api<{ ready: boolean; brief: DailyBrief | null }>(
+        `/briefs/today?timezone=${encodeURIComponent(timezone)}`
+      );
+      const selected = today.brief ?? latestBrief;
+      if (!selected) {
+        Alert.alert('Daily Brief', 'Your first morning brief will be ready at 7:00 AM.');
+        return;
+      }
+      router.push(`/brief/${selected.brief_date}` as never);
+    } catch (error: any) {
+      Alert.alert('Could not open Daily Brief', error?.message ?? 'Please try again.');
+    }
+  };
 
   const totalSignals = spectrum
     ? spectrum.sample.posts + spectrum.sample.upvotes + spectrum.sample.downvotes
@@ -429,13 +456,14 @@ export default function Profile() {
     >
       <ScalableImage
         source={
-          profile?.header_url
+          profile?.header_url && !headerFailed
             ? { uri: profile.header_url }
             : require('@/assets/images/solid-color-image.png')
         }
         type="width"
         dimension={profileWidth}
         height={200}
+        onError={() => setHeaderFailed(true)}
       />
       {/* Change the banner right from the profile */}
       <Pressable
@@ -521,6 +549,25 @@ export default function Profile() {
             <ThemedView style={styles.followingFeedCopy}>
               <ThemedText style={styles.followingFeedTitle}>Following feed</ThemedText>
               <ThemedText style={styles.followingFeedSubtitle}>Posts from people you chose</ThemedText>
+            </ThemedView>
+          </ThemedView>
+          <IconSymbol name="chevron.right" size={17} color={c.faint} />
+        </Pressable>
+
+        <Pressable
+          onPress={() => { tapLight(); void openDailyBrief(); }}
+          style={({ pressed }) => [styles.followingFeedButton, { opacity: pressed ? 0.65 : 1 }]}
+          accessibilityRole="button"
+          accessibilityLabel="Open Daily Brief"
+        >
+          <ThemedView style={styles.followingFeedLeft}>
+            <ThemedView style={styles.followingFeedIcon}>
+              <IconSymbol name="newspaper.fill" size={17} color={c.primary} />
+              {latestBrief && !latestBrief.seen_at ? <ThemedView style={styles.briefUnreadDot} /> : null}
+            </ThemedView>
+            <ThemedView style={styles.followingFeedCopy}>
+              <ThemedText style={styles.followingFeedTitle}>Daily Brief</ThemedText>
+              <ThemedText style={styles.followingFeedSubtitle}>Stories, The Floor, and activity around you</ThemedText>
             </ThemedView>
           </ThemedView>
           <IconSymbol name="chevron.right" size={17} color={c.faint} />
@@ -804,7 +851,19 @@ const makeStyles = (c: Palette) => StyleSheet.create({
     justifyContent: 'center',
     backgroundColor: c.accentSoftBg,
   },
+  briefUnreadDot: {
+    position: 'absolute',
+    top: 1,
+    right: 1,
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: c.primary,
+    borderWidth: 1,
+    borderColor: c.card,
+  },
   followingFeedCopy: {
+    flexShrink: 1,
     backgroundColor: 'transparent',
   },
   followingFeedTitle: {

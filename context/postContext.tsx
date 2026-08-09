@@ -180,13 +180,11 @@ export function PostProvider({ children }: { children: React.ReactNode }) {
   // profile tabs) may not be in the paged feed yet.
   const ensurePost = useCallback(async (id: string) => {
     if (postsRef.current.some((p) => p.id === id)) return;
-    try {
-      const row = await api<any>(`/posts/${id}`);
-      const mapped = mapPost(row);
-      setPosts((prev) => (prev.some((p) => p.id === id) ? prev : [...prev, mapped]));
-    } catch (err: any) {
-      console.log('Error fetching post:', err?.message);
-    }
+    // Let request errors reach direct-link routes so they can distinguish a
+    // missing/inaccessible post from a request that is still loading.
+    const row = await api<any>(`/posts/${id}`);
+    const mapped = mapPost(row);
+    setPosts((prev) => (prev.some((p) => p.id === id) ? prev : [...prev, mapped]));
   }, []);
 
   useEffect(() => {

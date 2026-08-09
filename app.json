@@ -10,6 +10,9 @@
     "ios": {
       "supportsTablet": false,
       "bundleIdentifier": "com.michaeltan.forum",
+      "associatedDomains": [
+        "applinks:forumeveryside.com"
+      ],
       "privacyManifests": {
         "NSPrivacyTracking": false,
         "NSPrivacyCollectedDataTypes": [

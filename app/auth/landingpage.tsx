@@ -1,10 +1,11 @@
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
+import ForumLogo from '@/components/forum-logo';
 import { type Palette } from '@/constants/theme';
 import { usePalette } from '@/hooks/use-palette';
 import { useRouter } from 'expo-router';
 import { useMemo } from 'react';
-import { Dimensions, Image, Pressable, StyleSheet } from 'react-native';
+import { Dimensions, Pressable, StyleSheet } from 'react-native';
 import { tapLight } from '@/lib/haptics';
 
 const screenWidth = Dimensions.get('window').width;
@@ -17,7 +18,7 @@ export default function Landing() {
   return(
     <ThemedView style={ styles.container }>
       <ThemedView style={styles.imageContainer}>
-        <Image source={require('@/assets/images/forumlogoInverse.png')} style={{ width: 280, height: 280}} />
+        <ForumLogo variant="inverse" size={280} />
         <ThemedText style={styles.title}>forum</ThemedText>
       </ThemedView>
 

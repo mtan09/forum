@@ -58,3 +58,10 @@ export async function flushFeedEvents() {
     console.log('Feed events will retry:', error?.message);
   }
 }
+
+/** Drop session-bound telemetry when authentication ends or never existed. */
+export function discardFeedEvents() {
+  if (timer) clearTimeout(timer);
+  timer = null;
+  queue = [];
+}

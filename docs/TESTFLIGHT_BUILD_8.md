@@ -412,7 +412,7 @@ valid outcome, not a missing feature.
 ## Known gaps — not fixed, don't file these
 
 - **Post spectrum coverage is ~40% unclassified.** Known, and a larger design
-  question — see `../forum-api/docs/post-scoring-investigation.md`.
+  question — see `../forum-api/docs/post-scoring.md`.
 - **`expo-doctor` fails on six packages at patch drift.** Held deliberately —
   see below. Expect that check to be red; it is not a reason to stop the build.
 

@@ -1,7 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage'
 import React, { createContext, ReactNode, useContext, useEffect, useMemo, useState } from 'react'
 import { AI_CONSENT_VERSION } from '../lib/ai-consent'
-import { api, getToken, setToken } from '../lib/api'
+import { ApiError, api, getToken, setToken } from '../lib/api'
 import { unregisterPush } from '../lib/notifications'
 
 const LEGACY_ONBOARDING_KEY = 'forum.needsOnboarding'
@@ -80,9 +80,19 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         if (!token) return
         const me = await api<AuthUser>('/users/me')
         if (isMounted) setUser(me)
-      } catch {
-        // token expired or invalid — clear it
-        await setToken(null)
+      } catch (err) {
+        // Only destroy the session when the server has actually rejected the
+        // token. An unqualified catch also swallowed network failures, so
+        // launching the app in a tunnel, on captive-portal wifi, or during a
+        // thirty-second API redeploy silently signed the user out with nothing
+        // explaining why — and cold launches are exactly when that happens.
+        //
+        // A network failure throws a plain Error (api.ts NETWORK_ERROR_MESSAGE);
+        // only an HTTP rejection carries ApiError.status. A 5xx means the
+        // server is unwell, not that the credential is bad, so it keeps the
+        // token too and the next launch retries.
+        const status = err instanceof ApiError ? err.status : null
+        if (status === 401 || status === 403) await setToken(null)
         if (isMounted) setUser(null)
       } finally {
         if (isMounted) setLoading(false)

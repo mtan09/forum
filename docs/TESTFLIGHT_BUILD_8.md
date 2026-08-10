@@ -16,6 +16,51 @@ away.
 > says "build 8" it means **the artifact labelled 1.0.0 (9)**. Look for 9 on the
 > phone.
 
+## Results — tested on device 2026-08-09, build 1.0.0 (9)
+
+| section | outcome |
+|---|---|
+| **A2** cold-start routing | **pass** |
+| **A3** all nine notifications + dismissal | **pass** — every one cold-launched onto its target; swipe-away navigated nowhere |
+| **A5** email | **pass** — reply and DM arrive, button path matches the push, link opens the app |
+| **B** haptics | **pass** |
+| **C** iOS regressions from the web shell | **pass** |
+| **D** small iOS fixes | **pass** |
+| **G** Daily Brief | **pass** — 07:00 delivery real, re-running the job sent nothing (dedupe holds) |
+| **H** Universal Links | **pass** — email link opens the app, not Safari |
+| **I** post spectrum | **one real defect, below** |
+| **A1 / A4** 9am Floor reminder | **NOT TESTED** — build 9 was installed after 09:00, so this morning's reminder fired on build 7. Needs tomorrow. |
+
+A2 and A3 passing is the point of this build: the cold-start drain works, which
+was the defect that made every launched-from-terminated tap a no-op.
+
+### Defect found in I — opposition read as support
+
+Two posts scored **0.78 (right)** while arguing the opposite:
+
+> "Restricting birthright citizenship **won't** 'fix' public health—it's an
+> administrative shock that destabilizes families…"
+
+Receipts show `polarity: "for"` on both claims. Two causes compound:
+
+- **Contrastive negation is not detected.** `claims.ts` catches "I oppose
+  cutting Medicaid", but not "X **won't** fix Y" or "X **isn't** A—**it's** B",
+  where the topic phrase is the sentence subject and the disagreement follows.
+- **One span counted twice.** "Restricting birthright citizenship" fires a
+  phrase rule (`immigration-enforcement · more`) *and* a template rule
+  (`birthright citizenship` is also an `immigration-openness` term with
+  "Restricting" as the contracting verb). Both push right, inflating 0.65 to
+  0.78.
+
+A confident placement on the side a post argues against is worse than the
+centrist mislabelling `neutral_false_placement_rate` guards against.
+
+**Deliberately not fixed by adding patterns.** That is the whack-a-mole that
+produced the overfitted scorer `claims-4.0.0` replaced, and there is currently
+no way to tell whether such a fix helps — see the deferred holdout set in
+`../forum-api/CLAUDE.md`. This is the first defect where verification is
+genuinely impossible without it.
+
 ## Baseline
 
 | | |
